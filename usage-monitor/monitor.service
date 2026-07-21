@@ -1,0 +1,15 @@
+[Unit]
+Description=DeepSeek Usage Monitor
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/usage-monitor
+Environment="DEEPSEEK_API_KEY=sk-your-key-here"
+ExecStart=/home/pi/usage-monitor/venv/bin/python /home/pi/usage-monitor/app.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

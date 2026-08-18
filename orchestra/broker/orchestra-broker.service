@@ -1,0 +1,16 @@
+[Unit]
+Description=Orchestra Broker dispatcher
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/liuxfs/broker
+ExecStart=/usr/bin/python3 /home/liuxfs/broker/dispatcher.py
+StandardOutput=append:/mnt/broker/logs/broker.log
+StandardError=append:/mnt/broker/logs/broker.log
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,6 @@
+[Unit]
+Description=Orchestra nightly task injection
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /home/liuxfs/broker/inject_daily.sh

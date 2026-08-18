@@ -10,7 +10,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 # 1) 传代码
 ssh "$SSH_USER@$SSH_HOST" 'mkdir -p /home/liuxfs/broker'
-scp -q "$ROOT"/broker/{db.py,taskfile.py,executor.py,dispatcher.py,__init__.py,inject_daily.sh} "$SSH_USER@$SSH_HOST:/home/liuxfs/broker/"
+scp -q "$ROOT"/broker/{db.py,taskfile.py,executor.py,dispatcher.py,__init__.py,inject_daily.sh,config.example.json} "$SSH_USER@$SSH_HOST:/home/liuxfs/broker/"
 scp -q "$ROOT"/broker/orchestra-broker.service "$ROOT"/broker/orchestra-timer.timer "$ROOT"/broker/orchestra-timer.service "$SSH_USER@$SSH_HOST:/tmp/"
 
 # 2) 远端：目录 + config.json（不存在时从 example 生成，路径按 REMOTE_ROOT 改写）

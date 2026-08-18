@@ -1,0 +1,37 @@
+## 任务结果报告
+
+### 执行情况
+
+**✅ 已完成 — 数据抓取与解析**
+使用 curl 从 arXiv API (`https://export.arxiv.org/api/query?search_query=cat:cs.CL&sortBy=submittedDate&sortOrder=descending&max_results=3`) 抓取并解析了 cs.CL 领域最近提交的 3 篇论文：
+
+1. **Towards Computational Provenance: Carrying Causal-State Evidence in Generated Text**
+2. **Proteus: Incremental Memory Activation for Long-Context Sequence Modeling**
+3. **Model Hypnosis: Strong control of AI via additive subliminal effects**
+
+（摘要内容已完整提取，见下方附注。）
+
+### ⚠️ 阻塞：无法写入指定输出目录
+
+**`/home/liuxfs/broker-data/results/T-20260819-e2e-dsh/attempt-1/output.json` 未能创建。**
+
+原因（已从 dsh 沙箱源码 `writableRoots()` 与 session 日志确认）：
+
+- 当前会话沙箱策略为 **workspace-write**，仅允许写入会话工作区 `/home/liuxfs/broker-data/tasks` 及平台临时目录 `/tmp`（`dsh-sandbox` 的 `writableRoots()` 硬编码了这三处）。
+- 指定的输出目录 `/home/liuxfs/broker-data/results/...` 在工作区之外，所有写入（bash 重定向、curl `-o`、write 工具、文件编辑器）均被沙箱拒绝（`file access denied under workspace-write mode` / EROFS）。
+- 我按规范对 **bash** 和 **write 工具** 分别提交了 `danger-full-access` 升级请求，但两次审批均被裁定为 **"unavailable"**（本 headless 会话无审批应答渠道），升级失败关闭 —— 该拒绝为最终决定，按规则不做绕过（例如符号链接/嵌套会话等手段均属禁止的规避行为）。
+
+### 尽力保全的数据
+
+- **暂存副本（有效 JSON，非指定目录）**：`/home/liuxfs/broker-data/tasks/output.json`（3 项、每项含 `title` 与 `abstract`，已通过 JSON 校验）。
+- 本报告包含的完整内容会由 broker 执行器捕获写入 attempt 目录的 `stdout.log`，便于事后恢复。
+
+### 结论
+
+| 项目 | 状态 |
+|---|---|
+| 目标文件绝对路径 | `/home/liuxfs/broker-data/results/T-20260819-e2e-dsh/attempt-1/output.json`（**未创建**） |
+| 暂存副本路径 | `/home/liuxfs/broker-data/tasks/output.json`（已创建，内容有效） |
+| 阻塞原因 | workspace-write 沙箱禁止写工作区外路径；`danger-full-access` 升级因无审批渠道被拒 |
+
+**如需完成任务，请为该会话提供审批应答渠道（批准一次 `danger-full-access` 升级），或由外部将 `/home/liuxfs/broker-data/tasks/output.json` 复制到 `/home/liuxfs/broker-data/results/T-20260819-e2e-dsh/attempt-1/output.json`。**

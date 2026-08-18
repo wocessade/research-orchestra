@@ -43,8 +43,8 @@ class TestShellExecutor(unittest.TestCase):
         self.assertIn("exit code 3", error)
 
     def test_shell_timeout(self):
-        # python -c sleep 跨平台可用（Windows cmd 无 sleep 命令）
-        spec = make_spec('python -c "import time; time.sleep(30)"', timeout=1)
+        # cmd 原生 sleep 写法：ping -n 31 等待约 30s（测试约定在 Git Bash/Windows 下运行）
+        spec = make_spec("ping -n 31 127.0.0.1 >nul", timeout=1)
         status, error = executor.run_task(spec, self.tasks, self.results)
         self.assertEqual(status, "failed")
         self.assertIn("timeout", error)
@@ -84,7 +84,7 @@ class TestDshExecutor(unittest.TestCase):
         args, kwargs = mock_run.call_args
         outdir = os.path.join(self.results, "results/T-20260819-test", "attempt-1")
         self.assertIn("dsh", args[0][0])
-        self.assertIn(outdir, args[0][2])  # prompt 注入输出目录
+        self.assertIn(outdir, args[0][3])  # cmd = [dsh, --profile, <profile>, prompt] → prompt 在索引 3
         self.assertEqual(kwargs["cwd"], self.tasks)
 
 class TestCheckNet(unittest.TestCase):

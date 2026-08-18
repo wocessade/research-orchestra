@@ -82,7 +82,8 @@ class TestDshExecutor(unittest.TestCase):
         status, _ = executor.run_task(spec, self.tasks, self.results)
         self.assertEqual(status, "done")
         args, kwargs = mock_run.call_args
-        outdir = os.path.join(self.results, "results/T-20260819-test", "attempt-1")
+        # 与 executor 内 pathlib 归一化一致：分段 join，避免嵌入正斜杠不匹配
+        outdir = os.path.join(self.results, "results", "T-20260819-test", "attempt-1")
         self.assertIn("dsh", args[0][0])
         self.assertIn(outdir, args[0][3])  # cmd = [dsh, --profile, <profile>, prompt] → prompt 在索引 3
         self.assertEqual(kwargs["cwd"], self.tasks)

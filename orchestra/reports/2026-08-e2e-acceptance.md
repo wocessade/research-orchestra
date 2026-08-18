@@ -8,11 +8,12 @@
 - 复跑：18 秒完成，attempt-2 产出 output.json（3 项、title+abstract 齐全、JSON 合法）+ arxiv_response.xml ✅
 - 全程内存峰值 545 MiB（2GB 板余量充足）
 
-## 场景 2：Windows 脱机 20 分钟任务照跑 ⏳（进行中）
+## 场景 2：Windows 脱机 20 分钟任务照跑 ✅
 
 - 任务 `T-20260819-e2e-offline`：每 240s 写一个心跳时间戳，共 5 个，总时长 20 分钟
-- 已推送到 Broker 并确认 running（02:06 前）
-- **验证方式**：用户关机 ≥20 分钟后回来，检查 `results/T-20260819-e2e-offline/attempt-1/heartbeat.txt` 是否为 5 行
+- 结果：**done，5/5 心跳全齐**（02:05:30 → 02:21:30，间隔均为 240s）
+- 心跳文件位于 tasks/heartbeat.txt（shell cwd 修复前的旧行为）；cwd 已统一为 attempt 目录（`288f7f8`），后续任务产出均落 attempt-N/
+- 用户离开期间确认 Windows 已关机（用户口头确认）
 
 ## 场景 3：中断恢复 ✅
 
@@ -34,7 +35,8 @@
 
 ## 遗留
 
-- 场景 2 待用户关机验证
+- shell 执行器 cwd 统一修复：已完成（`288f7f8`，24 测试绿，已部署重启）
 - dsh 会话日志（~/.dsh/sessions）未纳入 sync_pull——后续版本把 session 回放纳入复查材料
-- SSD 到位后迁移：REMOTE_ROOT 从 /home/liuxfs/broker-data 切回 /mnt/broker（Task 3）
+- SSD 到位后迁移：REMOTE_ROOT 从 /home/liuxfs/broker-data 切回 /mnt/broker（Task 3，转接盒已就绪待插入）
 - 核桃派 usage-monitor 仪表盘展示 Broker 状态：属 subsystem-4（POST /api/orchestra 已按接口预留实现）
+- 核桃派冷备链（rsync/samba + 每日备份 + 恢复演练）：NAS 计划方案 A，下一步开工

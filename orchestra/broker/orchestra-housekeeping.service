@@ -1,0 +1,7 @@
+[Unit]
+Description=Orchestra weekly housekeeping (dsh sessions cleanup, disk check)
+
+[Service]
+Type=oneshot
+User=liuxfs
+ExecStart=/bin/bash /home/liuxfs/broker/housekeeping.sh

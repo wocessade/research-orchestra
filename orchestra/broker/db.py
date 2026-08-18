@@ -68,6 +68,12 @@ def recover_running(conn: sqlite3.Connection) -> int:
     conn.commit()
     return n
 
+def get_task(conn: sqlite3.Connection, slug: str) -> tuple | None:
+    return conn.execute(
+        "SELECT slug, status, attempts, net_req, error FROM tasks WHERE slug=?",
+        (slug,),
+    ).fetchone()
+
 def list_tasks(conn: sqlite3.Connection, status: str | None = None) -> list[tuple]:
     if status:
         return conn.execute(

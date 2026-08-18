@@ -44,8 +44,15 @@ def report_status(cfg: dict, conn) -> None:
     except Exception as e:  # 上报失败不影响主循环
         log.warning("status report failed: %s", e)
 
+def _archive_task_file(f: Path, tasks_dir: Path) -> None:
+    """终态任务文件移入 tasks/archive/，避免队列目录无限积压。"""
+    archive = tasks_dir / "archive"
+    archive.mkdir(exist_ok=True)
+    f.rename(archive / f.name)
+
 def one_cycle(cfg: dict, conn, run=None, check_net_fn=None) -> dict:
-    """单轮：注册新任务 → 重排队失败任务 → 执行 queued。run/check_net_fn 供测试注入。"""
+    """单轮：注册新任务 → 重排队失败任务 → 执行 queued → 终态任务文件归档。
+    run/check_net_fn 供测试注入。"""
     run = run or executor.run_task
     check_net_fn = check_net_fn or executor.check_net
     tasks_dir = Path(cfg["tasks_dir"])
@@ -82,6 +89,12 @@ def one_cycle(cfg: dict, conn, run=None, check_net_fn=None) -> dict:
         db.finish_task(conn, slug, status, error)
         executed.append(slug)
         log.info("task %s -> %s (%s)", slug, status, error or "-")
+        row = db.get_task(conn, slug)
+        # 终态（done，或 attempts 用尽的 failed）→ 归档任务文件
+        if row and (row[1] == "done" or (row[1] == "failed" and row[2] >= max_attempts)):
+            f = tasks_dir / f"{slug}.md"
+            if f.exists():
+                _archive_task_file(f, tasks_dir)
     return {"executed": executed, "skipped_net": skipped_net}
 
 def main() -> None:

@@ -87,6 +87,18 @@ class TestDispatcher(unittest.TestCase):
         r = dispatcher.one_cycle(self.cfg, self.conn, run=mock.Mock(), check_net_fn=lambda: True)
         self.assertEqual(r["executed"], [])  # 不再空转
 
+    def test_done_task_file_archived(self):
+        write_task(self.cfg["tasks_dir"], "T-20260819-a")
+        dispatcher.one_cycle(self.cfg, self.conn, run=mock.Mock(return_value=("done", None)), check_net_fn=lambda: True)
+        self.assertFalse(os.path.exists(os.path.join(self.cfg["tasks_dir"], "T-20260819-a.md")))
+        self.assertTrue(os.path.exists(os.path.join(self.cfg["tasks_dir"], "archive", "T-20260819-a.md")))
+
+    def test_retryable_failed_file_stays(self):
+        write_task(self.cfg["tasks_dir"], "T-20260819-a")
+        dispatcher.one_cycle(self.cfg, self.conn, run=mock.Mock(return_value=("failed", "boom")), check_net_fn=lambda: True)
+        # attempts=1 < max_attempts=2 → 文件必须留在 tasks/ 供重试
+        self.assertTrue(os.path.exists(os.path.join(self.cfg["tasks_dir"], "T-20260819-a.md")))
+
     def test_recovery_marks_running_failed(self):
         write_task(self.cfg["tasks_dir"], "T-20260819-a")
         db.register_task(self.conn, "T-20260819-a", "optional", "results/T-20260819-a")

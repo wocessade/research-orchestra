@@ -1,15 +1,8 @@
 #!/usr/bin/env bash
-# 示例：每晚注入 arXiv 抓取任务（required 任务断网时 Broker 会自动跳过排队）
+# 每晚注入文献雷达任务（模板填充日期；幂等：当日已存在则跳过）
 set -euo pipefail
 D="$(date +%Y%m%d)"
-TASK="/mnt/broker/tasks/T-${D}-nightly-arxiv.md"
+TASK="/mnt/broker/tasks/T-${D}-nightly-radar.md"
 [ -f "$TASK" ] && exit 0
-cat > "$TASK" << 'EOF'
-# T-nightly-arxiv
-executor: shell
-net: required
-result: T-nightly-arxiv
----
-curl -s "https://export.arxiv.org/api/query?search_query=cat:cs.CL&sortBy=submittedDate&sortOrder=descending&max_results=10" -o arxiv.xml && echo done
-EOF
+sed "s/{{DATE}}/${D}/g" /home/liuxfs/broker/templates/nightly-radar.md > "$TASK"
 echo "injected $TASK"

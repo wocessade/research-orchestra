@@ -1,0 +1,7 @@
+[Unit]
+Description=Orchestra cold backup to walnutpi
+
+[Service]
+Type=oneshot
+User=liuxfs
+ExecStart=/bin/bash /home/liuxfs/broker/backup_to_nas.sh

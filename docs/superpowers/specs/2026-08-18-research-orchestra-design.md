@@ -225,7 +225,7 @@ CC 写 tasks/T-*.md ──git push/SSH──> Broker 队列(SQLite) ──dispat
 
 ## 13. 验收标准（总 spec 级）与后续细化清单
 
-总 spec 验收 = 六子系统各有一个可执行 smoke test 定义（§6 已列），用户审阅本 spec（v2）通过。
+总 spec 验收 = 六子系统各有一个可执行 smoke test 定义（§6 已列），用户审阅本 spec（v4）通过。
 
 后续细化 spec（逐个编写，建议顺序，编号与 §6 一一对应）：
 1. `subsystem-1-pi-broker`（Broker 部署：队列/dispatcher/checkpoint/resume + 4B dsh 安装与冒烟 + SSD 挂载）★最先

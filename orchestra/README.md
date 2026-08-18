@@ -31,3 +31,10 @@
 - 4B：WiFi `liudfs`，静态 IP `192.168.0.250`（NetworkManager 连接名 liudfs；备用：有线 DHCP）
 - 用法：`ORCHESTRA_SSH_HOST=192.168.0.250 [ORCHESTRA_REMOTE_ROOT=/home/liuxfs/broker-data] bash scripts/sync_push.sh`
 - 开学后宿舍网络需重新探测 IP 并更新本说明
+
+## 冷备链（NAS 方案 A）
+
+- 核桃派（192.168.0.200）为冷备接收端：`~/backup/broker/`（rsync over ssh，免密）+ samba 共享 `\192.168.0.200\backup`（user pi）
+- 4B 每日 03:00 `orchestra-backup.timer` 触发 `scripts/backup_to_nas.sh`（增量镜像 + SQLite 快照）
+- 部署拓扑：4B=宿舍（Broker），核桃派=实验室（展示+异地冷备）
+- 验收报告：`reports/2026-08-cold-backup-acceptance.md`

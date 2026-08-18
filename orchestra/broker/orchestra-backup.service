@@ -1,5 +1,6 @@
 [Unit]
 Description=Orchestra cold backup to walnutpi
+OnFailure=orchestra-backup-alert.service
 
 [Service]
 Type=oneshot

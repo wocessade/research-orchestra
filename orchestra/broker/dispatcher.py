@@ -67,6 +67,10 @@ def one_cycle(cfg: dict, conn, run=None, check_net_fn=None) -> dict:
             continue
         specs[spec.slug] = spec
         db.register_task(conn, spec.slug, spec.net, spec.result_dir)
+        # 已终态的历史任务文件（如升级前的 done）同样归档，防积压
+        row = db.get_task(conn, spec.slug)
+        if row and (row[1] == "done" or (row[1] == "failed" and row[2] >= max_attempts)):
+            _archive_task_file(f, tasks_dir)
 
     db.requeue_failed(conn, max_attempts)
 

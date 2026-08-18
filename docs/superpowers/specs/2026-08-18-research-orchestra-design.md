@@ -1,6 +1,6 @@
 # Research Orchestra — 以 Claude Code 为核心的科研-实验-论文框架（总架构设计）
 
-> 日期：2026-08-18 | 修订：2026-08-19（v2：VRAM 修正 12GB、Pi 任务代理三层架构、微信桥接入、网络分区与离线降级；v3：SSD 直挂存储、重型任务断网=排队断点续传（弃本地小模型硬扛）、主机移动网络方案、宿舍 NAS 待建、采购评估 §14）
+> 日期：2026-08-18 | 修订：2026-08-19（v2：VRAM 修正 12GB、Pi 任务代理三层架构、微信桥接入、网络分区与离线降级；v3：SSD 直挂存储、重型任务断网=排队断点续传（弃本地小模型硬扛）、主机移动网络方案、宿舍 NAS 待建、采购评估 §14；v4：4B 确认为 2GB（冒烟即升级决策门）、核桃派迁移完成（分机部署定稿）、§15 与 OpenClaw/Hermes 定位澄清）
 > 术语：CC = Claude Code（本机交互主脑）；dsh = DeepSeek Harness（执行层引擎）；Codex = OpenAI Codex CLI（副脑，后续加入）；Broker = Pi 任务代理服务器
 
 ## 1. 背景与目标
@@ -16,8 +16,8 @@
 | 硬件 | 关键规格（已实测/已核实） | 角色 | 依据与约束 |
 |---|---|---|---|
 | Windows 本机 | i7-11800H 8C/16T、64GB RAM（2×32GB @3200）、**RTX 3060 Laptop 12GB VRAM**（nvidia-smi 实测 12288 MiB；Win32 AdapterRAM 字段 4GB 截断，不可信）、4 盘共 2.4TB、Win10 19045、Hyper-V 可用 | **指挥中枢 + 重计算 + 本地推理** | CC 驻地；docx/pptx、Playwright、OCR、git、微信桥均在本机；Node v24.15.0 满足 dsh；**12GB VRAM 可跑 7B-8B 量化本地模型**（断网 LLM 降级） |
-| 树莓派 4B | BCM2711 quad A72，Raspberry Pi OS，当前跑 usage-monitor（`/home/liuxfs/usage-monitor`），SPI0，Waveshare 3.97″ 墨水屏 + LED 已跑通；**存储：用户已有 2280 SSD 经 USB3 转接盒直挂**，系统与 broker 数据落 SSD，SD 仅作安装/引导备份 | **Pi Broker：常驻任务代理服务器 + dsh 执行节点** | 7×24 常驻、Node arm64 可用；内存型号未确认（2/4/8GB）→ dsh 冒烟测试为第一步；**核桃派未完全验收前保留 4B 现有环境** |
-| 核桃派 1B | 全志 H616/H618，**1GB 内存**，Debian 12，仅 SPI1（`/dev/spidev1.0`），user `pi/pi` | **展示/物理 I/O 层**（usage-monitor 迁移目标机）+ Broker 冷备候选 | 1GB 跑 dsh 风险高，不推荐；Flask 轻量展示可承载；存储沿用 SD（轻负载） |
+| 树莓派 4B | BCM2711 quad A72，**2GB 内存（已确认）**，Raspberry Pi OS，SPI0 可用；usage-monitor **已迁至核桃派**，4B 现专职 Broker；**存储：用户已有 2280 SSD 经 USB3 转接盒直挂**，系统与 broker 数据落 SSD，SD 仅作安装/引导备份 | **Pi Broker：常驻任务代理服务器 + dsh 执行节点** | 7×24 常驻、Node arm64 可用；**2GB 是 dsh 冒烟测试的核心风险——冒烟即升级决策门**（过则留下，吃紧则按 §14 上 Pi 5） |
+| 核桃派 1B | 全志 H616/H618，**1GB 内存**，Debian 12，仅 SPI1（`/dev/spidev1.0`），user `pi/pi` | **展示/物理 I/O 层**（usage-monitor **已迁移至此并运行**，墨水屏+LED 在役）+ Broker 冷备候选 | 1GB 跑 dsh 风险高，不推荐；Flask 轻量展示可承载；存储沿用 SD（轻负载） |
 | 宿舍/实验室 NAS | Liudfs-NAS **不可用**（用户实验室/宿舍场景）；宿舍 NAS 需另建 | results/logs 异地冷备 | 待定：候选方案见 §12；Broker 主存储已由 SSD 解决，NAS 是冗余层不是必需层 |
 
 **分派原则：计算重在本机，调度与常驻在 4B（SSD 直挂），物理展示在核桃派，冷备在宿舍 NAS（待建，非必需）。**
@@ -136,7 +136,7 @@ result: results/T-20260819-xxx/
 - **state 新增 `orchestra` 块**：`{broker_health, queue_len, active_tasks, last_task, last_sync}`
 - **新增 `POST /api/orchestra`**：Broker/编排器上报状态，鉴权复用 `X-Monitor-Token`；现有三端点语义不变
 - **墨水屏**：新增"任务面板"视图（队列长度+活跃任务+Broker 健康）；`config.py` 增加 `SHOW_ORCHESTRA` 开关（默认 True），与已停用的 `SHOW_CC_CONTEXT` 并存
-- **部署**：usage-monitor 与 Broker 同机（4B）或分机（核桃派）均支持——分机时仪表盘定时拉 Broker 状态 API（LAN HTTP）
+- **部署**：usage-monitor 已在核桃派运行（迁移完成），Broker 在 4B——**默认分机部署**：仪表盘定时拉 Broker 状态 API（LAN HTTP）；同机部署仅作降级讨论
 - **上报者**：Broker dispatcher / orchestra 运行器脚本，**不是 CC hooks**——不碰 `~/.claude/settings.json`
 - **验收**：派 demo 任务，墨水屏任务面板出现状态变化，dashboard API 返回 orchestra 块
 
@@ -214,15 +214,14 @@ CC 写 tasks/T-*.md ──git push/SSH──> Broker 队列(SQLite) ──dispat
 
 | 风险 | 缓解 |
 |---|---|
-| 4B 内存型号未确认，dsh 内存占用未实测 | 冒烟测试为子系统 1 第一步；Minimal 起步；若 4B 内存 <4GB 且不够用，候选升级 Pi 5 8GB（见 §14 采购建议） |
+| **4B 仅 2GB，dsh 内存占用未实测** | 冒烟测试即升级决策门：Minimal 模式跑通且稳定 → 留下；吃紧 → §14 上 Pi 5 8GB（触发条件已明确） |
 | Pi 存储可靠性（SD 写磨损） | **已解决**：2280 SSD USB3 转接直挂 4B，系统与 broker 数据落 SSD，SD 仅安装/引导 |
 | Broker 单点（4B 挂则常驻层停） | 核桃派冷备；队列目录 git 同步，手动切换（自动化主备切换明确不做，过度设计） |
 | 宿舍 NAS 待建（异地冷备缺失期） | git 同步 + SSD 直挂已覆盖主要风险；NAS 是冗余层非必需层，方案见 §14 |
 | 校园网宿舍-实验室是否互通未知 | 入学后实测；不通则 Tailscale/ZeroTier（§7 已定优先级） |
-| 核桃派 1GB 明确不跑 dsh | 角色定为展示层；usage-monitor 迁移是否完成需用户确认 |
 | dsh 开发者预览（rc.7）接口可变 | 锁版本；升级看 changelog；执行层可替换（降级链） |
 | Windows 无 docker | headless 流程不需要；Hyper-V 可用，未来需要再评估 |
-| 开放问题 | 4B 内存容量、dsh 在 4B 实测内存、Codex CLI 登录方式、bridge.mjs 推送接口、核桃派迁移状态、校园网拓扑——各子系统细化 spec 的 smoke test 解决 |
+| 开放问题 | dsh 在 2GB 4B 的实测内存、Codex CLI 登录方式、bridge.mjs 推送接口、校园网拓扑——各子系统细化 spec 的 smoke test 解决 |
 
 ## 13. 验收标准（总 spec 级）与后续细化清单
 
@@ -250,3 +249,19 @@ CC 写 tasks/T-*.md ──git push/SSH──> Broker 队列(SQLite) ──dispat
 | GPU/云算力 | 不买 | — | 3060 12GB 学生阶段够；入学后导师组服务器优先 |
 
 **原则：先用现成硬件把流程跑通、跑出真实瓶颈，再按触发条件采购——避免"设备先行、流程滞后"。**
+
+## 15. 与 OpenClaw / Hermes 的关系（定位澄清）
+
+本系统与 OpenClaw、[Hermes Agent](https://hermes-agent.nousresearch.com/)（Nous Research 自托管个人助理）**属于同一大类**：常驻 7×24 的个人 AI 基础设施（IM 通道 + 定时任务 + 记忆持久化 + MCP 工具 + 模型无关）。形态收敛是必然——这是 2026 年个人 agent 的成熟模式，方向正确。
+
+**但实现哲学不同，不构成重复造轮子：**
+
+| 维度 | Hermes / OpenClaw | 本系统 |
+|---|---|---|
+| 脑 | 自带 agent loop（独立运行时，下载即用） | **CC 是脑**，本系统只做编排胶水层（broker+文件总线+git 同步），不写 agent loop |
+| 定位 | 通用个人助理（记忆、聊天、生活化任务） | **科研生产线**：RQ→实验→ingest→论文，学术诚信硬约束（数值只来自 artifacts、每 gate 人在环、负结果账本） |
+| 通道 | 主流 IM 全家桶（Telegram/WhatsApp/Discord…） | 现成微信桥（国内场景更实用）+ 邮件 + 墨水屏 |
+| 物理 I/O | 无 | 墨水屏/LED/GPIO 展示层 |
+| 形态 | 一体产品 | **组合架构**：每层可替换（dsh 坏→Bash；Codex 无缝加入；engine 账本独立） |
+
+**决策**：不切换到 Hermes/OpenClaw（agent 能力弱于 CC、无科研管线、无微信通道）；借鉴其设计模式（通道网关、hook 机制、记忆设计）；OpenClaw 作为未来通道网关候选仅在微信桥失效时再评估（YAGNI）。

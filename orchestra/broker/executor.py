@@ -46,6 +46,7 @@ def run_task(spec: TaskSpec, tasks_dir: str, results_root: str,
     cwd = str(outdir)
 
     started = time.time()
+    started_iso = _now()  # 真实开始时刻（state.json 用；哨兵审计：勿用完成时刻）
     stdout, stderr, status, error = "", "", "done", None
     try:
         proc = subprocess.run(
@@ -65,7 +66,7 @@ def run_task(spec: TaskSpec, tasks_dir: str, results_root: str,
     (outdir / "stderr.log").write_text(stderr, encoding="utf-8", errors="replace")
     state = {
         "slug": spec.slug, "executor": spec.executor, "attempt": attempt,
-        "status": status, "error": error, "started_at": _now(),
+        "status": status, "error": error, "started_at": started_iso,
         "elapsed_s": round(time.time() - started, 1),
     }
     (outdir / "state.json").write_text(

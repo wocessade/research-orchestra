@@ -5,7 +5,7 @@
 | 目录 | 用途 |
 |------|------|
 | config/rules.yaml | 执行器分派规则与降级顺序（CC 分派前读） |
-| config/model-routing.md | 模型调度策略表（用户维护，系统只读） |
+| config/model-routing.md | 模型调度策略表（**预留**：用户另行维护，见总 spec §8） |
 | tasks/ | 任务文件总线：CC 写入，Broker 轮询 |
 | results/ | 执行器产出（attempt-N/ 目录：stdout/stderr/state.json） |
 | logs/ | broker.log 与执行日志 |

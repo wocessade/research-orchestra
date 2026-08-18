@@ -31,8 +31,10 @@ class TestShellExecutor(unittest.TestCase):
         self.assertEqual(status, "done")
         self.assertIsNone(error)
         outdir = os.path.join(self.results, "T-20260819-test", "attempt-1")
-        self.assertIn("broker-ok", open(os.path.join(outdir, "stdout.log"), encoding="utf-8").read())
-        state = json.load(open(os.path.join(outdir, "state.json"), encoding="utf-8"))
+        with open(os.path.join(outdir, "stdout.log"), encoding="utf-8") as f:
+            self.assertIn("broker-ok", f.read())
+        with open(os.path.join(outdir, "state.json"), encoding="utf-8") as f:
+            state = json.load(f)
         self.assertEqual(state["status"], "done")
         self.assertEqual(state["executor"], "shell")
 

@@ -75,6 +75,18 @@ class TestDispatcher(unittest.TestCase):
         dispatcher.one_cycle(self.cfg, self.conn, run=mock.Mock(), check_net_fn=lambda: True)
         self.assertEqual(len(db.list_tasks(self.conn)), 1)  # done 不重跑
 
+    def test_task_file_deleted_goes_final_failed(self):
+        # 哨兵审计发现：文件被删时若不递增 attempts 会永久 requeue 空转
+        write_task(self.cfg["tasks_dir"], "T-20260819-a")
+        dispatcher.one_cycle(self.cfg, self.conn, run=mock.Mock(return_value=("failed", "x")), check_net_fn=lambda: True)
+        os.remove(os.path.join(self.cfg["tasks_dir"], "T-20260819-a.md"))
+        dispatcher.one_cycle(self.cfg, self.conn, run=mock.Mock(), check_net_fn=lambda: True)  # attempts=1
+        dispatcher.one_cycle(self.cfg, self.conn, run=mock.Mock(), check_net_fn=lambda: True)  # attempts=2
+        row = db.list_tasks(self.conn, "failed")[0]
+        self.assertEqual(row[2], 2)  # attempts=2 终态
+        r = dispatcher.one_cycle(self.cfg, self.conn, run=mock.Mock(), check_net_fn=lambda: True)
+        self.assertEqual(r["executed"], [])  # 不再空转
+
     def test_recovery_marks_running_failed(self):
         write_task(self.cfg["tasks_dir"], "T-20260819-a")
         db.register_task(self.conn, "T-20260819-a", "optional", "results/T-20260819-a")

@@ -67,7 +67,10 @@ def one_cycle(cfg: dict, conn, run=None, check_net_fn=None) -> dict:
     for slug, _st, _a, net_req, _e in db.list_tasks(conn, "queued"):
         spec = specs.get(slug)
         if spec is None:
-            db.finish_task(conn, slug, "failed", "task file missing")
+            # 任务文件被删：claim 递增 attempts 后置 failed，避免 attempts=0 被
+            # requeue_failed 永久循环（哨兵审计发现）
+            if db.claim_task(conn, slug):
+                db.finish_task(conn, slug, "failed", "task file missing")
             continue
         if net_req == "required" and not check_net_fn():
             skipped_net.append(slug)

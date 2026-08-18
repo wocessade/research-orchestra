@@ -401,7 +401,7 @@ if __name__ == "__main__":
 - [ ] **Step 2: 运行确认失败**
 
 ```bash
-cd /d/pythonProject/orchestra/broker && python -m unittest discover -s tests -p "test_db.py" -v 2>&1 | tail -3
+cd /d/pythonProject/orchestra/broker && python -m unittest discover -s tests -t . -p "test_db.py" -v 2>&1 | tail -3
 ```
 Expected: FAIL（`ModuleNotFoundError: No module named 'db'`）
 
@@ -492,7 +492,7 @@ def list_tasks(conn: sqlite3.Connection, status: str | None = None) -> list[tupl
 - [ ] **Step 4: 运行确认通过**
 
 ```bash
-cd /d/pythonProject/orchestra/broker && python -m unittest discover -s tests -p "test_db.py" -v 2>&1 | tail -3
+cd /d/pythonProject/orchestra/broker && python -m unittest discover -s tests -t . -p "test_db.py" -v 2>&1 | tail -3
 ```
 Expected: `OK`（5 tests passed）
 
@@ -583,7 +583,7 @@ if __name__ == "__main__":
 - [ ] **Step 2: 运行确认失败**
 
 ```bash
-cd /d/pythonProject/orchestra/broker && python -m unittest discover -s tests -p "test_taskfile.py" -v 2>&1 | tail -3
+cd /d/pythonProject/orchestra/broker && python -m unittest discover -s tests -t . -p "test_taskfile.py" -v 2>&1 | tail -3
 ```
 Expected: FAIL（ModuleNotFoundError）
 
@@ -646,7 +646,7 @@ def parse_taskfile(path: str | Path) -> TaskSpec:
 - [ ] **Step 4: 运行确认通过**
 
 ```bash
-cd /d/pythonProject/orchestra/broker && python -m unittest discover -s tests -p "test_taskfile.py" -v 2>&1 | tail -3
+cd /d/pythonProject/orchestra/broker && python -m unittest discover -s tests -t . -p "test_taskfile.py" -v 2>&1 | tail -3
 ```
 Expected: `OK`（5 tests passed）
 
@@ -775,7 +775,7 @@ if __name__ == "__main__":
 - [ ] **Step 2: 运行确认失败**
 
 ```bash
-cd /d/pythonProject/orchestra/broker && python -m unittest discover -s tests -p "test_executor.py" -v 2>&1 | tail -3
+cd /d/pythonProject/orchestra/broker && python -m unittest discover -s tests -t . -p "test_executor.py" -v 2>&1 | tail -3
 ```
 Expected: FAIL（ModuleNotFoundError）
 
@@ -856,7 +856,7 @@ def run_task(spec: TaskSpec, tasks_dir: str, results_root: str,
 - [ ] **Step 4: 运行确认通过**
 
 ```bash
-cd /d/pythonProject/orchestra/broker && python -m unittest discover -s tests -p "test_executor.py" -v 2>&1 | tail -3
+cd /d/pythonProject/orchestra/broker && python -m unittest discover -s tests -t . -p "test_executor.py" -v 2>&1 | tail -3
 ```
 Expected: `OK`（8 tests passed）
 
@@ -974,7 +974,7 @@ if __name__ == "__main__":
 - [ ] **Step 2: 运行确认失败**
 
 ```bash
-cd /d/pythonProject/orchestra/broker && python -m unittest discover -s tests -p "test_dispatcher.py" -v 2>&1 | tail -3
+cd /d/pythonProject/orchestra/broker && python -m unittest discover -s tests -t . -p "test_dispatcher.py" -v 2>&1 | tail -3
 ```
 Expected: FAIL（ModuleNotFoundError）
 
@@ -1104,14 +1104,14 @@ if __name__ == "__main__":
 - [ ] **Step 5: 运行确认通过**
 
 ```bash
-cd /d/pythonProject/orchestra/broker && python -m unittest discover -s tests -p "test_dispatcher.py" -v 2>&1 | tail -3
+cd /d/pythonProject/orchestra/broker && python -m unittest discover -s tests -t . -p "test_dispatcher.py" -v 2>&1 | tail -3
 ```
 Expected: `OK`（5 tests passed）
 
 - [ ] **Step 6: 全量回归**
 
 ```bash
-cd /d/pythonProject/orchestra/broker && python -m unittest discover -s tests -v 2>&1 | tail -3
+cd /d/pythonProject/orchestra/broker && python -m unittest discover -s tests -t . -v 2>&1 | tail -3
 ```
 Expected: `OK`（18 tests passed：db 5 + taskfile 5 + executor 8 + dispatcher 5 中重合计入总数）
 

@@ -25,3 +25,9 @@
     <执行体：dsh 任务的 prompt 全文，或 shell 任务的命令>
 
 快速流程：写 tasks/T-*.md → sync_push.sh → 等 Broker 执行 → sync_pull.sh → CC 复查写 reports/ → 归档 done/。
+
+## 部署连接（当前家庭网络）
+
+- 4B：WiFi `liudfs`，静态 IP `192.168.0.250`（NetworkManager 连接名 liudfs；备用：有线 DHCP）
+- 用法：`ORCHESTRA_SSH_HOST=192.168.0.250 [ORCHESTRA_REMOTE_ROOT=/home/liuxfs/broker-data] bash scripts/sync_push.sh`
+- 开学后宿舍网络需重新探测 IP 并更新本说明

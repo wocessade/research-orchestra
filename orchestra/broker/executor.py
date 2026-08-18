@@ -33,18 +33,22 @@ def run_task(spec: TaskSpec, tasks_dir: str, results_root: str,
     outdir.mkdir(parents=True, exist_ok=True)
 
     if spec.executor == "dsh":
-        prompt = f"输出目录: {outdir}\n所有产出文件必须写入该目录。\n\n{spec.body}"
+        prompt = f"工作目录: {outdir}\n所有产出文件必须写入该目录。\n\n{spec.body}"
         cmd = ["dsh", "--profile", dsh_profile, prompt]
     elif os.name == "nt":
         cmd = ["cmd", "/c", spec.body]
     else:
         cmd = ["/bin/sh", "-c", spec.body]
 
+    # dsh 沙箱为 workspace-write：仅 cwd 与 /tmp 可写。cwd 必须设为 attempt 输出目录，
+    # 否则 dsh 无法写入产出（E2E 实测：写入被沙箱拒绝，headless 无审批渠道无法升级）。
+    cwd = str(outdir) if spec.executor == "dsh" else str(tasks_dir)
+
     started = time.time()
     stdout, stderr, status, error = "", "", "done", None
     try:
         proc = subprocess.run(
-            cmd, cwd=str(tasks_dir), capture_output=True, text=True,
+            cmd, cwd=cwd, capture_output=True, text=True,
             timeout=spec.timeout, encoding="utf-8", errors="replace",
         )
         stdout, stderr = proc.stdout or "", proc.stderr or ""

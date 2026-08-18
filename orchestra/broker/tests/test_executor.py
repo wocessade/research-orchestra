@@ -86,7 +86,7 @@ class TestDshExecutor(unittest.TestCase):
         outdir = os.path.join(self.results, "T-20260819-test", "attempt-1")
         self.assertIn("dsh", args[0][0])
         self.assertIn(outdir, args[0][3])  # cmd = [dsh, --profile, <profile>, prompt] → prompt 在索引 3
-        self.assertEqual(kwargs["cwd"], self.tasks)
+        self.assertEqual(kwargs["cwd"], outdir)  # dsh 沙箱 workspace-write：cwd 即输出目录
 
 class TestCheckNet(unittest.TestCase):
     @mock.patch("socket.create_connection")

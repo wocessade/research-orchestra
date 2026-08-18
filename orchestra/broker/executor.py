@@ -40,9 +40,10 @@ def run_task(spec: TaskSpec, tasks_dir: str, results_root: str,
     else:
         cmd = ["/bin/sh", "-c", spec.body]
 
-    # dsh 沙箱为 workspace-write：仅 cwd 与 /tmp 可写。cwd 必须设为 attempt 输出目录，
-    # 否则 dsh 无法写入产出（E2E 实测：写入被沙箱拒绝，headless 无审批渠道无法升级）。
-    cwd = str(outdir) if spec.executor == "dsh" else str(tasks_dir)
+    # 统一 cwd = attempt 输出目录（任务工作区）：
+    # - dsh 沙箱为 workspace-write，仅 cwd 与 /tmp 可写（E2E 实测：写工作区外被拒）
+    # - shell 任务同样以 attempt 目录为工作区，产出落 attempt-N/，不污染 tasks/ 队列目录
+    cwd = str(outdir)
 
     started = time.time()
     stdout, stderr, status, error = "", "", "done", None

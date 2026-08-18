@@ -64,6 +64,15 @@ class TestShellExecutor(unittest.TestCase):
         self.assertTrue(os.path.isdir(os.path.join(base, "attempt-1")))
         self.assertTrue(os.path.isdir(os.path.join(base, "attempt-2")))
 
+    @mock.patch("subprocess.run")
+    def test_shell_cwd_is_attempt_dir(self, mock_run):
+        mock_run.return_value = mock.Mock(returncode=0, stdout="ok", stderr="")
+        spec = make_spec("echo ok")
+        status, _ = executor.run_task(spec, self.tasks, self.results)
+        self.assertEqual(status, "done")
+        outdir = os.path.join(self.results, "T-20260819-test", "attempt-1")
+        self.assertEqual(mock_run.call_args.kwargs["cwd"], outdir)  # 任务工作区=attempt 目录
+
 class TestDshExecutor(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

@@ -1,0 +1,13 @@
+# 执行器分派规则（v1）
+default_executor: dsh          # 未显式指定时默认
+executors:
+  dsh:                         # 4B 上的 dsh headless（主执行器）
+    net: required              # 需要外网（LLM API）
+    host: pi4                  # 目标主机标识
+  shell:                       # 本地 shell 命令（Pi 侧执行）
+    net: optional              # 断网照跑
+  codex: disabled              # subsystem-3 启用
+  haiku: cc-side               # CC 子代理，不经 Broker（subsystem-5 细化）
+max_attempts: 2                # 失败重试上限（Broker 同值，见 config.example.json）
+degradation_order: [pi-dsh, win-dsh, direct]
+  # win-dsh = Windows 本地 dsh（手动降级，Task 2 安装）；direct = CC 直接 Bash

@@ -19,7 +19,7 @@
     # T-YYYYMMDD-<slug>
     executor: dsh | shell
     net: required | optional
-    result: results/T-YYYYMMDD-<slug>
+    result: T-YYYYMMDD-<slug>
     timeout: <秒，默认 3600>
     ---
     <执行体：dsh 任务的 prompt 全文，或 shell 任务的命令>

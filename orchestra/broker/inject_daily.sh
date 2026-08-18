@@ -8,7 +8,7 @@ cat > "$TASK" << 'EOF'
 # T-nightly-arxiv
 executor: shell
 net: required
-result: results/T-nightly-arxiv
+result: T-nightly-arxiv
 ---
 curl -s "https://export.arxiv.org/api/query?search_query=cat:cs.CL&sortBy=submittedDate&sortOrder=descending&max_results=10" -o arxiv.xml && echo done
 EOF

@@ -11,7 +11,7 @@ import dispatcher
 TASK_MD = """# T-20260819-a
 executor: shell
 net: optional
-result: results/T-20260819-a
+result: T-20260819-a
 ---
 echo ok
 """
@@ -20,7 +20,7 @@ def write_task(tasks_dir, name, executor="shell", net="optional"):
     md = (TASK_MD.replace("# T-20260819-a", f"# {name}")
                  .replace("executor: shell", f"executor: {executor}")
                  .replace("net: optional", f"net: {net}")
-                 .replace("results/T-20260819-a", f"results/{name}"))
+                 .replace("T-20260819-a", f"{name}"))
     with open(os.path.join(tasks_dir, f"{name}.md"), "w", encoding="utf-8") as f:
         f.write(md)
 

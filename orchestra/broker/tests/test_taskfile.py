@@ -8,7 +8,7 @@ import taskfile
 SAMPLE = """# T-20260819-demo
 executor: shell
 net: optional
-result: results/T-20260819-demo
+result: T-20260819-demo
 timeout: 60
 ---
 echo hello
@@ -29,7 +29,7 @@ class TestParseTaskfile(unittest.TestCase):
         self.assertEqual(spec.slug, "T-20260819-demo")
         self.assertEqual(spec.executor, "shell")
         self.assertEqual(spec.net, "optional")
-        self.assertEqual(spec.result_dir, "results/T-20260819-demo")
+        self.assertEqual(spec.result_dir, "T-20260819-demo")
         self.assertEqual(spec.timeout, 60)
         self.assertEqual(spec.body, "echo hello")
 

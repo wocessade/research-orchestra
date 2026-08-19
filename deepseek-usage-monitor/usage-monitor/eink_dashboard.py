@@ -19,6 +19,7 @@
 
 import json
 import os
+import sys
 import time
 import tempfile
 import hashlib
@@ -29,6 +30,7 @@ from config import (
     EINK_FORCE_FULL_REFRESH,
     BALANCE_WARN_THRESHOLD, BALANCE_CRITICAL_THRESHOLD,
     SHOW_CC_CONTEXT,
+    SHOW_ORCHESTRA, ORCHESTRA_ROTATE_SEC, ORCHESTRA_STALE_SEC,
 )
 
 # ─── 版面常量 (与 _draw() 布局严格对应) ───────────
@@ -76,6 +78,9 @@ _CJK_FONT_PATHS = [
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
     "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
     "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+    # Windows 回退 (快照 CLI 预览用); Linux 路径优先, 不受影响
+    r"C:\Windows\Fonts\msyh.ttc",
+    r"C:\Windows\Fonts\simhei.ttf",
 ]
 
 
@@ -168,6 +173,23 @@ class EinkDashboard:
         status = state.get("cc_status", "idle")
         return "active" if status in ("running", "waiting") else "idle"
 
+    @classmethod
+    def _resolve_display_panel(cls, state: dict, now=None) -> str:
+        """展示面板 = 基面板; 仅当基面板 idle 且 SHOW_ORCHESTRA 且 broker
+        已有上报时, 按 ORCHESTRA_ROTATE_SEC 时间桶奇偶轮换到 orchestra。
+
+        now 注入用于测试; 同桶内确定性, 跨桶翻转触发全刷。
+        """
+        panel = cls._resolve_panel(state)
+        if panel != "idle" or not SHOW_ORCHESTRA:
+            return panel
+        last_report = state.get("orchestra_last_report") or {}
+        if not last_report.get("broker"):
+            return panel
+        if now is None:
+            now = time.time()
+        return "orchestra" if int(now // ORCHESTRA_ROTATE_SEC) % 2 else "idle"
+
     @staticmethod
     def _compute_data_hash(state: dict) -> str:
         """数据关键字段 hash — 变化时需全刷清残影。
@@ -188,14 +210,17 @@ class EinkDashboard:
         ).hexdigest()
 
     @classmethod
-    def _compute_display_hash(cls, state: dict) -> str:
+    def _compute_display_hash(cls, state: dict, now=None) -> str:
         """全部展示字段 hash (含时间) — 决定是否需要局刷。
 
         不含 last_updated (每 60s 余额时间戳会无意义推刷);
         services 保留以便底栏健康状态可局刷更新。
+        orchestra 纳入: 内容变化走局刷, 面板轮换由 panel 键 (桶号) 触发全刷。
         """
+        if now is None:
+            now = time.time()
         display_fields = {
-            "panel": cls._resolve_panel(state),
+            "panel": cls._resolve_display_panel(state, now),
             "balance": state.get("balance", {}),
             "usage": state.get("usage", {}),
             "alerts": state.get("alerts", []),
@@ -203,6 +228,8 @@ class EinkDashboard:
             "weather": state.get("weather", {}),
             "cc_status": state.get("cc_status", "idle"),
             "cc_model": state.get("cc_model", ""),
+            "orchestra": state.get("orchestra", {}),
+            "orchestra_last_report": state.get("orchestra_last_report", {}),
             "_time_minute": time.strftime("%H:%M"),
             "_date": time.strftime("%Y-%m-%d"),
         }
@@ -229,16 +256,16 @@ class EinkDashboard:
         Returns: 'full' | 'partial' | 'none'
         硬件异常向上抛出, 由 app 层 worker 捕获并 re-init。
         """
-        panel = self._resolve_panel(state)
+        now = time.time()
+        panel = self._resolve_display_panel(state, now)
         data_hash = self._compute_data_hash(state)
-        display_hash = self._compute_display_hash(state)
+        display_hash = self._compute_display_hash(state, now)
 
         if display_hash == self._last_display_hash:
             return "none"
 
         image = self._draw(state, panel)
         # 先算好帧; 推屏失败时不推进 hash, 以便下次重试
-        now = time.time()
 
         if not self.epd:
             preview_path = os.path.join(tempfile.gettempdir(), "eink_preview.png")
@@ -330,11 +357,13 @@ class EinkDashboard:
 
     def _draw(self, state: dict, panel=None) -> Image.Image:
         """绘制完整仪表盘 800×480 灰度位图"""
-        panel = panel or self._resolve_panel(state)
+        panel = panel or self._resolve_display_panel(state)
         img = Image.new("1", (self.width, self.height), 1)
         draw = ImageDraw.Draw(img)
         if panel == "idle":
             self._draw_idle(draw, state)
+        elif panel == "orchestra":
+            self._draw_orchestra(draw, state)
         else:
             self._draw_active(draw, state)
         return img
@@ -430,6 +459,77 @@ class EinkDashboard:
                 self._fmt_tokens(usage.get("total_tokens", 0)),
                 f"请求 {usage.get('total_requests', 0):,} 次",
             )
+
+        self._draw_footer(draw, 15, FOOTER_Y, self.width - 30, state)
+
+    def _draw_orchestra(self, draw: ImageDraw.Draw, state: dict) -> None:
+        """Orchestra 任务面板: Broker 健康 + 任务队列 + 活跃任务 + 最近任务
+
+        四卡复用 active 面板布局 (SHOW_CC_CONTEXT=False 分支); 中下区留空,
+        仅 标题栏 + 四卡 + 底栏。
+        """
+        self._draw_title_bar(draw, state, show_date=True)
+
+        orch = state.get("orchestra") or {}
+        rep = state.get("orchestra_last_report") or {}
+        now = time.time()
+
+        # 卡1: Broker 健康 — 新鲜度推导 (无上报 "--"; 超阈值 "离线")
+        broker_ts = rep.get("broker") or 0
+        if not broker_ts:
+            health_value, health_sub = "--", ""
+        else:
+            age = now - broker_ts
+            if age <= ORCHESTRA_STALE_SEC:
+                health = orch.get("broker_health") or "unknown"
+                if health == "ok":
+                    health_value = "OK"
+                elif health == "unknown":
+                    health_value = "--"
+                else:
+                    health_value = health
+            else:
+                health_value = "离线"
+            health_sub = self._fmt_ago(age)
+        self._draw_card(
+            draw, CARD_LEFT_X, CARD_ROW1_Y, CARD_W, CARD_H,
+            "Broker 健康", health_value, health_sub,
+        )
+
+        # 卡2: 任务队列
+        queue_len = orch.get("queue_len")
+        active = orch.get("active_tasks")
+        self._draw_card(
+            draw, CARD_RIGHT_X, CARD_ROW1_Y, CARD_W, CARD_H,
+            "任务队列",
+            "--" if queue_len is None else str(queue_len),
+            "活跃 --" if active is None else f"活跃 {active}",
+        )
+
+        # 卡3: 活跃任务
+        self._draw_card(
+            draw, CARD_LEFT_X, CARD_ROW2_Y, CARD_W, CARD_H,
+            "活跃任务",
+            "--" if active is None else str(active),
+            "",
+        )
+
+        # 卡4: 最近任务 (slug 过长截断防溢出卡片)
+        raw = orch.get("last_task")
+        if raw is None or not str(raw).strip():
+            task_value = "--"
+        else:
+            task_value = self._truncate_to_fit(
+                str(raw).strip(), self.font_large, CARD_W - 20
+            )
+        sync_ts = rep.get("sync") or orch.get("last_sync") or 0
+        sync_sub = (
+            "同步 --" if not sync_ts else f"同步 {self._fmt_ago(now - sync_ts)}"
+        )
+        self._draw_card(
+            draw, CARD_RIGHT_X, CARD_ROW2_Y, CARD_W, CARD_H,
+            "最近任务", task_value, sync_sub,
+        )
 
         self._draw_footer(draw, 15, FOOTER_Y, self.width - 30, state)
 
@@ -635,6 +735,22 @@ class EinkDashboard:
     # ─── 格式化辅助 ────────────────────────────
 
     @staticmethod
+    def _fmt_ago(age: float) -> str:
+        """秒差 → "Xs前" / "Xmin前" (同底栏更新时间的口径)"""
+        age = max(0, int(age))
+        return f"{age}s前" if age < 120 else f"{age // 60}min前"
+
+    @staticmethod
+    def _truncate_to_fit(text: str, font, max_w: int) -> str:
+        """按像素宽截断加省略号, 防长 slug 溢出卡片"""
+        if font.getlength(text) <= max_w:
+            return text
+        out = text
+        while out and font.getlength(out + "…") > max_w:
+            out = out[:-1]
+        return out + "…"
+
+    @staticmethod
     def _fmt_tokens(n: int) -> str:
         if n >= 1_000_000:
             return f"{n / 1_000_000:.0f}M"
@@ -665,3 +781,85 @@ class EinkDashboard:
         if total < BALANCE_WARN_THRESHOLD:
             return "[!] 余额偏低"
         return "预警已开启"
+
+
+# ─── 快照 CLI (无硬件, 纯绘制) ────────────────
+
+
+def _demo_state() -> dict:
+    """快照 CLI 缺省演示 state (balance/usage/weather 同 app 初始值样式)"""
+    now = time.time()
+    return {
+        "balance": {"total": "16.58", "currency": "CNY", "is_available": True},
+        "usage": {
+            "period_spending": "3.42",
+            "total_spending": "127.80",
+            "total_requests": 1547,
+            "total_tokens": 2450000,
+            "models": [
+                {"name": "deepseek-chat", "tokens": 1500000, "requests": 1200},
+                {"name": "deepseek-reasoner", "tokens": 950000, "requests": 347},
+            ],
+        },
+        "weather": {
+            "city": "南京", "temp_c": 28, "desc": "多云",
+            "feels_c": 30, "humidity": 65, "wind_kmph": 12,
+        },
+        "cc_status": "idle",
+        "last_updated": {
+            "balance": now - 300, "usage": now - 300,
+            "status": 0, "weather": now - 1200,
+        },
+        "network_latency_ms": 23,
+        "services": {"deepseek_api": "up", "deepseek_platform": "up"},
+        "orchestra": {
+            "broker_health": "ok",
+            "queue_len": 2,
+            "active_tasks": 1,
+            "last_task": "T-20260819-demo",
+            "last_sync": now - 180,
+        },
+        "orchestra_last_report": {"broker": now - 5, "sync": now - 180},
+    }
+
+
+def _main() -> int:
+    import argparse
+
+    ap = argparse.ArgumentParser(description="墨水屏渲染快照 (无硬件, 纯 PIL 绘制)")
+    ap.add_argument(
+        "--snapshot", metavar="OUT.png", help="输出快照 PNG 路径 (必选)"
+    )
+    ap.add_argument(
+        "--panel", choices=("idle", "active", "orchestra"), default=None,
+        help="指定面板; 缺省按 state 解析",
+    )
+    ap.add_argument(
+        "--state", metavar="STATE.json",
+        help="状态 JSON 文件; 缺省用内置演示 state",
+    )
+    args = ap.parse_args()
+
+    if not args.snapshot:
+        ap.print_help()
+        return 1
+
+    if args.state:
+        with open(args.state, "r", encoding="utf-8") as f:
+            state = json.load(f)
+    else:
+        state = _demo_state()
+
+    dash = EinkDashboard()  # 不 init_hardware → epd=None, 纯绘制
+    panel = args.panel or dash._resolve_display_panel(state)
+    img = dash._draw(state, panel)
+    img.save(args.snapshot)
+    print(
+        f"[eink] snapshot saved: {args.snapshot} "
+        f"(panel={panel}, {img.size[0]}x{img.size[1]})"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(_main())

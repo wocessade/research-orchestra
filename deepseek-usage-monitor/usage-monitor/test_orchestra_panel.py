@@ -190,6 +190,20 @@ class ResolveDisplayPanelTest(unittest.TestCase):
             h_off = EinkDashboard._compute_display_hash(state)
         self.assertNotEqual(h_on, h_off)
 
+    def test_last_report_ignored_by_both_hashes(self):
+        """D14 回归: last_report 每 30s 上报必变, 不得触发任何刷屏"""
+        s1 = orch_state()
+        s2 = orch_state()
+        s2["orchestra_last_report"] = {"broker": 9999.0, "sync": 8888.0}
+        self.assertEqual(
+            EinkDashboard._compute_data_hash(s1),
+            EinkDashboard._compute_data_hash(s2),
+        )
+        self.assertEqual(
+            EinkDashboard._compute_display_hash(s1),
+            EinkDashboard._compute_display_hash(s2),
+        )
+
 
 class FmtAgeTest(unittest.TestCase):
     """_fmt_age: epoch / ISO → Xs前 / Xmin前 / Xh前"""

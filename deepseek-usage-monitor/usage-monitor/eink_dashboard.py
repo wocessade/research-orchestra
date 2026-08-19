@@ -232,8 +232,10 @@ class EinkDashboard:
                 k: v for k, v in (state.get("orchestra") or {}).items()
                 if k != "host"
             },
-            "orchestra_last_report": state.get("orchestra_last_report", {}),
         }
+        # D14: 不含 orchestra_last_report — 时间戳每 30s 上报必变, 会导致
+        # 内容未变也全刷 (实机屏幕持续闪烁)。新鲜度只参与绘制, 由分钟级
+        # 局刷 (_time_minute) 自然更新。
         # 上下文展示开启时, 上一会话变更也触发全刷
         if SHOW_CC_CONTEXT:
             data_fields["last_session"] = state.get("last_session", {})
@@ -261,7 +263,8 @@ class EinkDashboard:
             "cc_status": state.get("cc_status", "idle"),
             "cc_model": state.get("cc_model", ""),
             "orchestra": state.get("orchestra", {}),
-            "orchestra_last_report": state.get("orchestra_last_report", {}),
+            # D14: 不含 orchestra_last_report — 每 30s 上报必变, 引发无意义
+            # 局刷; 新鲜度文本由分钟级 _time_minute 局刷更新
             "self_status": state.get("self_status", {}),
             "_time_minute": time.strftime("%H:%M"),
             "_date": time.strftime("%Y-%m-%d"),

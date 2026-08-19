@@ -68,6 +68,12 @@ else:
 
 FOOTER_H = 52
 
+# orchestra 面板专用 (subsystem-4): 卡片加高填满中区
+# 行1 y=62, 行2 y=246 (行间距 14px), 卡底 416, footer 430 留 14px
+ORCH_CARD_H = 170
+ORCH_ROW1_Y = 62
+ORCH_ROW2_Y = 246
+
 # True: 启用局刷波形 (全幅写入, 避免多 zone 窗口错位)
 PARTIAL_REFRESH_ENABLED = True
 
@@ -465,8 +471,8 @@ class EinkDashboard:
     def _draw_orchestra(self, draw: ImageDraw.Draw, state: dict) -> None:
         """Orchestra 任务面板: Broker 健康 + 任务队列 + 活跃任务 + 最近任务
 
-        四卡复用 active 面板布局 (SHOW_CC_CONTEXT=False 分支); 中下区留空,
-        仅 标题栏 + 四卡 + 底栏。
+        四卡使用 orchestra 专用高卡布局 (ORCH_CARD_H=170, 行1 y=62, 行2 y=246,
+        行间距 14px), 数值下移至 value_y=56 填满卡片中部, 消除 90px 垂直空白。
         """
         self._draw_title_bar(draw, state, show_date=True)
 
@@ -492,43 +498,49 @@ class EinkDashboard:
                 health_value = "离线"
             health_sub = self._fmt_ago(age)
         self._draw_card(
-            draw, CARD_LEFT_X, CARD_ROW1_Y, CARD_W, CARD_H,
-            "Broker 健康", health_value, health_sub,
+            draw, CARD_LEFT_X, ORCH_ROW1_Y, CARD_W, ORCH_CARD_H,
+            "Broker 健康", health_value, health_sub, value_y=56,
         )
 
-        # 卡2: 任务队列
+        # 卡2: 任务队列 — 副标题为排队数 (队列总长 - 活跃数)
         queue_len = orch.get("queue_len")
         active = orch.get("active_tasks")
+        if queue_len is not None and active is not None:
+            queue_sub = f"排队 {max(queue_len - active, 0)}"
+        else:
+            queue_sub = ""
         self._draw_card(
-            draw, CARD_RIGHT_X, CARD_ROW1_Y, CARD_W, CARD_H,
+            draw, CARD_RIGHT_X, ORCH_ROW1_Y, CARD_W, ORCH_CARD_H,
             "任务队列",
             "--" if queue_len is None else str(queue_len),
-            "活跃 --" if active is None else f"活跃 {active}",
+            queue_sub,
+            value_y=56,
         )
 
         # 卡3: 活跃任务
         self._draw_card(
-            draw, CARD_LEFT_X, CARD_ROW2_Y, CARD_W, CARD_H,
+            draw, CARD_LEFT_X, ORCH_ROW2_Y, CARD_W, ORCH_CARD_H,
             "活跃任务",
             "--" if active is None else str(active),
             "",
+            value_y=56,
         )
 
-        # 卡4: 最近任务 (slug 过长截断防溢出卡片)
+        # 卡4: 最近任务 — slug 用 font_medium + 像素级截断防溢出卡片
         raw = orch.get("last_task")
         if raw is None or not str(raw).strip():
             task_value = "--"
         else:
             task_value = self._truncate_to_fit(
-                str(raw).strip(), self.font_large, CARD_W - 20
+                str(raw).strip(), self.font_medium, CARD_W - 20
             )
         sync_ts = rep.get("sync") or orch.get("last_sync") or 0
         sync_sub = (
             "同步 --" if not sync_ts else f"同步 {self._fmt_ago(now - sync_ts)}"
         )
         self._draw_card(
-            draw, CARD_RIGHT_X, CARD_ROW2_Y, CARD_W, CARD_H,
-            "最近任务", task_value, sync_sub,
+            draw, CARD_RIGHT_X, ORCH_ROW2_Y, CARD_W, ORCH_CARD_H,
+            "最近任务", task_value, sync_sub, value_y=56,
         )
 
         self._draw_footer(draw, 15, FOOTER_Y, self.width - 30, state)
@@ -607,11 +619,15 @@ class EinkDashboard:
         self, draw: ImageDraw.Draw,
         x: int, y: int, w: int, h: int,
         title: str, value: str, subtitle: str,
+        value_y: int = 32,
     ) -> None:
-        """通用卡片: 细线边框 + 标题 + 大号数值; 副标题贴底留缝"""
+        """通用卡片: 细线边框 + 标题 + 大号数值; 副标题贴底留缝
+
+        value_y 供高卡面板下移数值 (缺省 32 = 原布局, 其他面板零影响)。
+        """
         draw.rectangle([(x, y), (x + w, y + h)], outline=0)
         draw.text((x + 10, y + 8), title, fill=0, font=self.font_small)
-        draw.text((x + 10, y + 32), value, fill=0, font=self.font_large)
+        draw.text((x + 10, y + value_y), value, fill=0, font=self.font_large)
         if subtitle:
             # 贴底绘制, 与大号温度/金额拉开间距 (避免叠在 46px 字脚下)
             draw.text((x + 10, y + h - 28), subtitle, fill=0, font=self.font_small)

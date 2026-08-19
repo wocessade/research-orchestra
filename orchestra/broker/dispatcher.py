@@ -63,7 +63,11 @@ def one_cycle(cfg: dict, conn, run=None, check_net_fn=None) -> dict:
         try:
             spec = taskfile.parse_taskfile(f)
         except ValueError as e:
-            log.error("跳过非法任务文件: %s", e)
+            # 解析失败按 .bad 归档（哨兵审计 INFO-4：否则每 30s 刷一条错误日志）
+            archive = tasks_dir / "archive"
+            archive.mkdir(exist_ok=True)
+            log.error("非法任务文件 %s 已按 .bad 归档: %s", f.name, e)
+            f.rename(archive / (f.name + ".bad"))
             continue
         specs[spec.slug] = spec
         db.register_task(conn, spec.slug, spec.net, spec.result_dir)
@@ -88,8 +92,13 @@ def one_cycle(cfg: dict, conn, run=None, check_net_fn=None) -> dict:
             continue
         if not db.claim_task(conn, slug):
             continue
-        status, error = run(spec, str(tasks_dir), cfg["results_dir"],
-                            dsh_profile=cfg.get("dsh_profile", "headless"))
+        try:
+            status, error = run(spec, str(tasks_dir), cfg["results_dir"],
+                                dsh_profile=cfg.get("dsh_profile", "headless"))
+        except Exception as e:
+            # 执行器异常也必须落库，否则任务永久卡 running 直到重启（哨兵审计 CONCERN-4）
+            log.exception("task %s executor crashed", slug)
+            status, error = "failed", f"executor exception: {e}"
         db.finish_task(conn, slug, status, error)
         executed.append(slug)
         log.info("task %s -> %s (%s)", slug, status, error or "-")
@@ -106,13 +115,15 @@ def main() -> None:
     signal.signal(signal.SIGTERM, lambda *a: (_ for _ in ()).throw(SystemExit(0)))
     cfg = load_config()
     conn = db.init_db(cfg["db_path"])
-    n = db.recover_running(conn)
-    if n:
-        log.info("recovered %d running task(s) -> failed", n)
     poll = float(cfg.get("poll_interval", 30))
     log.info("broker started (poll=%ss, db=%s)", poll, cfg["db_path"])
     while True:
         try:
+            # 每轮先回收上轮异常遗留的 running → failed（审计 CONCERN-4：
+            # one_cycle 同步执行，正常时轮初必无 running；有则必是崩溃残留）
+            n = db.recover_running(conn)
+            if n:
+                log.info("recovered %d running task(s) -> failed", n)
             one_cycle(cfg, conn)
             report_status(cfg, conn)
         except Exception:

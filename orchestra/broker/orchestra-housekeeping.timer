@@ -4,6 +4,7 @@ Description=Orchestra weekly housekeeping
 [Timer]
 OnCalendar=Sun *-*-* 04:00:00
 Persistent=true
+Timezone=Asia/Shanghai
 
 [Install]
 WantedBy=timers.target

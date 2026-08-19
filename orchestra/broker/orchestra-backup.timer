@@ -4,6 +4,7 @@ Description=Orchestra daily cold backup to walnutpi
 [Timer]
 OnCalendar=*-*-* 03:00:00
 Persistent=true
+Timezone=Asia/Shanghai
 
 [Install]
 WantedBy=timers.target

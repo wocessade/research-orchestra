@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import signal
 import socket
 import subprocess
 import time
@@ -48,19 +49,32 @@ def run_task(spec: TaskSpec, tasks_dir: str, results_root: str,
     started = time.time()
     started_iso = _now()  # 真实开始时刻（state.json 用；哨兵审计：勿用完成时刻）
     stdout, stderr, status, error = "", "", "done", None
+    # start_new_session：子进程自成进程组，超时 killpg 连同 dsh 孙进程一起终止
+    # （哨兵审计 CONCERN-5：只杀直接子进程会留孤儿继续跑完 → 重复计费+重复邮件）
+    kwargs = {"start_new_session": True} if os.name == "posix" else {}
+    proc = None
     try:
-        proc = subprocess.run(
-            cmd, cwd=cwd, capture_output=True, text=True,
-            timeout=spec.timeout, encoding="utf-8", errors="replace",
+        proc = subprocess.Popen(
+            cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True, encoding="utf-8", errors="replace", **kwargs,
         )
-        stdout, stderr = proc.stdout or "", proc.stderr or ""
+        stdout, stderr = proc.communicate(timeout=spec.timeout)
+        stdout, stderr = stdout or "", stderr or ""
         if proc.returncode != 0:
             status, error = "failed", f"exit code {proc.returncode}"
-    except subprocess.TimeoutExpired as e:
-        stdout, stderr = e.stdout or "", e.stderr or ""
+    except subprocess.TimeoutExpired:
+        if proc is not None:
+            if os.name == "posix":
+                os.killpg(proc.pid, signal.SIGKILL)
+            else:
+                proc.kill()
+            stdout, stderr = proc.communicate()
+            stdout, stderr = stdout or "", stderr or ""
         status, error = "failed", f"timeout after {spec.timeout}s"
     except FileNotFoundError as e:
         status, error = "failed", f"executable not found: {e.filename}"
+    except OSError as e:
+        status, error = "failed", f"spawn error: {e}"
 
     (outdir / "stdout.log").write_text(stdout, encoding="utf-8", errors="replace")
     (outdir / "stderr.log").write_text(stderr, encoding="utf-8", errors="replace")

@@ -108,5 +108,26 @@ class TestDispatcher(unittest.TestCase):
         dispatcher.one_cycle(self.cfg, self.conn, run=mock.Mock(return_value=("done", None)), check_net_fn=lambda: True)
         self.assertEqual(db.list_tasks(self.conn, "done")[0][0], "T-20260819-a")  # 重试成功
 
+    def test_executor_exception_goes_failed(self):
+        # 哨兵审计 CONCERN-4：执行器抛异常必须落库 failed，不能永久卡 running
+        write_task(self.cfg["tasks_dir"], "T-20260819-a")
+        boom = mock.Mock(side_effect=RuntimeError("disk full"))
+        dispatcher.one_cycle(self.cfg, self.conn, run=boom, check_net_fn=lambda: True)
+        row = db.list_tasks(self.conn, "failed")[0]
+        self.assertEqual(row[0], "T-20260819-a")
+        self.assertIn("executor exception", row[4])
+        # attempts=1 < max_attempts → 下一轮重试；重试又崩则 attempts=2 终态
+        dispatcher.one_cycle(self.cfg, self.conn, run=boom, check_net_fn=lambda: True)
+        self.assertEqual(db.list_tasks(self.conn, "failed")[0][2], 2)
+
+    def test_bad_taskfile_archived_as_bad(self):
+        # 哨兵审计 INFO-4：解析失败的任务文件按 .bad 归档，防每 30s 刷错误日志
+        with open(os.path.join(self.cfg["tasks_dir"], "T-20260819-x.md"), "w", encoding="utf-8") as f:
+            f.write("# T-20260819-x\nexecutor: shell\nnet: optional\nresult: T-20260819-x\ntimeout: notanumber\n---\necho x\n")
+        dispatcher.one_cycle(self.cfg, self.conn, run=mock.Mock(), check_net_fn=lambda: True)
+        self.assertFalse(os.path.exists(os.path.join(self.cfg["tasks_dir"], "T-20260819-x.md")))
+        self.assertTrue(os.path.exists(os.path.join(self.cfg["tasks_dir"], "archive", "T-20260819-x.md.bad")))
+        self.assertEqual(len(db.list_tasks(self.conn)), 0)  # 未注册
+
 if __name__ == "__main__":
     unittest.main()

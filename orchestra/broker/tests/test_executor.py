@@ -66,14 +66,16 @@ class TestShellExecutor(unittest.TestCase):
         self.assertTrue(os.path.isdir(os.path.join(base, "attempt-1")))
         self.assertTrue(os.path.isdir(os.path.join(base, "attempt-2")))
 
-    @mock.patch("subprocess.run")
-    def test_shell_cwd_is_attempt_dir(self, mock_run):
-        mock_run.return_value = mock.Mock(returncode=0, stdout="ok", stderr="")
+    @mock.patch("subprocess.Popen")
+    def test_shell_cwd_is_attempt_dir(self, mock_popen):
+        proc = mock_popen.return_value
+        proc.communicate.return_value = ("ok", "")
+        proc.returncode = 0
         spec = make_spec("echo ok")
         status, _ = executor.run_task(spec, self.tasks, self.results)
         self.assertEqual(status, "done")
         outdir = os.path.join(self.results, "T-20260819-test", "attempt-1")
-        self.assertEqual(mock_run.call_args.kwargs["cwd"], outdir)  # 任务工作区=attempt 目录
+        self.assertEqual(mock_popen.call_args.kwargs["cwd"], outdir)  # 任务工作区=attempt 目录
 
 class TestDshExecutor(unittest.TestCase):
     def setUp(self):
@@ -86,13 +88,15 @@ class TestDshExecutor(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    @mock.patch("subprocess.run")
-    def test_dsh_prompt_contains_output_dir(self, mock_run):
-        mock_run.return_value = mock.Mock(returncode=0, stdout="done", stderr="")
+    @mock.patch("subprocess.Popen")
+    def test_dsh_prompt_contains_output_dir(self, mock_popen):
+        proc = mock_popen.return_value
+        proc.communicate.return_value = ("done", "")
+        proc.returncode = 0
         spec = make_spec("分析数据", executor="dsh")
         status, _ = executor.run_task(spec, self.tasks, self.results)
         self.assertEqual(status, "done")
-        args, kwargs = mock_run.call_args
+        args, kwargs = mock_popen.call_args
         # 与 executor 内 pathlib 归一化一致：分段 join，避免嵌入正斜杠不匹配
         outdir = os.path.join(self.results, "T-20260819-test", "attempt-1")
         self.assertIn("dsh", args[0][0])

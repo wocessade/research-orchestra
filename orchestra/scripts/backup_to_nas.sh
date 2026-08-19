@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # 4B → 核桃派冷备：rsync over ssh 增量镜像（systemd timer 每日 03:00 触发）
-# 用法（在 4B 上）: bash backup_to_nas.sh [源目录]（默认 /home/liuxfs/broker-data）
+# 用法（在 4B 上）: bash backup_to_nas.sh [源目录]（默认 /mnt/broker；SD 过渡期传 ~/broker-data）
 # 恢复约定：NAS db/ 下只有 broker.db.snapshot 是恢复用一致副本（live db/wal/shm 不同步）
 set -euo pipefail
 
 NAS_USER="${ORCHESTRA_NAS_USER:-pi}"
 NAS_HOST="${ORCHESTRA_NAS_HOST:-192.168.0.200}"
-SRC="${1:-/home/liuxfs/broker-data}"
+SRC="${1:-/mnt/broker}"
 DST_ROOT="/home/pi/backup/broker"
 LOG="${SRC}/logs/backup.log"
 TS="$(date -Iseconds)"

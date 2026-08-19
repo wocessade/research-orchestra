@@ -1,0 +1,28 @@
+{
+  "mode": "mutual-review",
+  "status": "ok",
+  "findings": [
+    {
+      "severity": "med",
+      "file": "",
+      "line": 25,
+      "issue": "spec.result_dir is joined directly into results_root, so an absolute path or '..' component can make attempt output escape the intended results tree.",
+      "suggestion": "Resolve the candidate path and reject it unless it remains under the resolved results_root."
+    },
+    {
+      "severity": "med",
+      "file": "",
+      "line": 31,
+      "issue": "Attempt directory allocation is non-atomic, so concurrent executions for the same result_dir can both select the same attempt number and overwrite or interleave logs.",
+      "suggestion": "Create each attempt directory with an atomic mkdir that fails on existing paths and retry on FileExistsError."
+    },
+    {
+      "severity": "med",
+      "file": "",
+      "line": 66,
+      "issue": "On Windows a timeout only kills the direct process, leaving child processes launched by cmd or dsh able to keep running after the task is marked failed.",
+      "suggestion": "Create a Windows process group or job object and terminate the full process tree on timeout."
+    }
+  ],
+  "raw": "[{\"severity\":\"med\",\"file\":\"\",\"line\":25,\"issue\":\"spec.result_dir is joined directly into results_root, so an absolute path or '..' component can make attempt output escape the intended results tree.\",\"suggestion\":\"Resolve the candidate path and reject it unless it remains under the resolved results_root.\"},{\"severity\":\"med\",\"file\":\"\",\"line\":31,\"issue\":\"Attempt directory allocation is non-atomic, so concurrent executions for the same result_dir can both select the same attempt number and overwrite or interleave logs.\",\"suggestion\":\"Create each attempt directory with an atomic mkdir that fails on existing paths and retry on FileExistsError.\"},{\"severity\":\"med\",\"file\":\"\",\"line\":66,\"issue\":\"On Windows a timeout only kills the direct process, leaving child processes launched by cmd or dsh able to keep running after the task is marked failed.\",\"suggestion\":\"Create a Windows process group or job object and terminate the full process tree on timeout.\"}]"
+}

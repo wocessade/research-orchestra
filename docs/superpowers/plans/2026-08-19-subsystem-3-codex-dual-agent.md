@@ -83,10 +83,10 @@ codex_exec.py run <prompt-file|-> [--model X] [--timeout N] [--out DIR] [--json-
   - `parse_events(lines: list[str]) -> dict`（纯函数：item.completed 文本/session_id、错误事件分类）
   - CLI 层 `main()`（argparse 按约定 A；prompt 走 --prompt-file 或 stdin）
 
-- [ ] **Step 1: 写失败测试**（fixture 以真实冒烟流 `D:\Temp\codex-smoke-events.jsonl` 校准：正常 item.completed 流、认证失败事件、rate_limit 事件、超时、codex 未装、空流、WS 传输噪音事件、trusted-directory 拒绝）
-- [ ] **Step 2-4: 红→绿→回归**（scripts/tests/ 下 unittest，从 orchestra/scripts/ 目录运行）
-- [ ] **Step 5: 一次真实调用验证**（smoke 级小任务，cwd=D:\pythonProject 走 git 仓库信任正路径，存档 `D:\Temp\subsystem-3\codex_exec-real.json`）
-- [ ] **Step 6: Commit** `feat: codex_exec.py - codex exec JSONL wrapper with error classification`
+- [x] **Step 1: 写失败测试**（fixture 以真实冒烟流 `D:\Temp\codex-smoke-events.jsonl` 校准：正常 item.completed 流、认证失败事件、rate_limit 事件、超时、codex 未装、空流、WS 传输噪音事件、trusted-directory 拒绝）
+- [x] **Step 2-4: 红→绿→回归**（scripts/tests/ 下 unittest，从 orchestra/scripts/ 目录运行；discover 全量 Ran 76 OK = 36 新 + 39 既有 run_card 零回归）
+- [x] **Step 5: 一次真实调用验证**（首轮 120s 超时暴露 Windows 管道句柄 bug→修复；复核 `--timeout 420` 通过：status=ok / text=codex-exec-real-ok / elapsed_s=127.9 / events=9 / exit 0，存档 `D:\Temp\subsystem-3\codex_exec-real.json`，超时证据备份 codex_exec-real-timeout.json）
+- [x] **Step 6: Commit** `feat: codex_exec.py - codex exec JSONL wrapper with error classification`（eb7cf6e，仅两新文件，无署名行）
 
 ### Task 3: codex_modes.py（TDD）
 
@@ -103,8 +103,8 @@ codex_exec.py run <prompt-file|-> [--model X] [--timeout N] [--out DIR] [--json-
   - `claim_check(claims, run=None) -> dict`（逐条双判定；CC 判定由用户提供 or 本地规则？——**v1：CC verdict 由调用方传入**（CC 是编排者），codex verdict 走 run_codex）
   - CLI 层 main()（三个子命令 + 输出文件路径打印）
 
-- [ ] **Step 1-4: TDD**（全部用 mock run，不做真实调用）
-- [ ] **Step 5: Commit** `feat: codex_modes.py - mutual review, dual implement, claim check`
+- [x] **Step 1-4: TDD**（全部用 mock run，不做真实调用；discover 全量 Ran 124 OK = 76 既有零回归 + 48 新）
+- [x] **Step 5: Commit** `feat: codex_modes.py - mutual review, dual implement, claim check`（980f266，仅两新文件，无署名行）
 
 ### Task 4: 验收（历史代码独立审）
 
@@ -116,9 +116,9 @@ codex_exec.py run <prompt-file|-> [--model X] [--timeout N] [--out DIR] [--json-
 - Consumes: Task 2/3；`orchestra/broker/executor.py`
 - Produces: 验收报告（分歧清单逐条判定 + 命中率 + reviewed: ok）
 
-- [ ] **Step 1: 互审真实调用**：`codex_modes.py mutual-review orchestra/broker/executor.py` → review.json 存档
-- [ ] **Step 2: CC 逐条判定**：每条分歧标 真问题/误报/风格建议（对照已知缺陷档案：cwd 注入、attempt 递增、断网门、超时语义）；发现的新问题如实记录
-- [ ] **Step 3: 写验收报告**：判定表 + 命中率（数字引用 artifact）；顺带记录方式②③能力存在性验证结果（resume/fork 仅验证不脚本化）
+- [x] **Step 1: 互审真实调用**：`codex_modes.py mutual-review orchestra/broker/executor.py` → review.json 存档（第 3 次调用成功：context「不动工具」+ --timeout 1800；前两次 600s 超时/误杀，证据备份）
+- [x] **Step 2: CC 逐条判定**：每条分歧标 真问题/误报/风格建议（对照已知缺陷档案：cwd 注入、attempt 递增、断网门、超时语义）；发现的新问题如实记录（3/3 真问题，全为新问题）
+- [x] **Step 3: 写验收报告**：判定表 + 命中率（数字引用 artifact）；顺带记录方式②③能力存在性验证结果（resume/fork 仅验证不脚本化）
 - [ ] **Step 4: Commit** `docs: subsystem-3 codex dual-agent acceptance report`
 
 ### Task 5: 文档收尾

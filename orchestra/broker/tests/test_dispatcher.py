@@ -367,5 +367,54 @@ class TestDispatcher(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(self.cfg["tasks_dir"], "archive", "T-20260819-x.md.bad")))
         self.assertEqual(len(db.list_tasks(self.conn)), 0)  # 未注册
 
+    def test_terminal_replay_archives_with_log(self):
+        # M-12：终态任务卡重放（db 已终态 + 同名任务文件再次出现）→ 归档必须有日志
+        # （原因：终态重放），不能静默吞掉
+        write_task(self.cfg["tasks_dir"], "T-20260819-a")
+        db.register_task(self.conn, "T-20260819-a", "optional", "results/T-20260819-a")
+        db.finish_task(self.conn, "T-20260819-a", "done")
+        run = mock.Mock()
+        with self.assertLogs("dispatcher", level="INFO") as cm:
+            r = dispatcher.one_cycle(self.cfg, self.conn, run=run, check_net_fn=lambda: True)
+        run.assert_not_called()
+        self.assertEqual(r["executed"], [])
+        self.assertFalse(os.path.exists(os.path.join(self.cfg["tasks_dir"], "T-20260819-a.md")))
+        self.assertTrue(os.path.exists(os.path.join(self.cfg["tasks_dir"], "archive", "T-20260819-a.md")))
+        self.assertTrue(any("终态重放" in line for line in cm.output))
+
+    def test_archive_name_collision_is_idempotent(self):
+        # M-12：Windows 上 archive 已有同名文件时 rename 抛 FileExistsError，
+        # 不能抛穿 one_cycle —— 幂等处理（旧归档被新副本覆盖）
+        write_task(self.cfg["tasks_dir"], "T-20260819-a")
+        archive = os.path.join(self.cfg["tasks_dir"], "archive")
+        os.makedirs(archive, exist_ok=True)
+        stale = os.path.join(archive, "T-20260819-a.md")
+        with open(stale, "w", encoding="utf-8") as f:
+            f.write("stale copy\n")
+        r = dispatcher.one_cycle(
+            self.cfg, self.conn,
+            run=mock.Mock(return_value=("done", None)), check_net_fn=lambda: True,
+        )
+        self.assertEqual(r["executed"], ["T-20260819-a"])
+        with open(stale, encoding="utf-8") as f:
+            archived = f.read()
+        self.assertIn("# T-20260819-a", archived)  # 旧副本被新归档覆盖
+        self.assertNotIn("stale copy", archived)
+
+    def test_bad_archive_name_collision_is_idempotent(self):
+        # M-12：.bad 归档撞名同样幂等（Windows FileExistsError 不抛穿 one_cycle）
+        archive = os.path.join(self.cfg["tasks_dir"], "archive")
+        os.makedirs(archive, exist_ok=True)
+        bad = os.path.join(archive, "T-20260819-x.md.bad")
+        with open(bad, "w", encoding="utf-8") as f:
+            f.write("old bad copy\n")
+        with open(os.path.join(self.cfg["tasks_dir"], "T-20260819-x.md"), "w", encoding="utf-8") as f:
+            f.write("# T-20260819-x\nexecutor: shell\nnet: optional\nresult: T-20260819-x\ntimeout: notanumber\n---\necho x\n")
+        dispatcher.one_cycle(self.cfg, self.conn, run=mock.Mock(), check_net_fn=lambda: True)
+        with open(bad, encoding="utf-8") as f:
+            content = f.read()
+        self.assertIn("# T-20260819-x", content)
+        self.assertNotIn("old bad copy", content)
+
 if __name__ == "__main__":
     unittest.main()

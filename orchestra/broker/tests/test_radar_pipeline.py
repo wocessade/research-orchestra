@@ -281,6 +281,64 @@ class RadarPipelineTest(unittest.TestCase):
         result = json.loads((output / "notification.json").read_text(encoding="utf-8"))
         self.assertEqual(result["status"], "unknown")
 
+    def test_notify_takes_over_stale_lock_without_state(self):
+        render_root = self.root / "render-root-stale-lock"
+        attempt = render_root / "attempt-1"
+        radar_render.render(self.rank_root, attempt, "20260820")
+        (attempt / "state.json").write_text(json.dumps({"status": "done"}), encoding="utf-8")
+        sender = self.root / "stale-lock-sender.py"
+        sender.write_text(
+            "from pathlib import Path\n"
+            "p=Path(__file__).with_name('stale-lock-send-count.txt')\n"
+            "p.write_text((p.read_text() if p.exists() else '')+'sent\\n')\n",
+            encoding="utf-8",
+        )
+        state_root = self.root / "notifications-stale-lock"
+        state_root.mkdir()
+        lock_path = state_root / "radar-20260820.lock"
+        lock_path.write_text("stale", encoding="utf-8")
+        output = self.root / "notify-stale-lock"
+
+        rc = radar_notify.notify(render_root, state_root, output, "20260820", sender)
+
+        self.assertEqual(rc, 0)
+        self.assertFalse(lock_path.exists())
+        self.assertEqual(
+            (self.root / "stale-lock-send-count.txt").read_text(encoding="utf-8").count("sent"),
+            1,
+        )
+        result = json.loads((output / "notification.json").read_text(encoding="utf-8"))
+        self.assertEqual(result["status"], "sent")
+
+    def test_notify_keeps_unknown_on_stale_lock_with_sending_state(self):
+        render_root = self.root / "render-root-stale-lock-sending"
+        attempt = render_root / "attempt-1"
+        radar_render.render(self.rank_root, attempt, "20260820")
+        (attempt / "state.json").write_text(json.dumps({"status": "done"}), encoding="utf-8")
+        sender = self.root / "stale-lock-sending-sender.py"
+        sender.write_text(
+            "from pathlib import Path\n"
+            "Path(__file__).with_name('must-not-run.txt').write_text('ran')\n"
+            "raise SystemExit(0)\n",
+            encoding="utf-8",
+        )
+        state_root = self.root / "notifications-stale-lock-sending"
+        state_root.mkdir()
+        (state_root / "radar-20260820.json").write_text(
+            json.dumps({"status": "sending"}), encoding="utf-8"
+        )
+        lock_path = state_root / "radar-20260820.lock"
+        lock_path.write_text("stale", encoding="utf-8")
+        output = self.root / "notify-stale-lock-sending"
+
+        rc = radar_notify.notify(render_root, state_root, output, "20260820", sender)
+
+        self.assertEqual(rc, 2)
+        self.assertTrue(lock_path.exists())
+        self.assertFalse((self.root / "must-not-run.txt").exists())
+        result = json.loads((output / "notification.json").read_text(encoding="utf-8"))
+        self.assertEqual(result["status"], "unknown")
+
 
 if __name__ == "__main__":
     unittest.main()

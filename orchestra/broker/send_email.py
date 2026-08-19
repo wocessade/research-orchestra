@@ -46,6 +46,10 @@ def main() -> int:
     try:
         with s:
             s.sendmail(user, [to], msg.as_string())
+    except (smtplib.SMTPRecipientsRefused, smtplib.SMTPDataError) as e:
+        # 550/552 类确定性拒信：服务器明确拒绝 ⟹ 可证明未发送 ⟹ exit 10（not_sent，可重试）
+        print(f"send refused: {e}", file=sys.stderr)
+        return NOT_SENT_EXIT_CODE
     except Exception as e:
         print(f"send failed: {e}", file=sys.stderr)
         return 1

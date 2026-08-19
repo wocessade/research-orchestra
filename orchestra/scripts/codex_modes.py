@@ -469,7 +469,11 @@ def mutual_review(diff: str, context: Optional[str] = None, run: Optional[Callab
                 value = item.get("issue")
             elif field == "suggested_fix" and field not in item and "suggestion" in item:
                 value = item.get("suggestion")
-            if not isinstance(value, str):
+            if not isinstance(value, str) or (
+                field in ("claim", "trigger", "impact") and not value.strip()
+            ):
+                # M-11：claim/trigger/impact 为语义核心字段，strip 后空串的内容壳
+                # 结构完整但语义缺失，不能判 protocol=valid
                 invalid_fields.append({"index": index, "field": field})
         line_start_value = item.get("line_start", item.get("line"))
         line_end_value = item.get("line_end", item.get("line"))

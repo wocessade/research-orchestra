@@ -120,6 +120,15 @@ class CheckSkillsTest(unittest.TestCase):
                 "skills": [spec, dict(spec)],
             })
 
+    def test_validate_relative_file_rejects_windows_absolute_probes(self):
+        # Windows 漏检探针：/abs（root）、C:foo（drive-relative）、C:/foo（drive）、
+        # UNC \\server\share —— 全部必须拒绝（跨平台闭环，H-1）。
+        probes = ["/abs", "C:foo", "C:/foo", "\\\\server\\share"]
+        for probe in probes:
+            with self.subTest(probe=probe):
+                with self.assertRaisesRegex(ValueError, "unsafe relative path"):
+                    check_skills._validate_relative_file(probe, "test.field")
+
     def test_manifest_rejects_unsafe_and_uncovered_entrypoints(self):
         spec = self.spec()
         spec["entrypoints"] = ["../escape.py"]
@@ -155,10 +164,41 @@ class CheckSkillsTest(unittest.TestCase):
         manifest = self.root / "skills.json"
         manifest.write_text('{"schema_version": 1, "skills": []}', encoding="utf-8")
         output = io.StringIO()
-        with mock.patch("sys.stdout", output):
+        err = io.StringIO()
+        with mock.patch("sys.stdout", output), mock.patch("sys.stderr", err):
             rc = check_skills.main(["--manifest", str(manifest), "--strict"])
         self.assertEqual(rc, 2)
         self.assertEqual(json.loads(output.getvalue())["status"], "invalid")
+        self.assertNotIn("Traceback", err.getvalue())
+
+    def test_cli_recursion_error_reports_invalid_without_traceback(self):
+        # 深嵌套 manifest 触发 json.loads RecursionError（非 ValueError 子类，M-7）。
+        manifest = self.root / "skills.json"
+        manifest.write_text("[" * 200000 + "]" * 200000, encoding="utf-8")
+        output = io.StringIO()
+        err = io.StringIO()
+        with mock.patch("sys.stdout", output), mock.patch("sys.stderr", err):
+            rc = check_skills.main(["--manifest", str(manifest), "--strict"])
+        self.assertEqual(rc, 2)
+        self.assertEqual(json.loads(output.getvalue())["status"], "invalid")
+        self.assertNotIn("Traceback", err.getvalue())
+
+    def test_cli_lock_current_write_failure_reports_invalid_without_traceback(self):
+        # --lock-current 写失败（只读 manifest → PermissionError）必须结构化处理（M-8）。
+        manifest = self.root / "skills.json"
+        manifest.write_text(
+            json.dumps({"schema_version": 1, "skills": [self.spec()]}),
+            encoding="utf-8",
+        )
+        manifest.chmod(0o444)
+        self.addCleanup(manifest.chmod, 0o644)
+        output = io.StringIO()
+        err = io.StringIO()
+        with mock.patch("sys.stdout", output), mock.patch("sys.stderr", err):
+            rc = check_skills.main(["--manifest", str(manifest), "--lock-current"])
+        self.assertEqual(rc, 2)
+        self.assertEqual(json.loads(output.getvalue())["status"], "invalid")
+        self.assertNotIn("Traceback", err.getvalue())
 
 
 if __name__ == "__main__":

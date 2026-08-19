@@ -134,15 +134,14 @@ SQLite。若旧单体任务处于 `queued`、`running` 或尚未耗尽重试次�
 | broker 全量 unittest | 88 tests，OK |
 | Python `compileall`（orchestra + usage-monitor） | 通过 |
 | `bash -n`（仓库内 8 个 shell 脚本） | 通过 |
-| 默认 `check_skills.py --strict` | 退出 1，required Skill 状态为 missing（符合门禁设计） |
+| 默认 `check_skills.py --strict` | 退出 1，required Skill 状态为 unlocked（符合门禁设计） |
 
 ## 遗留风险
 
-1. 本机不存在 `~/.claude/skills/academic-research-engine`，仓库 manifest 的
-   `expected_digest` 仍为 `null`；因此真实 ingest 当前会被阻断。恢复前必须由用户
-   在受控环境提供并审查既有 Skill，再显式执行 `--lock-current --strict`。本轮按约束
-   未下载或安装 Skill。
-2. `nature-literature-pipeline` 同样未安装，但其 `required=false`，不阻断 ingest。
+1. ~~本机不存在 `~/.claude/skills/academic-research-engine`~~ **勘误（2026-08-20，终审 M-10）**：两 Skill 目录均已安装于本机，仓库 manifest 的
+   `expected_digest` 仍为 `null`，实测 `--strict` 状态为 **unlocked**（actual_digest 已算出）；因此真实 ingest 当前会被 HARD 阻断。恢复前必须由用户
+   在受控环境审查既有 Skill，再显式执行 `--lock-current --strict`。
+2. `nature-literature-pipeline` 已安装，但其 `required=false`，不阻断 ingest。
 3. 部署脚本仅做静态和 shell 语法验证，未连接 4B 执行真实部署；远端旧模板删除、
    systemd 重启和四阶段运行仍需部署窗口验证。
 4. Prompt 回归集验证关键契约词和结构，不等同于真实模型质量评测；模型升级后仍需

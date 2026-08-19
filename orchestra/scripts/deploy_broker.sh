@@ -30,14 +30,28 @@ PREFLIGHT
 cleanup_guard
 trap - EXIT
 
-# 2) 预检通过后才传在役代码、模板和 unit
+# 2) 预检通过后先停旧 broker（M-6）：stop 至末尾 restart 之间无在役进程，
+#    门禁快照与文件覆盖间的 TOCTOU 窗口归零；unit 未安装（首部署）时 stop 失败可容忍。
+broker_stopped=false
+if ssh "$SSH_USER@$SSH_HOST" 'sudo systemctl stop orchestra-broker.service' >/dev/null 2>&1; then
+  broker_stopped=true
+fi
+recover_broker() {
+  # 失败兜底：stop 后中途失败时把 broker 拉起来（部分覆盖的旧代码也比长期停机好）
+  if [ "$broker_stopped" = true ]; then
+    ssh "$SSH_USER@$SSH_HOST" 'sudo systemctl start orchestra-broker.service' >/dev/null 2>&1 || true
+  fi
+}
+trap recover_broker EXIT
+
+# 3) 预检通过后才传在役代码、模板和 unit
 ssh "$SSH_USER@$SSH_HOST" 'mkdir -p /home/liuxfs/broker /home/liuxfs/broker/templates'
 scp -q "$ROOT"/broker/{db.py,taskfile.py,executor.py,dispatcher.py,artifact_validators.py,radar_render.py,radar_notify.py,migration_guard.py,__init__.py,inject_daily.sh,housekeeping.sh,send_email.py,config.example.json} "$SSH_USER@$SSH_HOST:/home/liuxfs/broker/"
 scp -q "$ROOT"/scripts/backup_to_nas.sh "$SSH_USER@$SSH_HOST:/home/liuxfs/broker/"  # 审计 CONCERN-1：备份脚本本体此前从未随 deploy 传载
 scp -q "$ROOT"/templates/nightly-radar-*.md "$SSH_USER@$SSH_HOST:/home/liuxfs/broker/templates/"
 scp -q "$ROOT"/broker/orchestra-broker.service "$ROOT"/broker/orchestra-timer.timer "$ROOT"/broker/orchestra-timer.service "$ROOT"/broker/orchestra-backup.service "$ROOT"/broker/orchestra-backup.timer "$ROOT"/broker/orchestra-backup-alert.service "$ROOT"/broker/orchestra-housekeeping.service "$ROOT"/broker/orchestra-housekeeping.timer "$ROOT"/broker/logrotate-orchestra.conf "$SSH_USER@$SSH_HOST:/tmp/"
 
-# 3) 远端：目录 + config.json（不存在时从 example 生成，路径按 REMOTE_ROOT 改写）
+# 4) 远端：目录 + config.json（不存在时从 example 生成，路径按 REMOTE_ROOT 改写）
 ssh "$SSH_USER@$SSH_HOST" "REMOTE_ROOT='$REMOTE_ROOT' bash -s" << 'REMOTE'
 set -euo pipefail
 mkdir -p "$REMOTE_ROOT"/{tasks,results,logs,db}
@@ -72,4 +86,5 @@ sudo systemctl enable --now orchestra-housekeeping.timer
 sudo systemctl restart orchestra-broker.service
 sudo systemctl status orchestra-broker.service --no-pager | head -5
 REMOTE
+trap - EXIT
 echo "部署完成（remote root: $REMOTE_ROOT）"

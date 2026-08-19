@@ -66,6 +66,28 @@ class DeployBrokerContractTest(unittest.TestCase):
         self.assertNotIn(':/home/liuxfs/broker/"', preflight)
         self.assertNotIn("/etc/systemd/system/", preflight)
 
+    def test_broker_stopped_between_preflight_and_live_upload(self):
+        # M-6：门禁（PREFLIGHT）通过后、首次覆盖在役文件前必须先停旧 broker，
+        # 门禁快照与文件覆盖间的 TOCTOU 窗口归零；末尾 restart 负责拉起。
+        preflight_end = self.text.index("\nPREFLIGHT\n") + len("\nPREFLIGHT\n")
+        first_live_upload = self.text.index('scp -q "$ROOT"/broker/{db.py')
+        stop = self.text.index("sudo systemctl stop orchestra-broker.service")
+        restart = self.text.index("sudo systemctl restart orchestra-broker.service")
+        self.assertLess(preflight_end, stop)
+        self.assertLess(stop, first_live_upload)
+        self.assertLess(stop, restart)
+
+    def test_broker_recovery_trap_registered_after_stop(self):
+        # M-6 失败兜底：stop 之后中途失败要有 EXIT trap 把 broker 拉回（start），
+        # 且 trap 注册必须先于首次在役文件覆盖，保证失败路径也有恢复。
+        stop = self.text.index("sudo systemctl stop orchestra-broker.service")
+        trap_register = self.text.index("trap recover_broker EXIT")
+        start = self.text.index("sudo systemctl start orchestra-broker.service")
+        first_live_upload = self.text.index('scp -q "$ROOT"/broker/{db.py')
+        self.assertLess(stop, trap_register)
+        self.assertLess(stop, start)
+        self.assertLess(trap_register, first_live_upload)
+
     def test_preflight_failure_performs_no_live_upload(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

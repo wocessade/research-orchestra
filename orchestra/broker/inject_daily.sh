@@ -46,6 +46,13 @@ owner="$(hostname):${boot_id}:$$:${starttime}"
 acquire_marker() {
   owner_missing_retries=0
   while ! mkdir "$marker" 2>/dev/null; do
+    # M-5：mkdir 失败须区分 EEXIST 竞态与其他错误（ENOSPC/EIO/RO 等真错误）。
+    # 目录不存在 = 非竞态 → 立即报错退出，杜绝 mv 静默失败导致的无限循环；
+    # 目录存在（他方刚创建）= 正常竞态 → 继续走 owner 检查。
+    [ -d "$marker" ] || {
+      echo "marker unavailable: $marker" >&2
+      exit 1
+    }
     old_owner="$(cat "$marker/owner" 2>/dev/null || true)"
     if [ -z "$old_owner" ] && [ "$owner_missing_retries" -lt 20 ]; then
       owner_missing_retries=$((owner_missing_retries + 1))

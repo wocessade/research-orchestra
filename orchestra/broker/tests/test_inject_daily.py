@@ -37,13 +37,14 @@ class TestInjectDaily(unittest.TestCase):
             "ORCHESTRA_TEMPLATES_DIR": TEMPLATES.as_posix(),
         })
 
-    def run_inject(self, env=None):
+    def run_inject(self, env=None, timeout=30):
         return subprocess.run(
             [BASH, str(SCRIPT)],
             env=env or self.env,
             capture_output=True,
             text=True,
             check=False,
+            timeout=timeout,
         )
 
     def test_injects_four_ordered_tasks_with_dependencies(self):
@@ -264,6 +265,34 @@ class TestInjectDaily(unittest.TestCase):
         self.assertIn("4 new task(s)", first_stdout)
         self.assertEqual(len(list(self.tasks.glob("T-*.md"))), 4)
         self.assertFalse(marker.exists())
+
+    def test_marker_mkdir_failure_exits_quickly_instead_of_hanging(self):
+        # M-5：mkdir 以非 EEXIST 原因失败（ENOSPC/EIO/RO）时不得无限循环，必须快速 exit 1。
+        # PATH shim 令 marker 的 mkdir 恒失败（目录不存在=非竞态）、其余调用透传；
+        # 修复前该用例 10s 超时（red），修复后快速 exit 1 且报错。
+        bin_dir = self.root / "bin"
+        bin_dir.mkdir()
+        real_mkdir = (shutil.which("mkdir") or "/bin/mkdir").replace("\\", "/")
+        wrapper = bin_dir / "mkdir"
+        wrapper.write_text(
+            "#!/bin/sh\n"
+            "for arg in \"$@\"; do\n"
+            '  case "$arg" in\n'
+            "    *.radar-inject-*) exit 1 ;;\n"
+            "  esac\n"
+            "done\n"
+            'exec "' + real_mkdir + '" "$@"\n',
+            encoding="utf-8",
+        )
+        wrapper.chmod(0o755)
+        env = dict(self.env, PATH=str(bin_dir) + os.pathsep + self.env["PATH"])
+
+        result = self.run_inject(env=env, timeout=10)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("marker unavailable", result.stderr)
+        self.assertEqual(list(self.tasks.glob("T-*.md")), [])
+        self.assertEqual(list(self.tasks.glob(".radar-inject-*")), [])
 
 
 if __name__ == "__main__":

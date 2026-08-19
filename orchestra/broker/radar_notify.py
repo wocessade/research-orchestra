@@ -78,12 +78,31 @@ def notify(render_root: Path, state_root: Path, output_dir: Path, date: str,
         fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
         os.close(fd)
     except FileExistsError:
-        unknown = {
-            "status": "unknown", "reason": "notification lock already exists",
-            "digest_sha256": digest_sha,
-        }
-        _write_json(output_path, unknown)
-        return 2
+        if state_path.exists():
+            # state 已写（sending 写于 subprocess 之前）⟹ 无法证明本次未发送 ⟹ 拒绝接管
+            unknown = {
+                "status": "unknown", "reason": "notification lock already exists",
+                "digest_sha256": digest_sha,
+            }
+            _write_json(output_path, unknown)
+            return 2
+        # state 缺失 ⟹ "sending" 从未写入 ⟹ 发送器从未启动 ⟹ 可证明未发送 ⟹
+        # 安全接管：删除 stale 锁后重试本次发送
+        print(f"taking over stale notification lock: {lock_path}", file=sys.stderr)
+        try:
+            lock_path.unlink()
+        except FileNotFoundError:
+            pass
+        try:
+            fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+            os.close(fd)
+        except FileExistsError:
+            unknown = {
+                "status": "unknown", "reason": "notification lock already exists",
+                "digest_sha256": digest_sha,
+            }
+            _write_json(output_path, unknown)
+            return 2
 
     sending = {
         "status": "sending",

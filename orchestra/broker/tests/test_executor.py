@@ -20,6 +20,7 @@ def make_spec(
     required_outputs=(),
     json_outputs=(),
     validation_output=None,
+    validator=None,
 ):
     return taskfile.TaskSpec(
         slug="T-20260819-test", executor=executor, net="optional",
@@ -28,6 +29,7 @@ def make_spec(
         required_outputs=required_outputs,
         json_outputs=json_outputs,
         validation_output=validation_output,
+        validator=validator,
     )
 
 class TestShellExecutor(unittest.TestCase):
@@ -83,6 +85,46 @@ class TestShellExecutor(unittest.TestCase):
         self.assertEqual(status, "failed")
         self.assertIn("artifact validation failed", error)
         self.assertIn("missing required output", error)
+        outdir = os.path.join(self.results, "T-20260819-test", "attempt-1")
+        with open(os.path.join(outdir, "state.json"), encoding="utf-8") as f:
+            state = json.load(f)
+        self.assertEqual(state["output_validation"]["status"], "failed")
+
+    def test_validator_and_required_outputs_pass(self):
+        # M-3 接缝：validator 挂在 required_outputs 非空门后，双声明 + 产物齐全
+        # → done 且 output_validation=passed（mock validator 本体，专注接缝）
+        spec = make_spec(
+            "echo ok > result.json",
+            required_outputs=("result.json",),
+            validator="radar-fetch",
+        )
+        with mock.patch(
+            "executor.artifact_validators.validate_artifacts", return_value=[]
+        ) as mock_validate:
+            status, error = executor.run_task(spec, self.tasks, self.results)
+        self.assertEqual(status, "done")
+        self.assertIsNone(error)
+        outdir = (executor.Path(self.results) / "T-20260819-test" / "attempt-1").resolve()
+        mock_validate.assert_called_once_with("radar-fetch", outdir)
+        with open(os.path.join(str(outdir), "state.json"), encoding="utf-8") as f:
+            state = json.load(f)
+        self.assertEqual(state["output_validation"]["status"], "passed")
+
+    def test_validator_errors_fail_task(self):
+        # M-3 接缝失败侧：validator 报错 → failed 且 output_validation=failed
+        spec = make_spec(
+            "echo ok > result.json",
+            required_outputs=("result.json",),
+            validator="radar-fetch",
+        )
+        with mock.patch(
+            "executor.artifact_validators.validate_artifacts",
+            return_value=["papers_all.json: must be a non-empty array"],
+        ) as mock_validate:
+            status, error = executor.run_task(spec, self.tasks, self.results)
+        self.assertEqual(status, "failed")
+        self.assertIn("artifact validation failed", error)
+        mock_validate.assert_called_once()
         outdir = os.path.join(self.results, "T-20260819-test", "attempt-1")
         with open(os.path.join(outdir, "state.json"), encoding="utf-8") as f:
             state = json.load(f)

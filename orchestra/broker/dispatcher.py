@@ -90,11 +90,22 @@ def _reporter_loop(cfg: dict, stop_event: threading.Event) -> None:
     finally:
         conn.close()
 
+def _rename_overwrite(src: Path, dst: Path) -> None:
+    """rename 撞名幂等化：POSIX rename 覆盖；Windows 上目标已存在抛 FileExistsError，
+    先删同名再重试。归档目标同名时内容为同一任务文件的旧副本，覆盖即幂等，
+    不能抛穿 one_cycle（M-12）。"""
+    try:
+        src.rename(dst)
+    except FileExistsError:
+        dst.unlink()
+        src.rename(dst)
+
+
 def _archive_task_file(f: Path, tasks_dir: Path) -> None:
     """终态任务文件移入 tasks/archive/，避免队列目录无限积压。"""
     archive = tasks_dir / "archive"
     archive.mkdir(exist_ok=True)
-    f.rename(archive / f.name)
+    _rename_overwrite(f, archive / f.name)
 
 
 def _archive_by_slug(slug: str, tasks_dir: Path) -> None:
@@ -158,13 +169,15 @@ def one_cycle(cfg: dict, conn, run=None, check_net_fn=None) -> dict:
             archive = tasks_dir / "archive"
             archive.mkdir(exist_ok=True)
             log.error("非法任务文件 %s 已按 .bad 归档: %s", f.name, e)
-            f.rename(archive / (f.name + ".bad"))
+            _rename_overwrite(f, archive / (f.name + ".bad"))
             continue
         specs[spec.slug] = spec
         db.register_task(conn, spec.slug, spec.net, spec.result_dir)
-        # 已终态的历史任务文件（如升级前的 done）同样归档，防积压
+        # 已终态的历史任务文件（如升级前的 done / 重放同名任务卡）同样归档，
+        # 防积压；必须留日志说明归档原因，不能静默吞掉（M-12）
         row = db.get_task(conn, spec.slug)
         if _is_terminal(row, max_attempts):
+            log.info("归档 %s：终态重放（status=%s），不再执行", f.name, row[1])
             _archive_task_file(f, tasks_dir)
 
     db.requeue_failed(conn, max_attempts)

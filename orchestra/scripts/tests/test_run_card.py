@@ -483,6 +483,18 @@ class DoIngestTest(_FixtureMixin, unittest.TestCase):
         run.assert_not_called()
         self.assertIn("invalid skills manifest", out)
 
+    @mock.patch("run_card.check_skills._skill_digest")
+    def test_contract_unreadable_is_hard_no_traceback(self, digest):
+        # M-9：contract 文件不可读（inspect_skill → _skill_digest → read_bytes 抛 OSError）
+        # 必须结构化 HARD 输出 + 退出码 2，不能泄漏 traceback（与 ValueError 同款处理）
+        digest.side_effect = OSError(13, "Permission denied")
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            rc = run_card.do_ingest(self._args())
+        self.assertEqual(rc, 2)
+        self.assertIn("HARD:", out.getvalue())
+        self.assertEqual(err.getvalue().strip(), "")
+
 
 class MainTest(_FixtureMixin, unittest.TestCase):
     def test_main_commands_lists_arms(self):

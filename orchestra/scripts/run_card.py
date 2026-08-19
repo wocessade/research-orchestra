@@ -242,7 +242,9 @@ def do_ingest(args: argparse.Namespace) -> int:
         engine_dir = resolve_ingest_engine(
             manifest_path, getattr(args, "engine_dir", None)
         )
-    except ValueError as exc:
+    except (ValueError, OSError) as exc:
+        # OSError 来自 inspect_skill → _skill_digest 的 read_bytes（contract 文件
+        # 被独占锁定/不可读等），同样按 HARD 语义结构化输出，不泄漏 traceback（M-9）
         print(f"HARD: {exc}")
         return 2
     scripts_dir = engine_dir / "scripts"

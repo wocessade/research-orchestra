@@ -214,6 +214,40 @@ class TestParseTaskfile(unittest.TestCase):
             taskfile.parse_taskfile(self.path)
         self.assertIn("必须同时出现在 json_outputs", str(cm.exception))
 
+    def test_validator_requires_required_outputs(self):
+        # M-3：validator 只挂在 required_outputs 非空门后，漏写 required_outputs
+        # 会静默跳过语义校验 → 解析期强制耦合（镜像 json_outputs 同款约束）
+        with open(self.path, "w", encoding="utf-8") as f:
+            f.write(
+                "# T-20260819-demo\n"
+                "executor: dsh\n"
+                "net: optional\n"
+                "result: r\n"
+                "validator: radar-rank\n"
+                "---\nx\n"
+            )
+        with self.assertRaises(ValueError) as cm:
+            taskfile.parse_taskfile(self.path)
+        self.assertIn("必须同时出现在 required_outputs", str(cm.exception))
+
+    def test_validator_with_required_outputs_parsed(self):
+        with open(self.path, "w", encoding="utf-8") as f:
+            f.write(
+                "# T-20260819-demo\n"
+                "executor: dsh\n"
+                "net: optional\n"
+                "result: r\n"
+                "required_outputs: scored_papers.json, ranking_summary.json\n"
+                "validator: radar-rank\n"
+                "---\nx\n"
+            )
+        spec = taskfile.parse_taskfile(self.path)
+        self.assertEqual(spec.validator, "radar-rank")
+        self.assertEqual(
+            spec.required_outputs,
+            ("scored_papers.json", "ranking_summary.json"),
+        )
+
     def test_missing_field_raises(self):
         with open(self.path, "w", encoding="utf-8") as f:
             f.write("# T-1\n" "executor: shell\n" "---\necho hi\n")

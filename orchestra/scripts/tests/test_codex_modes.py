@@ -334,6 +334,35 @@ class MutualReviewTest(unittest.TestCase):
         self.assertEqual(result["status"], "ok")
         self.assertEqual(result["findings"], [])
 
+    def test_empty_shell_finding_is_not_protocol_valid(self):
+        # M-11：claim/trigger/impact 全空串 + confidence 0.0 + evidence [] 的内容壳
+        # 结构完整但语义缺失 → 不能判 protocol=valid
+        run = make_run(text=json.dumps([{
+            "id": "F-001",
+            "severity": "high",
+            "category": "security",
+            "file": "a/x.py",
+            "line_start": 1,
+            "line_end": 2,
+            "claim": "",
+            "trigger": "",
+            "impact": "",
+            "counter_evidence": "",
+            "confidence": 0.0,
+            "evidence": [],
+            "uncertainties": [],
+            "suggested_fix": "",
+            "validation_test": "",
+        }]))
+        result = codex_modes.mutual_review("d", run=run)
+        fields = {entry["field"] for entry in result["protocol"]["invalid_fields"]}
+        self.assertIn("claim", fields)
+        self.assertIn("trigger", fields)
+        self.assertIn("impact", fields)
+        self.assertNotEqual(result["protocol"]["status"], "valid")
+        self.assertEqual(result["status"], "error")
+        self.assertEqual(result["error"], "protocol_partial")
+
     def test_parse_failed_degrades(self):
         run = make_run(text="I refuse to review this diff.")
         result = codex_modes.mutual_review("d", run=run)

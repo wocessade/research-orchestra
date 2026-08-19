@@ -41,6 +41,10 @@ def _validate_relative_file(value: str, field: str) -> None:
         path.is_absolute()
         or "\\" in value
         or value != path.as_posix()
+        # Windows 跨平台闭环："/abs" 有 root、drive-relative "C:foo" 有 drive，
+        # 均非安全相对路径（H-1）。
+        or path.drive
+        or path.root
         or "." in path.parts
         or ".." in path.parts
     ):
@@ -213,27 +217,35 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _report_invalid(exc: Exception) -> int:
+    """结构化错误输出：status=invalid + 退出码 2，不泄漏 traceback。"""
+    print(json.dumps({
+        "schema_version": 1,
+        "status": "invalid",
+        "error": str(exc),
+        "skills": [],
+    }, ensure_ascii=False, indent=2))
+    return 2
+
+
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
     manifest_path = Path(args.manifest)
     try:
         data = json.loads(manifest_path.read_text(encoding="utf-8"))
         report = inspect_manifest(data)
-    except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
-        print(json.dumps({
-            "schema_version": 1,
-            "status": "invalid",
-            "error": str(exc),
-            "skills": [],
-        }, ensure_ascii=False, indent=2))
-        return 2
+    except (OSError, UnicodeError, json.JSONDecodeError, ValueError, RecursionError) as exc:
+        return _report_invalid(exc)
 
     if args.lock_current:
-        updated = lock_current(data, report)
-        manifest_path.write_text(
-            json.dumps(data, ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
+        try:
+            updated = lock_current(data, report)
+            manifest_path.write_text(
+                json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+        except (OSError, UnicodeError, json.JSONDecodeError, ValueError, RecursionError) as exc:
+            return _report_invalid(exc)
         report = inspect_manifest(data)
         report["locks_updated"] = updated
 

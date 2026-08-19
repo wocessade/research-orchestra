@@ -84,6 +84,8 @@ def parse_taskfile(path: str | Path) -> TaskSpec:
     validator = fields.get("validator") or None
     if validator is not None and validator not in _VALID_VALIDATORS:
         raise ValueError(f"{p}: validator 必须为 {'|'.join(_VALID_VALIDATORS)}")
+    if validator is not None and not required_outputs:
+        raise ValueError(f"{p}: validator 必须同时出现在 required_outputs")
     for output in required_outputs:
         _validate_relative_path(output, "required_outputs", p)
     for output in json_outputs:

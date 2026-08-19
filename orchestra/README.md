@@ -62,7 +62,7 @@
 - 用法：`ORCHESTRA_SSH_HOST=192.168.0.250 [ORCHESTRA_REMOTE_ROOT=/mnt/broker] bash scripts/deploy_broker.sh`
 - REMOTE_ROOT 默认 `/mnt/broker`（U 盘 ext4，fstab 按 UUID 挂载）；SD 过渡期传 `~/broker-data`
 - **Tailscale 已装（三端同 tailnet）**：4B=`liuxfs`(100.111.75.58)、核桃派=`walnutpi`(100.64.2.60)、Windows=`laptop-w0cessade`；`ORCHESTRA_SSH_HOST` 为 env 驱动，切 tailnet 名零代码改动
-- **学校网络切换：见 `docs/school-network-switch.md`**（入学前必读）
+- **学校网络切换：见 `orchestra/docs/school-network-switch.md`**（入学前必读）
 
 ## 冷备链（NAS 方案 A）
 
@@ -73,7 +73,7 @@
 
 ## 4B 兼职 NAS（mission 026 D16 / 西数 250G）
 
-- 盘：西数 250G（sdb）ext4 `LABEL=nas-data`，挂载 `/mnt/nas`（fstab UUID+nofail）；压测 31.7MB/s 写 / 33.1MB/s 读（USB2 水平，冷备够用；系统未被拖死——broker 上报 canary 实测）
+- 盘：西数 250G（sdb）ext4 `LABEL=nas-data`，挂载 `/mnt/nas`（fstab UUID+nofail）；压测 31.7MB/s 写 / 33.1MB/s 读（USB3 接口，实测速率冷备够用；系统未被拖死——broker 上报 canary 实测）
 - 共享：samba `\\192.168.0.250\nas`（user liuxfs；密码在 Pi 上生成，不落库）
 - 备份：`nas_backup.sh`（rsync /mnt/broker/{results,logs} → /mnt/nas/backup/broker/）+ `nas-backup.timer` 每日 04:17；源码 `orchestra/nas/`
 - 定位：冷备 NAS（入学后宿舍 NAS 预演）；高性能文件服务仍按总 spec §14 触发 N100 评估

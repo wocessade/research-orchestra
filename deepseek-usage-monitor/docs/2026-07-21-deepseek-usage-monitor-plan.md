@@ -31,8 +31,8 @@
 - [ ] **Step 1: 创建目录结构**
 
 ```bash
-mkdir -p D:/pythonProject/usage-monitor
-mkdir -p D:/pythonProject/windows-reporter
+mkdir -p D:/pythonProject/deepseek-usage-monitor/usage-monitor
+mkdir -p D:/pythonProject/deepseek-usage-monitor/windows-reporter
 ```
 
 - [ ] **Step 2: 写入 requirements.txt**
@@ -596,7 +596,7 @@ git commit -m "feat: add CC hooks status reporter for Windows"
         "hooks": [{
           "type": "command",
           "command": "python",
-          "args": ["D:/pythonProject/windows-reporter/reporter.py", "idle", "--session-start"],
+          "args": ["D:/pythonProject/deepseek-usage-monitor/windows-reporter/reporter.py", "idle", "--session-start"],
           "timeout": 10
         }]
       }
@@ -607,7 +607,7 @@ git commit -m "feat: add CC hooks status reporter for Windows"
         "hooks": [{
           "type": "command",
           "command": "python",
-          "args": ["D:/pythonProject/windows-reporter/reporter.py", "running"],
+          "args": ["D:/pythonProject/deepseek-usage-monitor/windows-reporter/reporter.py", "running"],
           "timeout": 5,
           "async": true
         }]
@@ -618,7 +618,7 @@ git commit -m "feat: add CC hooks status reporter for Windows"
         "hooks": [{
           "type": "command",
           "command": "python",
-          "args": ["D:/pythonProject/windows-reporter/reporter.py", "running"],
+          "args": ["D:/pythonProject/deepseek-usage-monitor/windows-reporter/reporter.py", "running"],
           "timeout": 5,
           "async": true
         }]
@@ -629,7 +629,7 @@ git commit -m "feat: add CC hooks status reporter for Windows"
         "hooks": [{
           "type": "command",
           "command": "python",
-          "args": ["D:/pythonProject/windows-reporter/reporter.py", "idle"],
+          "args": ["D:/pythonProject/deepseek-usage-monitor/windows-reporter/reporter.py", "idle"],
           "timeout": 5,
           "async": true
         }]
@@ -640,7 +640,7 @@ git commit -m "feat: add CC hooks status reporter for Windows"
         "hooks": [{
           "type": "command",
           "command": "python",
-          "args": ["D:/pythonProject/windows-reporter/reporter.py", "error"],
+          "args": ["D:/pythonProject/deepseek-usage-monitor/windows-reporter/reporter.py", "error"],
           "timeout": 5,
           "async": true
         }]
@@ -652,7 +652,7 @@ git commit -m "feat: add CC hooks status reporter for Windows"
         "hooks": [{
           "type": "command",
           "command": "python",
-          "args": ["D:/pythonProject/windows-reporter/reporter.py", "waiting"],
+          "args": ["D:/pythonProject/deepseek-usage-monitor/windows-reporter/reporter.py", "waiting"],
           "timeout": 5,
           "async": true
         }]
@@ -663,7 +663,7 @@ git commit -m "feat: add CC hooks status reporter for Windows"
         "hooks": [{
           "type": "command",
           "command": "python",
-          "args": ["D:/pythonProject/windows-reporter/reporter.py", "idle", "--session-end"],
+          "args": ["D:/pythonProject/deepseek-usage-monitor/windows-reporter/reporter.py", "idle", "--session-end"],
           "timeout": 10
         }]
       }
@@ -1067,7 +1067,7 @@ mkdir -p /home/pi/usage-monitor
 
 ```bash
 # 在 Windows 上
-scp -r D:/pythonProject/usage-monitor/* pi@raspberrypi.local:/home/pi/usage-monitor/
+scp -r D:/pythonProject/deepseek-usage-monitor/usage-monitor/* pi@raspberrypi.local:/home/pi/usage-monitor/
 ```
 
 - [ ] **Step 4: 树莓派上安装 Python 依赖**

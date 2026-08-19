@@ -1,0 +1,26 @@
+[Unit]
+Description=DeepSeek Usage Monitor
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/usage-monitor
+# 部署后执行: sudo systemctl edit monitor 填入真实密钥（勿写进此文件）
+Environment="DEEPSEEK_API_KEY=sk-your-key-here"
+# 可选 API 鉴权（Windows reporter/hooks 已停用；仅保护 /api/*）
+# Environment="MONITOR_TOKEN=change-me"
+# Playwright 回退默认关闭; 需要时取消下一行注释
+# Environment="ENABLE_PLAYWRIGHT_FALLBACK=1"
+# WalnutPi 1B: LED 红=PI0=256, 绿=PI1=257
+Environment="LED_RED_PIN=256"
+Environment="LED_GREEN_PIN=257"
+ExecStart=/usr/bin/python3 /home/pi/usage-monitor/app.py
+Restart=always
+RestartSec=10
+# 限制内存, 避免偶发 Chromium/泄漏拖垮整机
+MemoryMax=512M
+MemoryHigh=400M
+
+[Install]
+WantedBy=multi-user.target

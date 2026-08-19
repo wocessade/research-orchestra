@@ -3,3 +3,8 @@ Pillow==11.1.0
 gpiozero==2.0.1
 requests==2.32.3
 apscheduler==3.11.0
+# Pi runtime (optional on Windows):
+# lgpio
+# playwright   # only if ENABLE_PLAYWRIGHT_FALLBACK=1; then: playwright install chromium
+# Deploy from Windows only:
+# paramiko

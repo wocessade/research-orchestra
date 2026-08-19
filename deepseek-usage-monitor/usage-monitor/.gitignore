@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+auth_state.json
+*.log
+eink_preview.png
+.DS_Store
+.tasks/

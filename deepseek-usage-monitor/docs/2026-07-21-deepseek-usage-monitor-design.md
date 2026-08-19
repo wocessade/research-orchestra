@@ -151,7 +151,7 @@ Claude Code 提供 29 个 hook 事件。下表列出与本项目相关的事件�
           {
             "type": "command",
             "command": "python",
-            "args": ["D:/pythonProject/windows-reporter/reporter.py", "idle", "--session-start"],
+            "args": ["D:/pythonProject/deepseek-usage-monitor/windows-reporter/reporter.py", "idle", "--session-start"],
             "timeout": 10
           }
         ]
@@ -164,7 +164,7 @@ Claude Code 提供 29 个 hook 事件。下表列出与本项目相关的事件�
           {
             "type": "command",
             "command": "python",
-            "args": ["D:/pythonProject/windows-reporter/reporter.py", "running"],
+            "args": ["D:/pythonProject/deepseek-usage-monitor/windows-reporter/reporter.py", "running"],
             "timeout": 5,
             "async": true
           }
@@ -177,7 +177,7 @@ Claude Code 提供 29 个 hook 事件。下表列出与本项目相关的事件�
           {
             "type": "command",
             "command": "python",
-            "args": ["D:/pythonProject/windows-reporter/reporter.py", "running"],
+            "args": ["D:/pythonProject/deepseek-usage-monitor/windows-reporter/reporter.py", "running"],
             "timeout": 5,
             "async": true
           }
@@ -190,7 +190,7 @@ Claude Code 提供 29 个 hook 事件。下表列出与本项目相关的事件�
           {
             "type": "command",
             "command": "python",
-            "args": ["D:/pythonProject/windows-reporter/reporter.py", "idle"],
+            "args": ["D:/pythonProject/deepseek-usage-monitor/windows-reporter/reporter.py", "idle"],
             "timeout": 5,
             "async": true
           }
@@ -203,7 +203,7 @@ Claude Code 提供 29 个 hook 事件。下表列出与本项目相关的事件�
           {
             "type": "command",
             "command": "python",
-            "args": ["D:/pythonProject/windows-reporter/reporter.py", "error"],
+            "args": ["D:/pythonProject/deepseek-usage-monitor/windows-reporter/reporter.py", "error"],
             "timeout": 5,
             "async": true
           }
@@ -217,7 +217,7 @@ Claude Code 提供 29 个 hook 事件。下表列出与本项目相关的事件�
           {
             "type": "command",
             "command": "python",
-            "args": ["D:/pythonProject/windows-reporter/reporter.py", "waiting"],
+            "args": ["D:/pythonProject/deepseek-usage-monitor/windows-reporter/reporter.py", "waiting"],
             "timeout": 5,
             "async": true
           }
@@ -230,7 +230,7 @@ Claude Code 提供 29 个 hook 事件。下表列出与本项目相关的事件�
           {
             "type": "command",
             "command": "python",
-            "args": ["D:/pythonProject/windows-reporter/reporter.py", "compact-warning"],
+            "args": ["D:/pythonProject/deepseek-usage-monitor/windows-reporter/reporter.py", "compact-warning"],
             "timeout": 5,
             "async": true
           }
@@ -243,7 +243,7 @@ Claude Code 提供 29 个 hook 事件。下表列出与本项目相关的事件�
           {
             "type": "command",
             "command": "python",
-            "args": ["D:/pythonProject/windows-reporter/reporter.py", "running"],
+            "args": ["D:/pythonProject/deepseek-usage-monitor/windows-reporter/reporter.py", "running"],
             "timeout": 5,
             "async": true
           }
@@ -256,7 +256,7 @@ Claude Code 提供 29 个 hook 事件。下表列出与本项目相关的事件�
           {
             "type": "command",
             "command": "python",
-            "args": ["D:/pythonProject/windows-reporter/reporter.py", "idle", "--session-end"],
+            "args": ["D:/pythonProject/deepseek-usage-monitor/windows-reporter/reporter.py", "idle", "--session-end"],
             "timeout": 10
           }
         ]

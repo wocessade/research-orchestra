@@ -5,7 +5,7 @@ import paramiko
 
 HOST = "192.168.0.200"
 USER = "pi"
-PASS = "123456"
+PASS = os.environ.get("PI_PASS", "")
 
 LOCAL = r"D:\pythonProject\deepseek-usage-monitor\usage-monitor"
 AUTH_SRC = r"D:\backup\rpi-backup-20260801\extracted\auth_state.json"

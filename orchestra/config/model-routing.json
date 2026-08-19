@@ -1,0 +1,15 @@
+{
+  "dsh": { "radar-scoring": "flash", "experiment": "pro" },
+  "codex": {
+    "default": "terra",
+    "batch-summarize": "luna",
+    "radar-summary": "luna",
+    "vision-quick": "luna",
+    "mutual-review": "terra",
+    "claim-check": "terra",
+    "docs-draft": "terra",
+    "dual-implement": "terra",
+    "complex-audit": { "model": "sol", "effort": "high" },
+    "production-fix": { "owner": "claude" }
+  }
+}

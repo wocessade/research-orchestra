@@ -1,0 +1,7 @@
+[Unit]
+Description=Moonlight NAS local backup of broker results+logs
+
+[Service]
+Type=oneshot
+User=liuxfs
+ExecStart=/bin/bash /home/liuxfs/broker/nas_backup.sh

@@ -24,6 +24,7 @@ ORCH_INIT = {
     "active_tasks": None,
     "last_task": None,
     "last_sync": None,
+    "recent_tasks": [],
 }
 
 
@@ -169,16 +170,90 @@ class OrchestraApiTest(unittest.TestCase):
         self.assertEqual(resp.get_json(), {"ok": True, "merged": ["queue_len"]})
         self.assertEqual(self.orch_state()["queue_len"], 5)
 
+    # ─── recent_tasks 合并 (D9: 列表整表替换) ─────
+
+    def _tasks(self, n):
+        return [
+            {"slug": f"T-20260819-task-{i}", "status": "running", "ts": 100.0 + i}
+            for i in range(n)
+        ]
+
+    def test_recent_tasks_valid_merge(self):
+        resp = self.post_orchestra({"recent_tasks": self._tasks(2)})
+        self.assertEqual(
+            resp.get_json(), {"ok": True, "merged": ["recent_tasks"]}
+        )
+        tasks = self.orch_state()["recent_tasks"]
+        self.assertEqual(len(tasks), 2)
+        self.assertEqual(tasks[0]["slug"], "T-20260819-task-0")
+        self.assertEqual(tasks[0]["status"], "running")
+        self.assertEqual(tasks[0]["ts"], 100.0)
+
+    def test_recent_tasks_accepts_iso_ts(self):
+        resp = self.post_orchestra(
+            {"recent_tasks": [
+                {"slug": "T-a", "status": "done",
+                 "ts": "2026-08-19T10:00:00+00:00"},
+            ]}
+        )
+        self.assertEqual(resp.get_json(), {"ok": True, "merged": ["recent_tasks"]})
+        self.assertEqual(
+            self.orch_state()["recent_tasks"][0]["ts"],
+            "2026-08-19T10:00:00+00:00",
+        )
+
+    def test_recent_tasks_invalid_items_dropped(self):
+        resp = self.post_orchestra(
+            {"recent_tasks": [
+                "not-a-dict",                                # 非 dict
+                {"slug": "", "status": "done", "ts": 1},     # 空 slug
+                {"slug": "T-b", "status": "", "ts": 1},      # 空 status
+                {"slug": "T-c", "status": "done", "ts": None},  # bad ts
+                {"slug": "T-d", "status": "done", "ts": True},  # bool ts
+                {"slug": "T-e", "status": "done", "ts": 1},  # 合法
+            ]}
+        )
+        self.assertEqual(resp.get_json(), {"ok": True, "merged": ["recent_tasks"]})
+        tasks = self.orch_state()["recent_tasks"]
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(tasks[0]["slug"], "T-e")
+
+    def test_recent_tasks_whole_table_replace(self):
+        self.post_orchestra({"recent_tasks": self._tasks(2)})
+        resp = self.post_orchestra({"recent_tasks": [self._tasks(1)[0]]})
+        self.assertEqual(resp.get_json(), {"ok": True, "merged": ["recent_tasks"]})
+        tasks = self.orch_state()["recent_tasks"]
+        self.assertEqual(len(tasks), 1)  # 整表替换, 不残留旧条目
+
+    def test_recent_tasks_capped_at_8(self):
+        resp = self.post_orchestra({"recent_tasks": self._tasks(10)})
+        self.assertEqual(resp.get_json(), {"ok": True, "merged": ["recent_tasks"]})
+        tasks = self.orch_state()["recent_tasks"]
+        self.assertEqual(len(tasks), 8)  # cap 8
+        self.assertEqual(tasks[-1]["slug"], "T-20260819-task-7")
+
+    def test_recent_tasks_non_list_ignored(self):
+        resp = self.post_orchestra({"recent_tasks": "T-xxx"})
+        self.assertEqual(resp.get_json(), {"ok": True, "merged": []})
+        self.assertEqual(self.orch_state()["recent_tasks"], [])
+
+    def test_recent_tasks_empty_list_clears(self):
+        self.post_orchestra({"recent_tasks": self._tasks(2)})
+        resp = self.post_orchestra({"recent_tasks": []})
+        self.assertEqual(resp.get_json(), {"ok": True, "merged": ["recent_tasks"]})
+        self.assertEqual(self.orch_state()["recent_tasks"], [])
+
     # ─── /api/dashboard 携带 orchestra 块 ──────
 
     def test_dashboard_returns_orchestra_blocks(self):
-        self.post_orchestra({"queue_len": 7})
+        self.post_orchestra({"queue_len": 7, "recent_tasks": self._tasks(2)})
         resp = self.client.get("/api/dashboard", headers=AUTH)
         self.assertEqual(resp.status_code, 200)
         data = resp.get_json()
         self.assertIn("orchestra", data)
         self.assertIn("orchestra_last_report", data)
         self.assertEqual(data["orchestra"]["queue_len"], 7)
+        self.assertEqual(len(data["orchestra"]["recent_tasks"]), 2)
 
     # ─── /health 新鲜度 ────────────────────────
 

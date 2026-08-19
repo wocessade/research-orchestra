@@ -1,9 +1,10 @@
-"""e-ink orchestra 面板单元测试 (subsystem-4 Task 2)。
+"""e-ink orchestra 面板单元测试 (subsystem-4 Task 2, D9 融合面板)。
 
 - 纯函数测试: EinkDashboard._resolve_display_panel —— 基面板 idle 且开启
-  orchestra 时按时间桶 (ORCHESTRA_ROTATE_SEC) 轮换; now 注入保证确定性。
-  SHOW_ORCHESTRA / ORCHESTRA_ROTATE_SEC 是 eink_dashboard 模块级导入常量,
-  须 patch eink_dashboard.<名> 而非 config.<名>。
+  orchestra 时恒定展示融合 orchestra 面板 (无轮换, 无 now 参数)。
+  SHOW_ORCHESTRA 是 eink_dashboard 模块级导入常量,
+  须 patch eink_dashboard.SHOW_ORCHESTRA 而非 config.SHOW_ORCHESTRA。
+- 辅助函数测试: _fmt_age (epoch / ISO → Xs前 / Xmin前 / Xh前)。
 - 快照 CLI 测试: subprocess 跑 `eink_dashboard.py --snapshot`, 不 init_hardware
   (epd=None), 纯 PIL 绘制, 断言输出 800×480。
 """
@@ -18,15 +19,7 @@ from unittest import mock
 
 from PIL import Image
 
-from eink_dashboard import (
-    EinkDashboard,
-    SHOW_ORCHESTRA,
-    ORCHESTRA_ROTATE_SEC,
-)
-
-# 固定 60s 轮换周期, 桶号 = int(now // 60):
-#   now=100/119 → 桶1 (奇) → orchestra; now=120 → 桶2 (偶) → idle
-ROTATE = 60
+from eink_dashboard import EinkDashboard
 
 
 def orch_state(report: bool = True, **overrides):
@@ -39,6 +32,12 @@ def orch_state(report: bool = True, **overrides):
             "active_tasks": 1,
             "last_task": "T-20260819-demo",
             "last_sync": 800.0,
+            "recent_tasks": [
+                {"slug": "T-20260819-e2e-dsh",
+                 "status": "running", "ts": 700.0},
+                {"slug": "T-20260819-ctl-single",
+                 "status": "done", "ts": 400.0},
+            ],
         },
         "orchestra_last_report": (
             {"broker": 1000.0, "sync": 800.0} if report
@@ -50,108 +49,74 @@ def orch_state(report: bool = True, **overrides):
 
 
 class ResolveDisplayPanelTest(unittest.TestCase):
-    """_resolve_display_panel 纯函数"""
+    """_resolve_display_panel 纯函数 (D9: 无轮换, 恒定决议)"""
 
     def setUp(self):
         self.p_show = mock.patch("eink_dashboard.SHOW_ORCHESTRA", True)
-        self.p_rot = mock.patch("eink_dashboard.ORCHESTRA_ROTATE_SEC", ROTATE)
         self.p_show.start()
-        self.p_rot.start()
         self.addCleanup(self.p_show.stop)
-        self.addCleanup(self.p_rot.stop)
 
-    # ─── CC active 时不轮换 (不管时间桶) ──────
+    # ─── CC active 时永远展示 active 面板 ──────
 
     def test_cc_running_always_active(self):
-        for now in (100, 120, 179):  # 奇/偶桶
-            state = orch_state(cc_status="running")
-            self.assertEqual(
-                EinkDashboard._resolve_display_panel(state, now), "active"
-            )
+        state = orch_state(cc_status="running")
+        self.assertEqual(EinkDashboard._resolve_display_panel(state), "active")
 
     def test_cc_panel_active_always_active(self):
         state = orch_state(cc_panel="active")
-        self.assertEqual(
-            EinkDashboard._resolve_display_panel(state, 100), "active"
-        )
-        self.assertEqual(
-            EinkDashboard._resolve_display_panel(state, 120), "active"
-        )
+        self.assertEqual(EinkDashboard._resolve_display_panel(state), "active")
 
-    # ─── idle + 开关 + 有上报: 同桶稳定 / 跨桶翻转 ──
+    # ─── idle + SHOW_ORCHESTRA: 恒定融合面板 ────
 
-    def test_idle_same_bucket_stable(self):
+    def test_idle_with_show_orchestra_fused_constant(self):
+        """idle 基面板 → 恒定为 orchestra, 无时间依赖 (随时调用同结果)"""
         state = orch_state()
-        self.assertEqual(
-            EinkDashboard._resolve_display_panel(state, 100), "orchestra"
-        )
-        self.assertEqual(
-            EinkDashboard._resolve_display_panel(state, 119), "orchestra"
-        )
-
-    def test_idle_cross_bucket_flips(self):
-        state = orch_state()
-        # 桶1 (奇) → orchestra; 桶2 (偶) → idle; 桶3 (奇) → orchestra
-        self.assertEqual(
-            EinkDashboard._resolve_display_panel(state, 100), "orchestra"
-        )
-        self.assertEqual(
-            EinkDashboard._resolve_display_panel(state, 120), "idle"
-        )
-        self.assertEqual(
-            EinkDashboard._resolve_display_panel(state, 180), "orchestra"
-        )
-
-    def test_cc_panel_idle_rotates_too(self):
-        state = orch_state(cc_panel="idle")
-        self.assertEqual(
-            EinkDashboard._resolve_display_panel(state, 100), "orchestra"
-        )
-
-    def test_now_default_returns_valid_panel(self):
-        state = orch_state()
-        self.assertIn(
-            EinkDashboard._resolve_display_panel(state), ("idle", "orchestra")
-        )
-
-    # ─── 无上报不轮换 ────────────────────────
-
-    def test_no_report_no_rotation(self):
-        state = orch_state(report=False)
-        for now in (100, 120, 180):
+        for _ in range(3):
             self.assertEqual(
-                EinkDashboard._resolve_display_panel(state, now), "idle"
+                EinkDashboard._resolve_display_panel(state), "orchestra"
             )
 
-    def test_missing_report_key_no_rotation(self):
-        state = {"cc_status": "idle"}  # 无 orchestra 块 (app 初始即有, 防御)
+    def test_cc_panel_idle_fused_too(self):
+        state = orch_state(cc_panel="idle")
         self.assertEqual(
-            EinkDashboard._resolve_display_panel(state, 100), "idle"
+            EinkDashboard._resolve_display_panel(state), "orchestra"
         )
 
-    # ─── 开关关闭不轮换 ──────────────────────
+    # ─── 无上报 / 缺 orchestra 块仍展示融合面板 (D9 行为变更) ──
 
-    def test_show_orchestra_false_no_rotation(self):
+    def test_no_report_still_orchestra(self):
+        """无 broker 上报 (状态条显示 --) 也恒定 orchestra, 不再回退 idle"""
+        state = orch_state(report=False)
+        self.assertEqual(
+            EinkDashboard._resolve_display_panel(state), "orchestra"
+        )
+
+    def test_missing_orchestra_block_still_orchestra(self):
+        state = {"cc_status": "idle"}  # 防御: 无 orchestra 块
+        self.assertEqual(
+            EinkDashboard._resolve_display_panel(state), "orchestra"
+        )
+
+    # ─── 开关关闭回退旧 idle 面板 ──────────────
+
+    def test_show_orchestra_false_returns_idle(self):
         state = orch_state()
         with mock.patch("eink_dashboard.SHOW_ORCHESTRA", False):
             self.assertEqual(
-                EinkDashboard._resolve_display_panel(state, 100), "idle"
+                EinkDashboard._resolve_display_panel(state), "idle"
             )
 
     # ─── cc_status=error 基面板行为不变 ───────
 
     def test_cc_error_base_panel_unchanged(self):
-        """error 的基面板仍是 idle (不翻成 active), 轮换规则与 idle 一致"""
+        """error 的基面板仍是 idle (不翻成 active); 展示决议与 idle 一致"""
         state = orch_state(cc_status="error")
         self.assertEqual(EinkDashboard._resolve_panel(state), "idle")
         self.assertEqual(
-            EinkDashboard._resolve_display_panel(state, 120), "idle"
-        )
-        self.assertEqual(
-            EinkDashboard._resolve_display_panel(state, 100), "orchestra"
+            EinkDashboard._resolve_display_panel(state), "orchestra"
         )
 
-    # ─── hash 集成: orchestra 进展示 hash, 不进数据 hash ──
+    # ─── hash 集成: orchestra 内容变化 → data hash 与 display hash 均变 ──
 
     def test_display_hash_changes_with_orchestra(self):
         s1 = orch_state()
@@ -162,23 +127,60 @@ class ResolveDisplayPanelTest(unittest.TestCase):
             EinkDashboard._compute_display_hash(s2),
         )
 
-    def test_data_hash_ignores_orchestra(self):
+    def test_data_hash_changes_with_orchestra(self):
+        """D9: 融合面板内容即主数据 → orchestra 变化走全刷"""
         s1 = orch_state()
         s2 = orch_state()
-        s2["orchestra"]["queue_len"] = 5
-        self.assertEqual(
+        s2["orchestra"]["recent_tasks"] = [
+            {"slug": "T-new", "status": "running", "ts": 500.0}
+        ]
+        self.assertNotEqual(
             EinkDashboard._compute_data_hash(s1),
             EinkDashboard._compute_data_hash(s2),
         )
 
     def test_display_hash_panel_uses_display_resolution(self):
-        """hash 的 panel 键随桶翻转, 保证切面板时走全刷"""
+        """hash 的 panel 键随 SHOW_ORCHESTRA 决议变化 → 切面板走全刷"""
         state = orch_state()
-        with mock.patch("time.time", return_value=100.0):
-            h_odd = EinkDashboard._compute_display_hash(state)
-        with mock.patch("time.time", return_value=120.0):
-            h_even = EinkDashboard._compute_display_hash(state)
-        self.assertNotEqual(h_odd, h_even)
+        with mock.patch("eink_dashboard.SHOW_ORCHESTRA", True):
+            h_on = EinkDashboard._compute_display_hash(state)
+        with mock.patch("eink_dashboard.SHOW_ORCHESTRA", False):
+            h_off = EinkDashboard._compute_display_hash(state)
+        self.assertNotEqual(h_on, h_off)
+
+
+class FmtAgeTest(unittest.TestCase):
+    """_fmt_age: epoch / ISO → Xs前 / Xmin前 / Xh前"""
+
+    def test_epoch_seconds(self):
+        with mock.patch("time.time", return_value=1000.0):
+            self.assertEqual(EinkDashboard._fmt_age(999.9), "0s前")
+            self.assertEqual(EinkDashboard._fmt_age(995.0), "5s前")
+            self.assertEqual(EinkDashboard._fmt_age(940.0), "1min前")
+            self.assertEqual(EinkDashboard._fmt_age(100.0), "15min前")
+            self.assertEqual(EinkDashboard._fmt_age(-6200.0), "2h前")
+
+    def test_iso_string(self):
+        from datetime import datetime, timezone
+
+        now_ts = 1_800_000_000.0
+        # 从 epoch 生成 ISO 串, 免手算 (2027-01-15T08:00:00Z ≈ 1800000000)
+        iso_now = datetime.fromtimestamp(now_ts, tz=timezone.utc).isoformat()
+        iso_now_z = iso_now.replace("+00:00", "Z")
+        iso_minus_15 = datetime.fromtimestamp(
+            now_ts - 900, tz=timezone.utc
+        ).isoformat()
+        with mock.patch("time.time", return_value=now_ts):
+            self.assertEqual(EinkDashboard._fmt_age(iso_now), "0s前")
+            self.assertEqual(EinkDashboard._fmt_age(iso_now_z), "0s前")
+            self.assertEqual(EinkDashboard._fmt_age(iso_minus_15), "15min前")
+
+    def test_invalid_returns_dash(self):
+        with mock.patch("time.time", return_value=1000.0):
+            self.assertEqual(EinkDashboard._fmt_age(None), "--")
+            self.assertEqual(EinkDashboard._fmt_age("garbage"), "--")
+            self.assertEqual(EinkDashboard._fmt_age(""), "--")
+            self.assertEqual(EinkDashboard._fmt_age("not-a-date"), "--")
 
 
 class SnapshotCliTest(unittest.TestCase):

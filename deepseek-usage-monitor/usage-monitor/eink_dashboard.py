@@ -23,6 +23,7 @@ import sys
 import time
 import tempfile
 import hashlib
+from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from config import (
@@ -30,7 +31,7 @@ from config import (
     EINK_FORCE_FULL_REFRESH,
     BALANCE_WARN_THRESHOLD, BALANCE_CRITICAL_THRESHOLD,
     SHOW_CC_CONTEXT,
-    SHOW_ORCHESTRA, ORCHESTRA_ROTATE_SEC, ORCHESTRA_STALE_SEC,
+    SHOW_ORCHESTRA, ORCHESTRA_STALE_SEC,
 )
 
 # ─── 版面常量 (与 _draw() 布局严格对应) ───────────
@@ -68,11 +69,24 @@ else:
 
 FOOTER_H = 52
 
-# orchestra 面板专用 (subsystem-4): 卡片加高填满中区
-# 行1 y=62, 行2 y=246 (行间距 14px), 卡底 416, footer 430 留 14px
-ORCH_CARD_H = 170
-ORCH_ROW1_Y = 62
-ORCH_ROW2_Y = 246
+# orchestra 融合面板 (D9): 紧凑状态条 + 最近任务列表 + DeepSeek/天气小字行
+ORCH_STATUS_Y = 58        # 状态条 (font_normal 单行)
+ORCH_LIST_TITLE_Y = 92    # 「最近任务」标题 (font_medium)
+ORCH_LIST_Y = 118         # 列表首行
+ORCH_LIST_ROW_H = 40      # 列表行高
+ORCH_LIST_MAX_ROWS = 5    # 最多 5 行
+ORCH_LIST_SLUG_W = 480    # slug 像素截断宽 = 60% 屏宽
+ORCH_STATUS_X = 500       # 状态标签列 x
+ORCH_RIGHT_X = 785        # 时间右对齐 x (800-15)
+ORCH_INFO_Y = 330         # DeepSeek/天气小字行
+
+# 最近任务状态 → 中文标签 (未识别状态回退原串截断)
+ORCH_STATUS_LABELS = {
+    "pending": "排队中", "queued": "排队中", "waiting": "排队中",
+    "running": "运行中", "active": "运行中",
+    "done": "完成", "completed": "完成", "success": "完成", "ok": "完成",
+    "failed": "失败", "error": "失败", "fail": "失败",
+}
 
 # True: 启用局刷波形 (全幅写入, 避免多 zone 窗口错位)
 PARTIAL_REFRESH_ENABLED = True
@@ -180,33 +194,30 @@ class EinkDashboard:
         return "active" if status in ("running", "waiting") else "idle"
 
     @classmethod
-    def _resolve_display_panel(cls, state: dict, now=None) -> str:
-        """展示面板 = 基面板; 仅当基面板 idle 且 SHOW_ORCHESTRA 且 broker
-        已有上报时, 按 ORCHESTRA_ROTATE_SEC 时间桶奇偶轮换到 orchestra。
-
-        now 注入用于测试; 同桶内确定性, 跨桶翻转触发全刷。
+    def _resolve_display_panel(cls, state: dict) -> str:
+        """展示面板 = 基面板; 仅当基面板 idle 且 SHOW_ORCHESTRA 时展示
+        融合 orchestra 面板 (无轮换, 恒定)。SHOW_ORCHESTRA=False →
+        回退旧 idle 面板。
         """
         panel = cls._resolve_panel(state)
-        if panel != "idle" or not SHOW_ORCHESTRA:
-            return panel
-        last_report = state.get("orchestra_last_report") or {}
-        if not last_report.get("broker"):
-            return panel
-        if now is None:
-            now = time.time()
-        return "orchestra" if int(now // ORCHESTRA_ROTATE_SEC) % 2 else "idle"
+        if panel == "idle" and SHOW_ORCHESTRA:
+            return "orchestra"
+        return panel
 
     @staticmethod
     def _compute_data_hash(state: dict) -> str:
         """数据关键字段 hash — 变化时需全刷清残影。
 
         不含 services: 平台状态抖动不应触发全刷。
+        D9 融合面板: orchestra 内容即主数据 (任务列表/状态条), 变化走全刷。
         """
         data_fields = {
             "balance": state.get("balance", {}),
             "usage": state.get("usage", {}),
             "alerts": state.get("alerts", []),
             "weather": state.get("weather", {}),
+            "orchestra": state.get("orchestra", {}),
+            "orchestra_last_report": state.get("orchestra_last_report", {}),
         }
         # 上下文展示开启时, 上一会话变更也触发全刷
         if SHOW_CC_CONTEXT:
@@ -216,17 +227,16 @@ class EinkDashboard:
         ).hexdigest()
 
     @classmethod
-    def _compute_display_hash(cls, state: dict, now=None) -> str:
+    def _compute_display_hash(cls, state: dict) -> str:
         """全部展示字段 hash (含时间) — 决定是否需要局刷。
 
         不含 last_updated (每 60s 余额时间戳会无意义推刷);
         services 保留以便底栏健康状态可局刷更新。
-        orchestra 纳入: 内容变化走局刷, 面板轮换由 panel 键 (桶号) 触发全刷。
+        orchestra 纳入: 内容变化走局刷; 面板决议由 _resolve_display_panel
+        输出, 变化 (idle↔orchestra) 由 data hash / panel 键走全刷。
         """
-        if now is None:
-            now = time.time()
         display_fields = {
-            "panel": cls._resolve_display_panel(state, now),
+            "panel": cls._resolve_display_panel(state),
             "balance": state.get("balance", {}),
             "usage": state.get("usage", {}),
             "alerts": state.get("alerts", []),
@@ -263,9 +273,9 @@ class EinkDashboard:
         硬件异常向上抛出, 由 app 层 worker 捕获并 re-init。
         """
         now = time.time()
-        panel = self._resolve_display_panel(state, now)
+        panel = self._resolve_display_panel(state)
         data_hash = self._compute_data_hash(state)
-        display_hash = self._compute_display_hash(state, now)
+        display_hash = self._compute_display_hash(state)
 
         if display_hash == self._last_display_hash:
             return "none"
@@ -469,10 +479,10 @@ class EinkDashboard:
         self._draw_footer(draw, 15, FOOTER_Y, self.width - 30, state)
 
     def _draw_orchestra(self, draw: ImageDraw.Draw, state: dict) -> None:
-        """Orchestra 任务面板: Broker 健康 + 任务队列 + 活跃任务 + 最近任务
+        """Orchestra 融合面板 (D9): 紧凑状态条 + 最近任务列表 + 小字行
 
-        四卡使用 orchestra 专用高卡布局 (ORCH_CARD_H=170, 行1 y=62, 行2 y=246,
-        行间距 14px), 数值下移至 value_y=56 填满卡片中部, 消除 90px 垂直空白。
+        废弃四卡版: 两态/单数字信息压成单行状态条, 最近任务列表为主内容,
+        底部一行放 DeepSeek 余额/用量与天气, 适配研究编排工作流。
         """
         self._draw_title_bar(draw, state, show_date=True)
 
@@ -480,68 +490,89 @@ class EinkDashboard:
         rep = state.get("orchestra_last_report") or {}
         now = time.time()
 
-        # 卡1: Broker 健康 — 新鲜度推导 (无上报 "--"; 超阈值 "离线")
+        # ── 状态条: Broker {OK|离线|--} · 队列 {N|--} · 运行 {N|--} · 同步 ──
         broker_ts = rep.get("broker") or 0
         if not broker_ts:
-            health_value, health_sub = "--", ""
+            health = "--"
         else:
             age = now - broker_ts
             if age <= ORCHESTRA_STALE_SEC:
-                health = orch.get("broker_health") or "unknown"
-                if health == "ok":
-                    health_value = "OK"
-                elif health == "unknown":
-                    health_value = "--"
+                h = orch.get("broker_health") or "unknown"
+                if h == "ok":
+                    health = "OK"
+                elif h == "unknown":
+                    health = "--"
                 else:
-                    health_value = health
+                    health = h
             else:
-                health_value = "离线"
-            health_sub = self._fmt_ago(age)
-        self._draw_card(
-            draw, CARD_LEFT_X, ORCH_ROW1_Y, CARD_W, ORCH_CARD_H,
-            "Broker 健康", health_value, health_sub, value_y=56,
+                health = "离线"
+        sync_ts = rep.get("sync") or 0
+        sync_str = "--" if not sync_ts else self._fmt_age(sync_ts)
+        q = orch.get("queue_len")
+        a = orch.get("active_tasks")
+        strip = (
+            f"Broker {health} · 队列 {('--' if q is None else q)}"
+            f" · 运行 {('--' if a is None else a)} · 同步 {sync_str}"
         )
+        draw.text((15, ORCH_STATUS_Y), strip, fill=0, font=self.font_normal)
 
-        # 卡2: 任务队列 — 副标题为排队数 (队列总长 - 活跃数)
-        queue_len = orch.get("queue_len")
-        active = orch.get("active_tasks")
-        if queue_len is not None and active is not None:
-            queue_sub = f"排队 {max(queue_len - active, 0)}"
-        else:
-            queue_sub = ""
-        self._draw_card(
-            draw, CARD_RIGHT_X, ORCH_ROW1_Y, CARD_W, ORCH_CARD_H,
-            "任务队列",
-            "--" if queue_len is None else str(queue_len),
-            queue_sub,
-            value_y=56,
-        )
-
-        # 卡3: 活跃任务
-        self._draw_card(
-            draw, CARD_LEFT_X, ORCH_ROW2_Y, CARD_W, ORCH_CARD_H,
-            "活跃任务",
-            "--" if active is None else str(active),
-            "",
-            value_y=56,
-        )
-
-        # 卡4: 最近任务 — slug 用 font_medium + 像素级截断防溢出卡片
-        raw = orch.get("last_task")
-        if raw is None or not str(raw).strip():
-            task_value = "--"
-        else:
-            task_value = self._truncate_to_fit(
-                str(raw).strip(), self.font_medium, CARD_W - 20
+        # ── 最近任务列表 (主内容) ──
+        draw.text((15, ORCH_LIST_TITLE_Y), "最近任务", fill=0,
+                  font=self.font_medium)
+        tasks = orch.get("recent_tasks") or []
+        if not tasks:
+            msg = "（暂无上报）"
+            bbox = draw.textbbox((0, 0), msg, font=self.font_normal)
+            tw = bbox[2] - bbox[0]
+            th = bbox[3] - bbox[1]
+            draw.text(
+                (
+                    (self.width - tw) // 2,
+                    ORCH_LIST_Y + (ORCH_LIST_MAX_ROWS * ORCH_LIST_ROW_H - th) // 2,
+                ),
+                msg,
+                fill=0,
+                font=self.font_normal,
             )
-        sync_ts = rep.get("sync") or orch.get("last_sync") or 0
-        sync_sub = (
-            "同步 --" if not sync_ts else f"同步 {self._fmt_ago(now - sync_ts)}"
-        )
-        self._draw_card(
-            draw, CARD_RIGHT_X, ORCH_ROW2_Y, CARD_W, ORCH_CARD_H,
-            "最近任务", task_value, sync_sub, value_y=56,
-        )
+        else:
+            y = ORCH_LIST_Y
+            for item in tasks[:ORCH_LIST_MAX_ROWS]:
+                slug = str(item.get("slug", "")).strip() or "--"
+                slug = self._truncate_to_fit(
+                    slug, self.font_normal, ORCH_LIST_SLUG_W
+                )
+                draw.text((15, y), slug, fill=0, font=self.font_normal)
+
+                status = str(item.get("status", "")) or "--"
+                label = ORCH_STATUS_LABELS.get(status, status[:6])
+                draw.text((ORCH_STATUS_X, y), label, fill=0, font=self.font_normal)
+
+                age_s = self._fmt_age(item.get("ts"))
+                w = self.font_normal.getlength(age_s)
+                draw.text((ORCH_RIGHT_X - w, y), age_s, fill=0,
+                          font=self.font_normal)
+                y += ORCH_LIST_ROW_H
+
+        # ── DeepSeek/天气小字行 (整行超宽时先舍 desc 尾部字符) ──
+        bal = state.get("balance") or {}
+        usage = state.get("usage") or {}
+        wthr = state.get("weather") or {}
+        b = bal.get("total")
+        p = usage.get("period_spending")
+        line = f"¥{('--' if b is None else b)} · 本期 ¥{('--' if p is None else p)}"
+        temp = wthr.get("temp_c")
+        desc = wthr.get("desc")
+        max_w = self.width - 30
+        if temp is not None:
+            line += f" · {temp}°C"
+            if desc:
+                rest = f" {desc}"
+                while rest and self.font_normal.getlength(line + rest) > max_w:
+                    rest = rest[:-1]
+                line += rest
+        if self.font_normal.getlength(line) > max_w:
+            line = self._truncate_to_fit(line, self.font_normal, max_w)
+        draw.text((15, ORCH_INFO_Y), line, fill=0, font=self.font_normal)
 
         self._draw_footer(draw, 15, FOOTER_Y, self.width - 30, state)
 
@@ -619,15 +650,11 @@ class EinkDashboard:
         self, draw: ImageDraw.Draw,
         x: int, y: int, w: int, h: int,
         title: str, value: str, subtitle: str,
-        value_y: int = 32,
     ) -> None:
-        """通用卡片: 细线边框 + 标题 + 大号数值; 副标题贴底留缝
-
-        value_y 供高卡面板下移数值 (缺省 32 = 原布局, 其他面板零影响)。
-        """
+        """通用卡片: 细线边框 + 标题 + 大号数值; 副标题贴底留缝"""
         draw.rectangle([(x, y), (x + w, y + h)], outline=0)
         draw.text((x + 10, y + 8), title, fill=0, font=self.font_small)
-        draw.text((x + 10, y + value_y), value, fill=0, font=self.font_large)
+        draw.text((x + 10, y + 32), value, fill=0, font=self.font_large)
         if subtitle:
             # 贴底绘制, 与大号温度/金额拉开间距 (避免叠在 46px 字脚下)
             draw.text((x + 10, y + h - 28), subtitle, fill=0, font=self.font_small)
@@ -751,10 +778,26 @@ class EinkDashboard:
     # ─── 格式化辅助 ────────────────────────────
 
     @staticmethod
-    def _fmt_ago(age: float) -> str:
-        """秒差 → "Xs前" / "Xmin前" (同底栏更新时间的口径)"""
-        age = max(0, int(age))
-        return f"{age}s前" if age < 120 else f"{age // 60}min前"
+    def _fmt_age(ts) -> str:
+        """任务时间戳 (epoch 秒或 ISO) → "Xs前" / "Xmin前" / "Xh前" (无效 → "--")"""
+        if ts is None:
+            return "--"
+        if isinstance(ts, str):
+            try:
+                ts = datetime.fromisoformat(
+                    ts.strip().replace("Z", "+00:00")
+                ).timestamp()
+            except ValueError:
+                return "--"
+        try:
+            age = max(0, time.time() - float(ts))
+        except (TypeError, ValueError):
+            return "--"
+        if age < 60:
+            return f"{int(age)}s前"
+        if age < 3600:
+            return f"{int(age // 60)}min前"
+        return f"{int(age // 3600)}h前"
 
     @staticmethod
     def _truncate_to_fit(text: str, font, max_w: int) -> str:
@@ -834,6 +877,16 @@ def _demo_state() -> dict:
             "active_tasks": 1,
             "last_task": "T-20260819-demo",
             "last_sync": now - 180,
+            "recent_tasks": [
+                {"slug": "T-20260819-nightly-radar",
+                 "status": "running", "ts": now - 300},
+                {"slug": "T-20260819-trt-dsh",
+                 "status": "done", "ts": now - 600},
+                {"slug": "T-20260819-ctl-single",
+                 "status": "done", "ts": now - 720},
+                {"slug": "T-20260819-usb-smoke",
+                 "status": "failed", "ts": now - 7200},
+            ],
         },
         "orchestra_last_report": {"broker": now - 5, "sync": now - 180},
     }

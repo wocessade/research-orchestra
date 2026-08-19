@@ -58,7 +58,6 @@ SHOW_CC_CONTEXT = False
 # ─── Orchestra 状态面板 (subsystem-4) ─────────
 
 SHOW_ORCHESTRA = True        # 面板开关 (Task 2 起由 eink_dashboard 消费)
-ORCHESTRA_ROTATE_SEC = 60    # 状态块轮换周期 (秒)
 ORCHESTRA_STALE_SEC = 90     # 新鲜度阈值 = 3 × Broker poll 30s
 
 # ─── GPIO 引脚 (BCM 编号) ─────────────────────

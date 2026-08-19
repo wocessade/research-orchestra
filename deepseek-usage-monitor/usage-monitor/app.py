@@ -54,7 +54,6 @@ from config import (  # noqa: E402
     LED_RED_PIN,
     LED_GREEN_PIN,
     SHOW_ORCHESTRA,
-    ORCHESTRA_ROTATE_SEC,
     ORCHESTRA_STALE_SEC,
 )
 
@@ -96,6 +95,7 @@ state = {
         "active_tasks": None,
         "last_task": None,
         "last_sync": None,
+        "recent_tasks": [],
     },
     "orchestra_last_report": {"broker": 0, "sync": 0},  # epoch 秒, 无上报 = 0
     "last_updated": {"balance": 0, "usage": 0, "status": 0, "weather": 0},
@@ -513,9 +513,15 @@ def update_orchestra():
       "queue_len": 3,
       "active_tasks": 1,
       "last_task": "T-20260819-e2e-dsh",
-      "last_sync": 1750000000.25
+      "last_sync": 1750000000.25,
+      "recent_tasks": [
+        {"slug": "T-...", "status": "running", "ts": 1750000000.0},
+        ...
+      ]
     }
-    五个字段任意子集; 非法字段忽略且不计入 merged。
+    字段任意子集; 非法字段忽略且不计入 merged。
+    recent_tasks 必须为 list, 每项为含 slug/status/ts 的 dict; 非法项丢弃,
+    合法后整表替换 (Broker 权威), 仅保留前 8 条。
     """
     data = request.get_json() or {}
     source = data.get("source", "broker")
@@ -550,6 +556,47 @@ def update_orchestra():
                         "orchestra: invalid broker_health=%r ignored", value
                     )
                     continue
+            elif field == "recent_tasks":
+                if not isinstance(value, list):
+                    log.warning(
+                        "orchestra: invalid recent_tasks=%r ignored (not list)",
+                        value,
+                    )
+                    continue
+                tasks = []
+                for item in value:
+                    if not isinstance(item, dict):
+                        log.warning(
+                            "orchestra: recent_tasks item not dict ignored: %r",
+                            item,
+                        )
+                        continue
+                    slug = item.get("slug")
+                    status = item.get("status")
+                    ts = item.get("ts")
+                    if not isinstance(slug, str) or not slug.strip():
+                        log.warning(
+                            "orchestra: recent_tasks item bad slug ignored: %r",
+                            item,
+                        )
+                        continue
+                    if not isinstance(status, str) or not status.strip():
+                        log.warning(
+                            "orchestra: recent_tasks item bad status ignored: %r",
+                            item,
+                        )
+                        continue
+                    if isinstance(ts, bool) or not isinstance(ts, (str, int, float)):
+                        log.warning(
+                            "orchestra: recent_tasks item bad ts ignored: %r",
+                            item,
+                        )
+                        continue
+                    tasks.append({"slug": slug, "status": status, "ts": ts})
+                # 整表替换 (Broker 权威), 仅保留前 8 条
+                orch[field] = tasks[:8]
+                merged.append(field)
+                continue
             orch[field] = value
             merged.append(field)
         state["orchestra_last_report"][source] = time.time()

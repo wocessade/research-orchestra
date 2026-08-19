@@ -72,17 +72,24 @@ FOOTER_H = 52
 # orchestra 融合面板 (D9): 紧凑状态条 + 最近任务列表 + DeepSeek/天气小字行
 # D10: 下半新增设备区 (Broker/核桃派 负载内存), 任务行高收紧 40→36
 ORCH_STATUS_Y = 58        # 状态条 (font_normal 单行)
-ORCH_LIST_TITLE_Y = 88    # 「最近任务」标题 (font_title 加粗)
-ORCH_LIST_Y = 118         # 列表首行 (标题 24px 底 112 留 6px)
+ORCH_BOX_X1 = 15          # 模块外框左/右边界 (与内容边距对齐)
+ORCH_BOX_X2 = 785
+ORCH_BOX_PAD_X = 24       # 框内内容左缩进 (D12: 与左框线留 9px)
+ORCH_BOX1_TOP = 82        # 框1「最近任务」顶 (状态条底 78 留 4px)
+ORCH_LIST_TITLE_Y = 86    # 「最近任务」标题 (font_title 加粗; D12 上移, 底 110)
+ORCH_LIST_Y = 122         # 列表首行 (标题底留 12px 正文间隙)
 ORCH_LIST_ROW_H = 36      # 列表行高
 ORCH_LIST_MAX_ROWS = 5    # 最多 5 行
-ORCH_LIST_SLUG_W = 480    # slug 像素截断宽 = 60% 屏宽
+ORCH_LIST_SLUG_W = 468    # slug 像素截断宽 (24+468=492, 到状态列 500 留 8)
 ORCH_STATUS_X = 500       # 状态标签列 x
-ORCH_RIGHT_X = 785        # 时间右对齐 x (800-15)
-ORCH_DEV_TITLE_Y = 306    # 「设备」标题 (font_title 加粗; 列表底 298 留 8px)
-ORCH_DEV_ROW1_Y = 336     # 设备行1: 4B Broker (标题底 330 留 6px, D11 拉开)
-ORCH_DEV_ROW2_Y = 358     # 设备行2: 核桃派 (本机)
-ORCH_INFO_Y = 386         # DeepSeek/天气小字行 (行2 底 380 留 6px)
+ORCH_RIGHT_X = 776        # 时间右对齐 x (与右框线 785 留 9px, D12)
+ORCH_BOX1_BOTTOM = 296    # 框1 底 (末行 266 底 288 留 8px)
+ORCH_BOX2_TOP = 304       # 框2「设备」顶 (与框1 留 8px)
+ORCH_DEV_TITLE_Y = 308    # 「设备」标题 (font_title 加粗; D12 上移, 底 332)
+ORCH_DEV_ROW1_Y = 344     # 设备行1: 4B Broker (标题底留 12px 正文间隙)
+ORCH_DEV_ROW2_Y = 366     # 设备行2: 核桃派 (本机)
+ORCH_BOX2_BOTTOM = 396    # 框2 底 (行2 底 388 留 8px)
+ORCH_INFO_Y = 402         # DeepSeek/天气小字行 (框2 底留 6px, 底 424 距 footer 6px)
 
 # 最近任务状态 → 中文标签 (未识别状态回退原串截断)
 ORCH_STATUS_LABELS = {
@@ -521,6 +528,16 @@ class EinkDashboard:
         rep = state.get("orchestra_last_report") or {}
         now = time.time()
 
+        # ── 模块外框 (D12 预览): 最近任务 / 设备 两框 ──
+        draw.rectangle(
+            [(ORCH_BOX_X1, ORCH_BOX1_TOP), (ORCH_BOX_X2, ORCH_BOX1_BOTTOM)],
+            outline=0,
+        )
+        draw.rectangle(
+            [(ORCH_BOX_X1, ORCH_BOX2_TOP), (ORCH_BOX_X2, ORCH_BOX2_BOTTOM)],
+            outline=0,
+        )
+
         # ── 状态条: Broker {OK|离线|--} · 队列 {N|--} · 运行 {N|--} · 同步 ──
         health = self._broker_health(rep, orch, now)
         sync_ts = rep.get("sync") or 0
@@ -534,7 +551,7 @@ class EinkDashboard:
         draw.text((15, ORCH_STATUS_Y), strip, fill=0, font=self.font_normal)
 
         # ── 最近任务列表 (主内容) ──
-        draw.text((15, ORCH_LIST_TITLE_Y), "最近任务", fill=0,
+        draw.text((ORCH_BOX_PAD_X, ORCH_LIST_TITLE_Y), "最近任务", fill=0,
                   font=self.font_title)
         tasks = orch.get("recent_tasks") or []
         if not tasks:
@@ -558,7 +575,7 @@ class EinkDashboard:
                 slug = self._truncate_to_fit(
                     slug, self.font_normal, ORCH_LIST_SLUG_W
                 )
-                draw.text((15, y), slug, fill=0, font=self.font_normal)
+                draw.text((ORCH_BOX_PAD_X, y), slug, fill=0, font=self.font_normal)
 
                 status = str(item.get("status", "")) or "--"
                 label = ORCH_STATUS_LABELS.get(status, status[:6])
@@ -571,7 +588,7 @@ class EinkDashboard:
                 y += ORCH_LIST_ROW_H
 
         # ── 设备区: 4B Broker / 核桃派 (本机) 负载·内存 ──
-        draw.text((15, ORCH_DEV_TITLE_Y), "设备", fill=0,
+        draw.text((ORCH_BOX_PAD_X, ORCH_DEV_TITLE_Y), "设备", fill=0,
                   font=self.font_title)
         host = orch.get("host") or {}
         # 行1: Broker 在线状态 = 与状态条相同的新鲜度推导
@@ -581,7 +598,7 @@ class EinkDashboard:
             f" · 负载 {self._fmt_val(host.get('load1'))}"
             f" · 内存 {self._fmt_val(host.get('mem_pct'), '%')}"
         )
-        draw.text((15, ORCH_DEV_ROW1_Y), r1, fill=0, font=self.font_normal)
+        draw.text((ORCH_BOX_PAD_X, ORCH_DEV_ROW1_Y), r1, fill=0, font=self.font_normal)
         # 行2: 核桃派 (本机, 进程存活即 OK)
         self_st = state.get("self_status") or {}
         r2 = (
@@ -589,7 +606,7 @@ class EinkDashboard:
             f" · 负载 {self._fmt_val(self_st.get('load1'))}"
             f" · 内存 {self._fmt_val(self_st.get('mem_pct'), '%')}"
         )
-        draw.text((15, ORCH_DEV_ROW2_Y), r2, fill=0, font=self.font_normal)
+        draw.text((ORCH_BOX_PAD_X, ORCH_DEV_ROW2_Y), r2, fill=0, font=self.font_normal)
 
         # ── DeepSeek/天气小字行 (整行超宽时先舍 desc 尾部字符) ──
         bal = state.get("balance") or {}

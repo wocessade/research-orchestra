@@ -33,6 +33,13 @@
 - 产出：digest.json / digest.txt / top5.json / papers_all.json；邮件投递有 /tmp/radar-sent-<日期> 幂等标记（防重试重复发信）
 - 周日 04:00 housekeeping：清理 14 天前 dsh 会话、磁盘余量告警（邮件）；日志 logrotate 7 天
 
+## 实验管线闭环（mission 025 / 总 spec §6.2）
+
+- 实验卡（`.research/experiments/EXP-*/card.md`）新增 `## Commands` 段：无头可执行命令、`# arm: <id>` 臂标记、数值只来自 run artifact（最后一条命令产 metrics.json，符合 metrics.schema.json）
+- 闭环：卡 → CC 审查 → Broker 入队 → shell/dsh 无头执行 → metrics.json → `run_card.py ingest` 入账（engine ingest_run.py）→ CC 复查写 reports/（数字只引用 ingest artifact 路径）
+- `scripts/run_card.py commands <card.md> [--arm ID]` 提取卡命令生成任务文件；`scripts/run_card.py ingest <metrics.json> --card <card.md> --research-root <root>` 入账（engine 三脚本只被调用不改动）
+- 验收 demo：`orchestra/demo/`（EXP-001 对照实验，研究根隔离在 demo/.research/）；验收报告 `reports/2026-08-experiment-loop-acceptance.md`
+
 ## 部署连接（当前家庭网络）
 
 - 4B：WiFi `liudfs`，静态 IP `192.168.0.250`（NetworkManager 连接名 liudfs；备用：有线 DHCP）

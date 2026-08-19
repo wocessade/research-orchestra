@@ -1,6 +1,6 @@
 # Research Orchestra — 以 Claude Code 为核心的科研-实验-论文框架（总架构设计）
 
-> 日期：2026-08-18 | 修订：2026-08-19（v2：VRAM 修正 12GB、Pi 任务代理三层架构、微信桥接入、网络分区与离线降级；v3：SSD 直挂存储、重型任务断网=排队断点续传（弃本地小模型硬扛）、主机移动网络方案、宿舍 NAS 待建、采购评估 §14；v4：4B 确认为 2GB（冒烟即升级决策门）、核桃派迁移完成（分机部署定稿）、§15 与 OpenClaw/Hermes 定位澄清）
+> 日期：2026-08-18 | 修订：2026-08-19（v2：VRAM 修正 12GB、Pi 任务代理三层架构、微信桥接入、网络分区与离线降级；v3：SSD 直挂存储、重型任务断网=排队断点续传（弃本地小模型硬扛）、主机移动网络方案、宿舍 NAS 待建、采购评估 §14；v4：4B 确认为 2GB（冒烟即升级决策门）、核桃派迁移完成（分机部署定稿）、§15 与 OpenClaw/Hermes 定位澄清；v5：subsystem-2 验收完成（实验卡 Commands 约定 + ingest 闭环）、存储/模板表述与现状同步）
 > 术语：CC = Claude Code（本机交互主脑）；dsh = DeepSeek Harness（执行层引擎）；Codex = OpenAI Codex CLI（副脑，后续加入）；Broker = Pi 任务代理服务器
 
 ## 1. 背景与目标
@@ -16,11 +16,11 @@
 | 硬件 | 关键规格（已实测/已核实） | 角色 | 依据与约束 |
 |---|---|---|---|
 | Windows 本机 | i7-11800H 8C/16T、64GB RAM（2×32GB @3200）、**RTX 3060 Laptop 12GB VRAM**（nvidia-smi 实测 12288 MiB；Win32 AdapterRAM 字段 4GB 截断，不可信）、4 盘共 2.4TB、Win10 19045、Hyper-V 可用 | **指挥中枢 + 重计算 + 本地推理** | CC 驻地；docx/pptx、Playwright、OCR、git、微信桥均在本机；Node v24.15.0 满足 dsh；**12GB VRAM 可跑 7B-8B 量化本地模型**（断网 LLM 降级） |
-| 树莓派 4B | BCM2711 quad A72，**2GB 内存（已确认）**，Raspberry Pi OS，SPI0 可用；usage-monitor **已迁至核桃派**，4B 现专职 Broker；**存储：用户已有 2280 SSD 经 USB3 转接盒直挂**，系统与 broker 数据落 SSD，SD 仅作安装/引导备份 | **Pi Broker：常驻任务代理服务器 + dsh 执行节点** | 7×24 常驻、Node arm64 可用；**2GB 是 dsh 冒烟测试的核心风险——冒烟即升级决策门**（过则留下，吃紧则按 §14 上 Pi 5） |
+| 树莓派 4B | BCM2711 quad A72，**2GB 内存（已确认）**，Raspberry Pi OS，SPI0 可用；usage-monitor **已迁至核桃派**，4B 现专职 Broker；**存储：broker 数据落闪迪 16G U 盘（ext4，fstab UUID+nofail 挂载 /mnt/broker，写入/WAL 冒烟通过；金士顿盘写入负载拖死整机已弃用）**；2280 SSD 留作宿舍 NAS/冷备扩容候选 | **Pi Broker：常驻任务代理服务器 + dsh 执行节点** | 7×24 常驻、Node arm64 可用；**2GB 是 dsh 冒烟测试的核心风险——冒烟即升级决策门**（过则留下，吃紧则按 §14 上 Pi 5） |
 | 核桃派 1B | 全志 H616/H618，**1GB 内存**，Debian 12，仅 SPI1（`/dev/spidev1.0`），user `pi/pi` | **展示/物理 I/O 层**（usage-monitor **已迁移至此并运行**，墨水屏+LED 在役）+ Broker 冷备候选 | 1GB 跑 dsh 风险高，不推荐；Flask 轻量展示可承载；存储沿用 SD（轻负载） |
-| 宿舍/实验室 NAS | Liudfs-NAS **不可用**（用户实验室/宿舍场景）；宿舍 NAS 需另建 | results/logs 异地冷备 | 待定：候选方案见 §12；Broker 主存储已由 SSD 解决，NAS 是冗余层不是必需层 |
+| 宿舍/实验室 NAS | Liudfs-NAS **不可用**（用户实验室/宿舍场景）；宿舍 NAS 需另建 | results/logs 异地冷备 | 待定：候选方案见 §12；Broker 主存储已由闪迪 U 盘解决，NAS 是冗余层不是必需层 |
 
-**分派原则：计算重在本机，调度与常驻在 4B（SSD 直挂），物理展示在核桃派，冷备在宿舍 NAS（待建，非必需）。**
+**分派原则：计算重在本机，调度与常驻在 4B（闪迪 U 盘直挂 /mnt/broker），物理展示在核桃派，冷备在宿舍 NAS（待建，非必需）。**
 
 ## 3. 软件资产与已有接口（对齐清单）
 
@@ -32,7 +32,7 @@
 | nature-literature-pipeline 等 | 文献雷达 ingest 后端 | 夜间定时任务自然负载（Broker 常驻执行） | 不重写 |
 | ~/.codex 残留 | `config.toml`、`auth.json`、`sessions/`、`memories/`、`plugins/`、`computer-use/`；VS Code `openai.chatgpt` 插件 | Codex CLI 装回后复用登录与历史（§6.3） | **勿删勿改残留** |
 | v2rayN 代理 | SOCKS5 `127.0.0.1:10808`（Win） | API 连通性兜底（§7） | 不动配置 |
-| 缺失项 | dsh（未装）、codex CLI（未装）、docker（未装）、Ollama（未装，断网降级用） | 安装方案见 §6.1/§6.3/§7 | — |
+| 缺失项 | ~~dsh~~（已装 0.1.0-rc.7，4B+Windows 双侧，mission 021 冒烟通过）；codex CLI（未装）、docker（未装）、Ollama（未装，断网降级用） | 安装方案见 §6.1/§6.3/§7 | — |
 
 ## 4. 总体架构（三层）
 
@@ -51,7 +51,7 @@
 ├────────────────────── 展示/物理面（核桃派 1B 优先，4B 兼容）────────┤
 │  usage-monitor：墨水屏 + LED + 告警（扩展 broker 队列视图 §6.4）     │
 └──────────────────────────────────────────────────────────────────┘
-存储：4B 用 2280 SSD（USB3 转接）承载系统+broker 数据；宿舍 NAS（待建）做异地冷备
+存储：4B broker 数据落闪迪 U 盘 /mnt/broker（2026-08-19 迁移完成）；宿舍 NAS（待建）做异地冷备
 ```
 
 跨层通信四条总线，避免点对点耦合：
@@ -93,6 +93,8 @@ acceptance: <可验证的验收条件>
 result: results/T-20260819-xxx/
 ```
 
+> **v1 落地裁剪（mission 021 DECISIONS）**：priority/schedule/acceptance 三字段 v1 未实现——priority 在个位数队列规模下无意义（YAGNI）、schedule 由 systemd timer 承担、acceptance 由 CC 复查（reports/）承担。Broker v1 严格格式：`executor: dsh|shell`、`net: required|optional`、`result`、`timeout` + 执行体。字段语义保留，后续版本按需加回。
+
 **规则**：任务文件是唯一派发入口；CC 复查后写 `reports/` 并标注 `reviewed: ok|reject`；reject 标注原因留在 tasks/ 待重派或降级重派。
 
 ## 6. 子系统接口
@@ -123,6 +125,7 @@ result: results/T-20260819-xxx/
 - **engine 三脚本不改**，仅作为消费端；`program.yaml` compute mode 保持 `human_in_loop`
 - **本地算力边界（v2 修正）**：12GB VRAM → 7B-8B 量化模型舒适（q4 ≈ 5-6GB）、14B q4 临界；64GB RAM 可 CPU offload 更大模型。**注意：本地小模型只适合轻量任务，不是重型 LLM 工作的断网降级方案**——重型任务断网时排队断点续传（§7）
 - **验收**：对照实验（单次 LLM 调用 vs dsh 多步 agent 同一抽取任务）数字全部走 ingest，无手抄数字
+- **状态（2026-08-19）**：细化 spec 与实施见 `plans/2026-08-19-subsystem-2-experiment-loop.md`；对照实验验收通过（验收报告 `orchestra/reports/2026-08-experiment-loop-acceptance.md`）：shell 单次调用与 dsh 多步 agent 两臂均产出合规 metrics.json 并经 ingest_run.py 入账，无手抄数字。
 
 ### 6.3 子系统 3：双 agent 验证（CC × Codex）
 
@@ -153,7 +156,7 @@ result: results/T-20260819-xxx/
   - **出站**：任务完成/失败/复查请求 → 微信消息推送到用户手机（人在校园也能收）
   - **入站**：用户微信发指令 → 桥启动 CC 会话 → CC 操作编排器（派任务/查状态/批准复查）——"人在环"的远程形态
   - **接入方式**：orchestra 运行器脚本复用桥的发送接口（细化 spec 时读 bridge.mjs 确认推送函数，**不改桥本体**）
-- **降级链**：微信（需 Windows+iLink 外网）→ QQ 邮件（需 Windows+SMTP）→ 墨水屏/LED（纯 Pi 侧 LAN，最终兜底）
+- **降级链**：微信（需 Windows+iLink 外网）→ QQ 邮件（**Pi 直发，24/7**——023 已部署 send_email.py 并实测成功，原"需 Windows+SMTP"表述作废）→ 墨水屏/LED（纯 Pi 侧 LAN，最终兜底）
 - **验收**：Broker 完成一个定时任务后，手机微信收到结果摘要；微信发"查任务"收到队列状态回复
 
 ## 7. 网络分区与离线降级
@@ -163,7 +166,7 @@ result: results/T-20260819-xxx/
 | 场景 | 降级策略 |
 |---|---|
 | 外网不稳/断 | ① 任务按 `net` 分级：optional（本地脚本/实验/文件处理）断网照跑；required（LLM/抓取）排队+指数退避重试（复用已有 USAGE_LOGIN_BACKOFF 模式）② API 连通性兜底：v2rayN SOCKS5（Win 127.0.0.1:10808）；Pi 可配 HTTPS_PROXY 走本机 ③ **重型 LLM 任务断网 = 排队断点续传**（dsh 会话 resume 原生支持，网络恢复自动续跑），**不用本地小模型硬扛**——8B 量化对重型任务不够，默认不装 Ollama（仅当出现轻量本地推理需求时再评估） |
-| Windows 脱机 | Broker 照常（队列/定时/LLM 任务不经 Windows）；复查延后；微信/邮件停用，告警走墨水屏/LED |
+| Windows 脱机 | Broker 照常（队列/定时/LLM 任务不经 Windows）；复查延后；微信停用、**邮件正常（Pi 直发）**，告警走墨水屏/LED |
 | LAN 断 | 系统停摆（最不可能）；Broker 侧任务状态已持久化，LAN 恢复后续跑，不丢队列 |
 | 主机移动（宿舍↔实验室） | 见下方"主机移动与远程访问"专段 |
 | 网络错峰 | 需外网的批量任务（文献抓取、大模型跑量）排在夜间网络稳定时段（systemd timer 定时） |
@@ -215,7 +218,7 @@ CC 写 tasks/T-*.md ──git push/SSH──> Broker 队列(SQLite) ──dispat
 | 风险 | 缓解 |
 |---|---|
 | **4B 仅 2GB，dsh 内存占用未实测** | 冒烟测试即升级决策门：Minimal 模式跑通且稳定 → 留下；吃紧 → §14 上 Pi 5 8GB（触发条件已明确） |
-| Pi 存储可靠性（SD 写磨损） | **已解决**：2280 SSD USB3 转接直挂 4B，系统与 broker 数据落 SSD，SD 仅安装/引导 |
+| Pi 存储可靠性（SD 写磨损） | **已解决**：闪迪 16G U 盘 ext4 直挂 /mnt/broker（fstab UUID+nofail，写入/WAL 冒烟通过；金士顿盘写入负载下拖死整机已弃用）；SSD+转接盒留作宿舍 NAS/冷备扩容候选 |
 | Broker 单点（4B 挂则常驻层停） | 核桃派冷备；队列目录 git 同步，手动切换（自动化主备切换明确不做，过度设计） |
 | 宿舍 NAS 待建（异地冷备缺失期） | git 同步 + SSD 直挂已覆盖主要风险；NAS 是冗余层非必需层，方案见 §14 |
 | 校园网宿舍-实验室是否互通未知 | 入学后实测；不通则 Tailscale/ZeroTier（§7 已定优先级） |
@@ -229,7 +232,7 @@ CC 写 tasks/T-*.md ──git push/SSH──> Broker 队列(SQLite) ──dispat
 
 后续细化 spec（逐个编写，建议顺序，编号与 §6 一一对应）：
 1. `subsystem-1-pi-broker`（Broker 部署：队列/dispatcher/checkpoint/resume + 4B dsh 安装与冒烟 + SSD 挂载）★最先
-2. `subsystem-2-experiment-loop`（实验卡命令字段约定 + ingest 对接）
+2. ~~subsystem-2-experiment-loop~~（✅ 已细化并验收，见 §6.2 状态行）
 3. `subsystem-3-codex-dual-agent`（CLI 安装 + 三模式脚本化）
 4. `subsystem-4-dashboard-orchestra`（state/orchestra + 墨水屏面板 + 上报脚本）
 5. `subsystem-5-haiku-dispatch`（rules.yaml 结构与判定清单）
@@ -241,7 +244,7 @@ CC 写 tasks/T-*.md ──git push/SSH──> Broker 队列(SQLite) ──dispat
 
 | 候选采购 | 触发条件 | 预估 | 建议 |
 |---|---|---|---|
-| USB3 M.2 转接盒（2280） | 立即（**唯一推荐现在买**，几十元） | ~40-60 元 | 用户已有 SSD，转接盒是打通 4B 存储的最小投入 |
+| USB3 M.2 转接盒（2280） | ~~立即（唯一推荐现在买，几十元）~~ **已购**；存储现走闪迪 U 盘，SSD 留作宿舍 NAS/冷备扩容 | ~40-60 元 | 已购待用 |
 | Pi 5 8GB/16GB（替换 4B 作 Broker） | 4B 内存 <4GB 且 dsh 冒烟吃紧 | ~500 元 | 性能翻数倍、PCIe 原生；4B 退役为实验节点 |
 | 宿舍 NAS：N100 小主机（二手/准系统） | 异地冷备需求 + 宿舍常驻设备 | ~500-800 元 | 同价位性能远强于品牌 NAS；还能兼作备用执行节点/跑本地小模型 |
 | 品牌 NAS（群晖等） | 不推荐 | — | 溢价高，N100 方案更优 |

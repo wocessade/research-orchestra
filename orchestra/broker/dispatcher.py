@@ -17,13 +17,27 @@ log = logging.getLogger("dispatcher")
 def load_config(path: str = "config.json") -> dict:
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
-def build_payload(conn) -> dict:
-    """report_status 的 payload 纯函数：4 字段 + recent_tasks（最多 5 条，ts 降序）。
-    旧 monitor 忽略新字段，向后兼容。"""
+def read_host_stats() -> dict | None:
+    """读本机负载/内存（供墨水屏设备区显示）：/proc/loadavg 首列 load1（1 位小数）、
+    /proc/meminfo MemTotal/MemAvailable → mem_pct（整数百分比）。
+    文件不存在或解析失败 → None（非 Linux 或容器内无 /proc）。"""
+    try:
+        load1 = float(Path("/proc/loadavg").read_text().split()[0])
+        mem_lines = Path("/proc/meminfo").read_text().splitlines()
+        total = next(int(l.split()[1]) for l in mem_lines if l.startswith("MemTotal:"))
+        avail = next(int(l.split()[1]) for l in mem_lines if l.startswith("MemAvailable:"))
+    except (OSError, ValueError, StopIteration):
+        return None
+    return {"load1": round(load1, 1), "mem_pct": round(100 * (1 - avail / total))}
+
+def build_payload(conn, host_stats: dict | None = None) -> dict:
+    """report_status 的 payload 纯函数：4 字段 + recent_tasks（最多 5 条，ts 降序）
+    + host 负载/内存。host_stats 注入（测试用假值）；None 时读本机 /proc，
+    读不到则不包含 host 键（旧 monitor / 无 /proc 环境向后兼容）。"""
     done = db.list_tasks(conn, "done")
     queued = len(db.list_tasks(conn, "queued"))
     running = len(db.list_tasks(conn, "running"))
-    return {
+    payload = {
         "broker_health": "ok",
         "queue_len": queued + running,
         "active_tasks": running,
@@ -33,6 +47,10 @@ def build_payload(conn) -> dict:
             for slug, status, ts in db.list_recent(conn)
         ],
     }
+    stats = host_stats if host_stats is not None else read_host_stats()
+    if stats is not None:
+        payload["host"] = stats
+    return payload
 
 def report_status(cfg: dict, conn) -> None:
     api = cfg.get("api_url")

@@ -170,6 +170,38 @@ class TestDispatcher(unittest.TestCase):
         self.assertEqual(payload["active_tasks"], 0)
         self.assertIsNone(payload["last_task"])
         self.assertEqual(payload["recent_tasks"], [])
+        self.assertNotIn("host", payload)  # 本机无 /proc（如 Windows）→ 无 host 键
+
+    def test_build_payload_host_stats(self):
+        payload = dispatcher.build_payload(self.conn, host_stats={"load1": 0.3, "mem_pct": 38})
+        self.assertEqual(payload["host"], {"load1": 0.3, "mem_pct": 38})
+        # 既有字段不受影响
+        self.assertEqual(payload["broker_health"], "ok")
+        self.assertEqual(payload["recent_tasks"], [])
+
+    def test_build_payload_no_host_key_when_stats_none(self):
+        # 注入 None（或读 /proc 失败）→ 不含 host 键，向后兼容
+        with mock.patch.object(dispatcher, "read_host_stats", return_value=None):
+            payload = dispatcher.build_payload(self.conn)
+        self.assertNotIn("host", payload)
+
+    def test_read_host_stats_parses_proc(self):
+        # Path.read_text 走 io.open 不走 builtins.open，故直接 mock Path.read_text
+        fake = {
+            "/proc/loadavg": "0.34 0.21 0.18 1/223 456\n",
+            "/proc/meminfo": "MemTotal:       1024000 kB\nMemAvailable:   634880 kB\n",
+        }
+        with mock.patch.object(dispatcher.Path, "read_text", autospec=True,
+                               side_effect=lambda self: fake[self.as_posix()]):
+            stats = dispatcher.read_host_stats()
+        self.assertEqual(stats, {"load1": 0.3, "mem_pct": 38})  # round(0.34,1)=0.3；已用 38% → 38
+
+    def test_read_host_stats_none_when_missing(self):
+        # /proc 不存在（Windows/容器）或解析失败 → None
+        with mock.patch.object(dispatcher.Path, "read_text", side_effect=FileNotFoundError):
+            self.assertIsNone(dispatcher.read_host_stats())
+        with mock.patch.object(dispatcher.Path, "read_text", side_effect=ValueError("garbage")):
+            self.assertIsNone(dispatcher.read_host_stats())
 
     def test_bad_taskfile_archived_as_bad(self):
         # 哨兵审计 INFO-4：解析失败的任务文件按 .bad 归档，防每 30s 刷错误日志

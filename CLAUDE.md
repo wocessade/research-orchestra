@@ -28,15 +28,16 @@
 
 - 派任务：T-*.md 任务卡 → `orchestra/scripts/sync_push.sh` → 4B broker 队列执行 → attempt-N 落盘
 - 状态：4B reporter 每 30s POST 核桃派 usage-monitor（X-Monitor-Token 鉴权）→ 墨水屏融合面板
-- 雷达：每晚 23:30 自动注入（模板 `orchestra/templates/nightly-radar.md`），晨间 QQ 邮箱日报
+- 雷达：每晚 23:30 注入四阶段任务（`templates/nightly-radar-{fetch,rank,render,notify}.md` → 10/20/30/40，depends_on 串联），晨间 QQ 邮箱日报
 - 定时：03:00 冷备到核桃派 / 04:17 NAS 盘内备份 / 周日 04:00 housekeeping
 - 双 agent：`orchestra/scripts/codex_exec.py` + `codex_modes.py`（互审/双实现/claim 核验）；本机 codex 冷启动 ~2min，互审建议 --timeout ≥900
 - 模型路由：任务卡 `model: flash|pro` 字段（dsh --patch）；codex 三档由 CC 查 `orchestra/config/model-routing.json` 透传
-- 测试：broker 41 unittest / scripts 124（discover 从各自目录跑）
+- 并发两档：标准档（4-8 路扁平，030 已实战）/ 树状档（2 层×≤3 子树×≤12 叶子，031 首跑）；opus 只接口+统一 commit，agent 不 commit；约定 `docs/superpowers/specs/2026-08-20-concurrent-work-modes.md`
+- 测试：broker 102 unittest / scripts 154（discover 从各自目录跑；Windows 上 3 个平台正当 skip）
 
 ## 当前挂账（更新日期 2026-08-20）
 
-- executor.py 3 条 codex 审出 finding 待修（需 Pi 部署窗口）
+- SOL 重构 + 030 修复已合并入库（a2d31b8）：四阶段雷达、artifact 校验、taskkill 树杀等需一次 Pi 部署窗口；skills.json expected_digest=null → 真实 ingest 被 HARD 阻断，需用户提供 Skill 后 `--lock-current --strict`
 - 入学前（2026-09）：弱密码整改（见 `orchestra/docs/school-network-switch.md`）、宿舍-实验室互通实测、Tailscale 切换
 - 雷达→Zotero 直连方向已提出，待用户拍板（`docs/superpowers/plans/2026-08-20-radar-digest-reading-note.md`）
 - 双 agent 想法池剩余项（resume 脚本化 / usage 统计）待选（模型路由表已落地，spec `docs/superpowers/specs/2026-08-20-model-routing-design.md`）

@@ -13,6 +13,7 @@ class TaskSpec:
     result_dir: str
     timeout: int
     body: str
+    model: str | None = None   # dsh 模型档位（flash|pro），缺省用 profile 默认
 
 _REQUIRED = ("executor", "net", "result")
 
@@ -48,4 +49,5 @@ def parse_taskfile(path: str | Path) -> TaskSpec:
         result_dir=fields["result"],
         timeout=int(fields.get("timeout", "3600")),
         body=body,
+        model=fields.get("model"),
     )

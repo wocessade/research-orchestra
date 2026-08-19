@@ -57,5 +57,24 @@ class TestParseTaskfile(unittest.TestCase):
         with self.assertRaises(ValueError):
             taskfile.parse_taskfile(self.path)
 
+    def test_model_field_optional_default_none(self):
+        with open(self.path, "w", encoding="utf-8") as f:
+            f.write("# T-1\n" "executor: shell\n" "net: optional\n" "result: r\n" "---\necho hi\n")
+        self.assertIsNone(taskfile.parse_taskfile(self.path).model)
+
+    def test_model_field_passthrough(self):
+        with open(self.path, "w", encoding="utf-8") as f:
+            f.write("# T-1\n" "executor: shell\n" "net: optional\n" "result: r\n" "model: flash\n" "---\necho hi\n")
+        self.assertEqual(taskfile.parse_taskfile(self.path).model, "flash")
+        with open(self.path, "w", encoding="utf-8") as f:
+            f.write("# T-1\n" "executor: shell\n" "net: optional\n" "result: r\n" "model: pro\n" "---\necho hi\n")
+        self.assertEqual(taskfile.parse_taskfile(self.path).model, "pro")
+
+    def test_model_field_not_validated(self):
+        # 档位校验责任在写卡的 CC；解析层透传不校验
+        with open(self.path, "w", encoding="utf-8") as f:
+            f.write("# T-1\n" "executor: shell\n" "net: optional\n" "result: r\n" "model: weird-tier\n" "---\necho hi\n")
+        self.assertEqual(taskfile.parse_taskfile(self.path).model, "weird-tier")
+
 if __name__ == "__main__":
     unittest.main()

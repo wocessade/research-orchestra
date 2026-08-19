@@ -32,7 +32,7 @@
 | 2 | dashboard orchestra 块 | `dashboard-after-activation.json`：orchestra 块含 active_tasks / broker_health / host / last_sync / last_task / queue_len / recent_tasks 7 字段，`broker_health=ok`，host.load1/mem_pct 有值 | PASS |
 | 3 | push 链路 30-60s 刷新 | 上报节奏 30s：`e2e-broker-post-gap.txt` 中 13:17:22→13:26:24 相邻 POST 均为 ~30s 步进；last_report.broker 步进 13:09:50 → 13:25:54 → 13:26:24 → 13:30:25（激活快照 + 三帧）。push→面板可见：last_sync 在帧2（13:27:54 采集）已可见（push 13:26:36-40，约 75s）；任务状态变化在 done（13:28:24）后 1s 上报（13:28:25）+ 2-8s 全刷（13:28:27/33） | PASS（任务状态上报延迟的机制说明见「五、遗留」） |
 | 4 | 融合面板渲染 | 三帧 PNG `e2e-frame1/2/3.png`（800x480 eink 渲染，ink 覆盖率 14.47% / 14.55% / 14.58%，非空白）；`health-after-token.json` `eink_ready=true` | PASS |
-| 5 | demo 任务面板变化 | 三帧 state JSON 前后对照（见下表）+ 三帧 PNG + 日志行（`e2e-broker-log.txt`、`e2e-full-refresh.txt`） | PASS（附说明：运行中状态不可观测，见下表注） |
+| 5 | demo 任务面板变化 | 三帧 state JSON 前后对照（见下表）+ 三帧 PNG + 日志行（`e2e-broker-log.txt`、`e2e-full-refresh.txt`） | PASS（运行中状态原不可观测，D15 修复后实测补齐：见「五、遗留与发现」D15 段落） |
 | 6 | last_sync 链 | 帧1 `last_sync=null` → 帧2/帧3 `last_sync=1787117200`；`orchestra_last_report.sync` 帧1=0 → 帧2/帧3=1787117196.4；sync 上报 POST（源 .186，13:26:36）见 `e2e-broker-post-gap.txt` | PASS |
 | 7 | 零回归 | 测试记录见「四、测试记录」 | PASS |
 | 8 | reviewed | 留空待 CC 复查 | — |
@@ -60,7 +60,7 @@
 ## 五、遗留与发现
 
 - **demo 任务文件归档**：本地 `D:\pythonProject\orchestra\tasks\T-20260819-dashboard-demo.md` 保留为源记录（与其它已完成任务一致，供 sync_push 幂等重推）；Broker 侧消费后已移入 `/mnt/broker/tasks/archive/`（本次同步重推的 3 个旧任务文件同样归档，slug 幂等未重跑——broker.log 在 13:26-13:29 间无新增执行行，仅 demo 一条 done）
-- **发现（建议，不涉及本次改动）**：Broker 执行期间无上报，面板无法呈现任务「running」帧；如需，可在 `one_cycle()` 前先行 `report_status()`，使执行中状态每 30s 上屏
+- **发现 → 已修复（D15，commit ea0c907）**：Broker 执行期间无上报，面板无法呈现任务「running」帧 → dispatcher 新增独立 reporter 线程（自持 WAL 连接，每 30s 上报，与主循环解耦；主循环移除 report_status 防双报）。**实机验证**：派 150s 任务 T-20260819-d15-running，执行中 `D:\Temp\subsystem-4\d15-running-state.json` 的 `active_tasks=1`、`recent_tasks[0]=T-20260819-d15-running/running`、上报新鲜 28s；渲染帧 `D:\Temp\subsystem-4\d15-running-frame.png`；任务终态 done（`orchestra/results/results/T-20260819-d15-running/attempt-1/state.json`，elapsed_s=150.0）。修复后长任务期间面板不再误报「Broker 离线」
 - **结果路径**：任务文件 `result: results/T-20260819-dashboard-demo` 相对 results 根解析，落地 `/mnt/broker/results/results/`（嵌套目录，语义正常）；sync_pull 同构拉回本地
 - **结果物**：远端 `attempt-1/` 含 `state.json`（status=done、elapsed_s=90.0）、`heartbeat.txt`（`Wed 19 Aug 13:28:24 CST 2026`）、`stdout.log`（5B）、`stderr.log`（0B）；已 `sync_pull` 至本地 `D:\pythonProject\orchestra\results\results\T-20260819-dashboard-demo\attempt-1\`（内容逐字节一致）
 
@@ -69,3 +69,4 @@
 | 复查人 | 结论 | 日期 |
 |---|---|---|
 | CC | reviewed: ok（2026-08-19 复查：三帧 state JSON 关键值、full-refresh 日志行、broker.log done 行已逐项核对实测一致；三帧 PNG 非空白渲染；无手抄数字。验收项 5 的「运行中不可观测」已由 D15 修复任务承接，本报告遗留段如实记录。） | 2026-08-19 |
+| CC | reviewed: ok（D15 补充复查 2026-08-19：reporter 线程 16:05 实机部署（日志 `reporter thread started`）；d15-running-state.json 关键值逐项核对一致；d15-running-frame.png 为核桃派实机渲染；D17 事故（1A 适配器）与本次验收无关。） | 2026-08-19 |

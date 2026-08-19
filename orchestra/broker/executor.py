@@ -33,9 +33,18 @@ def run_task(spec: TaskSpec, tasks_dir: str, results_root: str,
     outdir = base / f"attempt-{attempt}"
     outdir.mkdir(parents=True, exist_ok=True)
 
+    stdout, stderr, status, error = "", "", "done", None
     if spec.executor == "dsh":
         prompt = f"工作目录: {outdir}\n所有产出文件必须写入该目录。\n\n{spec.body}"
-        cmd = ["dsh", "--profile", dsh_profile, prompt]
+        cmd = ["dsh", "--profile", dsh_profile]
+        if spec.model:
+            patch_path = f"/mnt/broker/dsh-patches/{spec.model}.yml"
+            if not os.path.exists(patch_path):
+                status, error = "failed", f"model patch not found: {patch_path}"
+            else:
+                cmd += ["--patch", patch_path]
+        if status == "done":
+            cmd.append(prompt)
     elif os.name == "nt":
         cmd = ["cmd", "/c", spec.body]
     else:
@@ -48,33 +57,33 @@ def run_task(spec: TaskSpec, tasks_dir: str, results_root: str,
 
     started = time.time()
     started_iso = _now()  # 真实开始时刻（state.json 用；哨兵审计：勿用完成时刻）
-    stdout, stderr, status, error = "", "", "done", None
     # start_new_session：子进程自成进程组，超时 killpg 连同 dsh 孙进程一起终止
     # （哨兵审计 CONCERN-5：只杀直接子进程会留孤儿继续跑完 → 重复计费+重复邮件）
     kwargs = {"start_new_session": True} if os.name == "posix" else {}
     proc = None
-    try:
-        proc = subprocess.Popen(
-            cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            text=True, encoding="utf-8", errors="replace", **kwargs,
-        )
-        stdout, stderr = proc.communicate(timeout=spec.timeout)
-        stdout, stderr = stdout or "", stderr or ""
-        if proc.returncode != 0:
-            status, error = "failed", f"exit code {proc.returncode}"
-    except subprocess.TimeoutExpired:
-        if proc is not None:
-            if os.name == "posix":
-                os.killpg(proc.pid, signal.SIGKILL)
-            else:
-                proc.kill()
-            stdout, stderr = proc.communicate()
+    if status == "done":
+        try:
+            proc = subprocess.Popen(
+                cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                text=True, encoding="utf-8", errors="replace", **kwargs,
+            )
+            stdout, stderr = proc.communicate(timeout=spec.timeout)
             stdout, stderr = stdout or "", stderr or ""
-        status, error = "failed", f"timeout after {spec.timeout}s"
-    except FileNotFoundError as e:
-        status, error = "failed", f"executable not found: {e.filename}"
-    except OSError as e:
-        status, error = "failed", f"spawn error: {e}"
+            if proc.returncode != 0:
+                status, error = "failed", f"exit code {proc.returncode}"
+        except subprocess.TimeoutExpired:
+            if proc is not None:
+                if os.name == "posix":
+                    os.killpg(proc.pid, signal.SIGKILL)
+                else:
+                    proc.kill()
+                stdout, stderr = proc.communicate()
+                stdout, stderr = stdout or "", stderr or ""
+            status, error = "failed", f"timeout after {spec.timeout}s"
+        except FileNotFoundError as e:
+            status, error = "failed", f"executable not found: {e.filename}"
+        except OSError as e:
+            status, error = "failed", f"spawn error: {e}"
 
     (outdir / "stdout.log").write_text(stdout, encoding="utf-8", errors="replace")
     (outdir / "stderr.log").write_text(stderr, encoding="utf-8", errors="replace")

@@ -3,15 +3,16 @@ import json
 import os
 import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
 
 import executor
 import taskfile
 
-def make_spec(body, executor="shell", timeout=30):
+def make_spec(body, executor="shell", timeout=30, model=None):
     return taskfile.TaskSpec(
         slug="T-20260819-test", executor=executor, net="optional",
-        result_dir="T-20260819-test", timeout=timeout, body=body,
+        result_dir="T-20260819-test", timeout=timeout, body=body, model=model,
     )
 
 class TestShellExecutor(unittest.TestCase):
@@ -102,6 +103,39 @@ class TestDshExecutor(unittest.TestCase):
         self.assertIn("dsh", args[0][0])
         self.assertIn(outdir, args[0][3])  # cmd = [dsh, --profile, <profile>, prompt] → prompt 在索引 3
         self.assertEqual(kwargs["cwd"], outdir)  # dsh 沙箱 workspace-write：cwd 即输出目录
+
+    @mock.patch("os.path.exists", return_value=True)
+    @mock.patch("subprocess.Popen")
+    def test_dsh_model_appends_patch(self, popen, _exists):
+        proc = popen.return_value
+        proc.communicate.return_value = ("", "")
+        proc.returncode = 0
+        spec = make_spec("分析数据", executor="dsh", model="flash")
+        status, _ = executor.run_task(spec, self.tasks, self.results)
+        argv = popen.call_args.args[0]
+        self.assertIn("--patch", argv)
+        self.assertEqual(argv[argv.index("--patch") + 1], "/mnt/broker/dsh-patches/flash.yml")
+        self.assertEqual(status, "done")
+
+    @mock.patch("os.path.exists", return_value=False)
+    @mock.patch("subprocess.Popen")
+    def test_dsh_model_missing_patch_fails(self, popen, _exists):
+        spec = make_spec("分析数据", executor="dsh", model="pro")
+        status, error = executor.run_task(spec, self.tasks, self.results)
+        self.assertEqual(status, "failed")
+        self.assertIn("model patch not found", error)
+        popen.assert_not_called()
+        # state.json 仍落盘
+        self.assertTrue(any(Path(self.results).rglob("state.json")))
+
+    @mock.patch("os.path.exists", return_value=True)
+    @mock.patch("subprocess.Popen")
+    def test_dsh_no_model_no_patch(self, popen, _exists):
+        proc = popen.return_value
+        proc.communicate.return_value = ("", "")
+        proc.returncode = 0
+        executor.run_task(make_spec("分析数据", executor="dsh", model=None), self.tasks, self.results)
+        self.assertNotIn("--patch", popen.call_args.args[0])
 
 class TestCheckNet(unittest.TestCase):
     @mock.patch("socket.create_connection")

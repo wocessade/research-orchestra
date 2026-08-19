@@ -25,3 +25,9 @@
 
 - dsh 臂产出路径在 attempt-1 内：trt 的 metrics.json 位于 `results/T-20260819-trt-dsh/attempt-1/metrics.json`，而 ctl 臂在任务根目录 `results/T-20260819-ctl-single/metrics.json`。ingest 与卡 Run log 已如实记录各自路径，路径差异对入账无影响；是否需在 Broker/dsh prompt 注入层统一 outdir 位置留待总 spec 复盘，本 mission 不修改 broker（与计划风险预案一致）。
 - 远端拉回的 `results/`、`logs/` 中除两臂外还有其它任务产物（如 `T-20260819-usb-smoke`、`T-20260819-nightly-radar` 等，为 sync_pull 全量拉回的正常现象），均未入账、未纳入本验收范围。
+- 方法学不对称（哨兵审计 LOW）：trt 臂任务 prompt 向 dsh agent 暴露了含金标准值的 gold.json，而 ctl 臂（extract_single.py）只取字段名、值不进 prompt——两臂 accuracy 不可作质量对比；本 mission 成功标准冻结为管线入账、报告不产科研结论，不破坏验收。未来复用该模式时给 agent 只提供字段名文件。
+- 4B demo 目录的 ctl 中间产物 result_ctl.json 已清理（哨兵审计后）；未来重跑 ctl 臂需先清理该文件或把 --out 指向 result 目录。
+
+## 复查结论
+
+reviewed: ok（2026-08-19，CC 复查：本报告所有数字已逐项追溯 ingest artifact 实测一致；哨兵审计独立复核实测一致，无手抄数字。）

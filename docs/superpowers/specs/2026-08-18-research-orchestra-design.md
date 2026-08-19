@@ -116,12 +116,12 @@ result: results/T-20260819-xxx/
 ### 6.2 子系统 2：实验管线闭环（engine × dsh）
 
 ```
-实验卡(card.md, commands 字段可无头执行) ──CC 审查──> Broker 入队 ──> dsh headless 执行
+实验卡(card.md, `## Commands` 段可无头执行) ──CC 审查──> Broker 入队 ──> dsh headless 执行
   ──> results/metrics.json ──ingest_run.py──> .research/experiments/EXP-*/runs/
   ──> CC 复查（数值一致性、对照 engine 硬规则）──> handoff_sync.py
 ```
 
-- **接口约定**：实验卡 `commands:` 字段必须可无头执行；"卡"是接口，"执行"是可替换实现（人工/dsh/Codex 都能执行同一张卡）
+- **接口约定**：实验卡 `## Commands` 段（fenced bash block + `# arm:` 臂标记）必须可无头执行；"卡"是接口，"执行"是可替换实现（人工/dsh/Codex 都能执行同一张卡）
 - **engine 三脚本不改**，仅作为消费端；`program.yaml` compute mode 保持 `human_in_loop`
 - **本地算力边界（v2 修正）**：12GB VRAM → 7B-8B 量化模型舒适（q4 ≈ 5-6GB）、14B q4 临界；64GB RAM 可 CPU offload 更大模型。**注意：本地小模型只适合轻量任务，不是重型 LLM 工作的断网降级方案**——重型任务断网时排队断点续传（§7）
 - **验收**：对照实验（单次 LLM 调用 vs dsh 多步 agent 同一抽取任务）数字全部走 ingest，无手抄数字

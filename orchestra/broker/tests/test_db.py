@@ -52,5 +52,48 @@ class TestDb(unittest.TestCase):
         self.assertEqual(n, 1)
         self.assertEqual(db.list_tasks(self.conn, "failed")[0][4], "recovered after restart")
 
+    def test_list_recent_empty(self):
+        self.assertEqual(db.list_recent(self.conn), [])
+
+    def test_list_recent_order_and_coalesce(self):
+        # 兜底优先级：done_at > started_at > created_at；时间戳直接写入保证确定性
+        # （_now 秒级精度，两次调用可能同秒）
+        for slug in ("T-a", "T-b", "T-c"):
+            db.register_task(self.conn, slug, "optional", "r")
+        db.claim_task(self.conn, "T-a")
+        db.finish_task(self.conn, "T-a", "done")  # done_at 已有
+        db.claim_task(self.conn, "T-b")           # running：无 done_at，用 started_at
+        # T-c 保持 queued：两者皆无，用 created_at
+        for slug, ts in [
+            ("T-a", "2026-08-19T01:00:00+00:00"),
+            ("T-b", "2026-08-19T02:00:00+00:00"),
+            ("T-c", "2026-08-19T03:00:00+00:00"),
+        ]:
+            self.conn.execute("UPDATE tasks SET created_at=? WHERE slug=?", (ts, slug))
+        self.conn.execute("UPDATE tasks SET started_at='2026-08-19T04:00:00+00:00' WHERE slug='T-b'")
+        self.conn.execute("UPDATE tasks SET done_at='2026-08-19T05:00:00+00:00' WHERE slug='T-a'")
+        self.conn.commit()
+        rows = db.list_recent(self.conn)
+        # 降序：T-a(done_at 05:00) > T-b(started_at 04:00) > T-c(created_at 03:00)
+        self.assertEqual([r[0] for r in rows], ["T-a", "T-b", "T-c"])
+        self.assertEqual(rows[0], ("T-a", "done", "2026-08-19T05:00:00+00:00"))
+        self.assertEqual(rows[1], ("T-b", "running", "2026-08-19T04:00:00+00:00"))
+        self.assertEqual(rows[2], ("T-c", "queued", "2026-08-19T03:00:00+00:00"))
+
+    def test_list_recent_limit(self):
+        for i in range(8):
+            self.conn.execute(
+                "INSERT INTO tasks (slug, status, net_req, result_path, created_at) "
+                "VALUES (?,?,?,?,?)",
+                (f"T-{i:03d}", "queued", "optional", "r", f"2026-08-19T{i+1:02d}:00:00+00:00"),
+            )
+        self.conn.commit()
+        rows = db.list_recent(self.conn)  # 默认上限 5
+        self.assertEqual(len(rows), 5)
+        self.assertEqual(rows[0][0], "T-007")  # 最新在前
+        self.assertEqual(rows[-1][0], "T-003")
+        self.assertEqual([r[0] for r in db.list_recent(self.conn, limit=3)],
+                         ["T-007", "T-006", "T-005"])
+
 if __name__ == "__main__":
     unittest.main()

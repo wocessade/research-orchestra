@@ -17,19 +17,28 @@ log = logging.getLogger("dispatcher")
 def load_config(path: str = "config.json") -> dict:
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
-def report_status(cfg: dict, conn) -> None:
-    api = cfg.get("api_url")
-    if not api:
-        return
+def build_payload(conn) -> dict:
+    """report_status 的 payload 纯函数：4 字段 + recent_tasks（最多 5 条，ts 降序）。
+    旧 monitor 忽略新字段，向后兼容。"""
     done = db.list_tasks(conn, "done")
     queued = len(db.list_tasks(conn, "queued"))
     running = len(db.list_tasks(conn, "running"))
-    payload = {
+    return {
         "broker_health": "ok",
         "queue_len": queued + running,
         "active_tasks": running,
         "last_task": done[-1][0] if done else None,
+        "recent_tasks": [
+            {"slug": slug, "status": status, "ts": ts}
+            for slug, status, ts in db.list_recent(conn)
+        ],
     }
+
+def report_status(cfg: dict, conn) -> None:
+    api = cfg.get("api_url")
+    if not api:
+        return
+    payload = build_payload(conn)
     req = urllib.request.Request(
         api.rstrip("/") + "/api/orchestra",
         data=json.dumps(payload).encode("utf-8"),

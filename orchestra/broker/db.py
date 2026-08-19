@@ -83,3 +83,12 @@ def list_tasks(conn: sqlite3.Connection, status: str | None = None) -> list[tupl
     return conn.execute(
         "SELECT slug, status, attempts, net_req, error FROM tasks"
     ).fetchall()
+
+def list_recent(conn: sqlite3.Connection, limit: int = 5) -> list[tuple[str, str, str]]:
+    """最近任务 (slug, status, ts)：ts = COALESCE(done_at, started_at, created_at)，
+    created_at 必填兜底防 NULL；按 ts 降序，最多 limit 条（默认 5，供面板最近任务列表）。"""
+    return conn.execute(
+        "SELECT slug, status, COALESCE(done_at, started_at, created_at) FROM tasks "
+        "ORDER BY COALESCE(done_at, started_at, created_at) DESC LIMIT ?",
+        (limit,),
+    ).fetchall()

@@ -61,3 +61,10 @@
 - 4B 每日 03:00 `orchestra-backup.timer` 触发 Pi 上 `/home/liuxfs/broker/backup_to_nas.sh`（repo 副本在 scripts/，deploy_broker.sh 同步传载；增量镜像 + SQLite 快照，源路径随 REMOTE_ROOT 改写）
 - 部署拓扑：4B=宿舍（Broker），核桃派=实验室（展示+异地冷备）
 - 验收报告：`reports/2026-08-cold-backup-acceptance.md`
+
+## 4B 兼职 NAS（mission 026 D16 / 西数 250G）
+
+- 盘：西数 250G（sdb）ext4 `LABEL=nas-data`，挂载 `/mnt/nas`（fstab UUID+nofail）；压测 31.7MB/s 写 / 33.1MB/s 读（USB2 水平，冷备够用；系统未被拖死——broker 上报 canary 实测）
+- 共享：samba `\\192.168.0.250\nas`（user liuxfs；密码在 Pi 上生成，不落库）
+- 备份：`nas_backup.sh`（rsync /mnt/broker/{results,logs} → /mnt/nas/backup/broker/）+ `nas-backup.timer` 每日 04:17；源码 `orchestra/nas/`
+- 定位：冷备 NAS（入学后宿舍 NAS 预演）；高性能文件服务仍按总 spec §14 触发 N100 评估

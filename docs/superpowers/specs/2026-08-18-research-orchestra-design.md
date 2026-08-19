@@ -1,6 +1,6 @@
 # Research Orchestra — 以 Claude Code 为核心的科研-实验-论文框架（总架构设计）
 
-> 日期：2026-08-18 | 修订：2026-08-19（v2：VRAM 修正 12GB、Pi 任务代理三层架构、微信桥接入、网络分区与离线降级；v3：SSD 直挂存储、重型任务断网=排队断点续传（弃本地小模型硬扛）、主机移动网络方案、宿舍 NAS 待建、采购评估 §14；v4：4B 确认为 2GB（冒烟即升级决策门）、核桃派迁移完成（分机部署定稿）、§15 与 OpenClaw/Hermes 定位澄清；v5：subsystem-2 验收完成（实验卡 Commands 约定 + ingest 闭环）、存储/模板表述与现状同步）
+> 日期：2026-08-18 | 修订：2026-08-19（v2：VRAM 修正 12GB、Pi 任务代理三层架构、微信桥接入、网络分区与离线降级；v3：SSD 直挂存储、重型任务断网=排队断点续传（弃本地小模型硬扛）、主机移动网络方案、宿舍 NAS 待建、采购评估 §14；v4：4B 确认为 2GB（冒烟即升级决策门）、核桃派迁移完成（分机部署定稿）、§15 与 OpenClaw/Hermes 定位澄清；v5：subsystem-2 验收完成（实验卡 Commands 约定 + ingest 闭环）、存储/模板表述与现状同步；v6：subsystem-4 验收完成（融合面板 + orchestra 上报链路 + Broker reporter 线程 + Tailscale 三端 + 4B 兼职 NAS））
 > 术语：CC = Claude Code（本机交互主脑）；dsh = DeepSeek Harness（执行层引擎）；Codex = OpenAI Codex CLI（副脑，后续加入）；Broker = Pi 任务代理服务器
 
 ## 1. 背景与目标
@@ -26,7 +26,7 @@
 
 | 资产 | 接口/能力 | 本框架用法 | 不动项 |
 |---|---|---|---|
-| usage-monitor（Flask :5000） | `GET /api/dashboard`（全量 state）、`POST /api/status`（CC 状态上报）、`GET /health`；`X-Monitor-Token` 鉴权；APScheduler；墨水屏 worker 带 coalesce/失败退避；无硬件 mock 降级 | 展示层：扩展 orchestra 状态块（§6.4）；上报通道复用同一鉴权模式 | **不动 `~/.claude/settings.json`**（hooks 已停用）；不动现有三端点语义，只增量扩展 |
+| usage-monitor（Flask :5000） | `GET /api/dashboard`（全量 state）、`POST /api/status`（CC 状态上报）、`GET /health`、**`POST /api/orchestra`（部分字段合并，2026-08-19 上线）**；`X-Monitor-Token` 鉴权（已全链路开启）；APScheduler；墨水屏 worker 带 coalesce/失败退避；无硬件 mock 降级 | 展示层：orchestra 融合面板（§6.4 已验收）；上报通道复用同一鉴权模式 | **不动 `~/.claude/settings.json`**（hooks 已停用）；不动现有三端点语义，只增量扩展 |
 | 微信桥接（`.wechat-acp/bridge.mjs`，桌面 `微信桥接.bat` 启动） | 微信 iLink API ↔ Claude CLI **双向桥**（用户微信消息可驱动 CC 会话）；自带 QQ SMTP 邮件兜底（send_email.mjs）；跑在 Windows（依赖 fcc-server.exe 代理） | **通知与远程指挥通道**（§6.6）：出站推送任务结果/复查请求，入站接收用户微信指令 | 桥脚本本体不动；接入时只读其发送接口 |
 | academic-research-engine | `.research/` 状态机；`validate_experiment_card.py` / `ingest_run.py` / `handoff_sync.py`；硬规则"数值只来自 ingest artifacts"、人在环 | 实验管线闭环的账本与摄入层（§6.2），脚本不改 | 不重造雷达/精读/验证 |
 | nature-literature-pipeline 等 | 文献雷达 ingest 后端 | 夜间定时任务自然负载（Broker 常驻执行） | 不重写 |
@@ -142,6 +142,7 @@ result: results/T-20260819-xxx/
 - **部署**：usage-monitor 已在核桃派运行（迁移完成），Broker 在 4B——**默认分机部署**：仪表盘定时拉 Broker 状态 API（LAN HTTP）；同机部署仅作降级讨论
 - **上报者**：Broker dispatcher / orchestra 运行器脚本，**不是 CC hooks**——不碰 `~/.claude/settings.json`
 - **验收**：派 demo 任务，墨水屏任务面板出现状态变化，dashboard API 返回 orchestra 块
+- **状态（2026-08-19）**：细化 spec 与实施见 `plans/2026-08-19-subsystem-4-dashboard-orchestra.md`；验收通过（报告 `orchestra/reports/2026-08-dashboard-acceptance.md`，reviewed: ok）。实施要点与本文差异：① 面板体系按用户反馈定为**融合单面板**（状态条 + 最近任务列表 + 设备区 + DeepSeek/天气小字行；标题栏死 CC 控件移除——hooks 停用后无上报源）而非任务面板/闲置面板双视图；② Broker payload 扩展 `recent_tasks`/`host`（report_status 拆出 build_payload + **独立 reporter 线程**——主循环同步执行期间持续上报，长任务不误报离线）；③ 数据通道推送为主（拉取模式待定）；④ 鉴权已全链路开启（X-Monitor-Token，两 Pi 间流转）；⑤ Tailscale 三端接入（学校网络切换预案就绪）。
 
 ### 6.5 子系统 5：haiku 分派规则（编排层）
 
@@ -231,10 +232,10 @@ CC 写 tasks/T-*.md ──git push/SSH──> Broker 队列(SQLite) ──dispat
 总 spec 验收 = 六子系统各有一个可执行 smoke test 定义（§6 已列），用户审阅本 spec（v4）通过。
 
 后续细化 spec（逐个编写，建议顺序，编号与 §6 一一对应）：
-1. `subsystem-1-pi-broker`（Broker 部署：队列/dispatcher/checkpoint/resume + 4B dsh 安装与冒烟 + SSD 挂载）★最先
+1. ~~subsystem-1-pi-broker~~（✅ 已细化并验收，mission 021）
 2. ~~subsystem-2-experiment-loop~~（✅ 已细化并验收，见 §6.2 状态行）
 3. `subsystem-3-codex-dual-agent`（CLI 安装 + 三模式脚本化）
-4. `subsystem-4-dashboard-orchestra`（state/orchestra + 墨水屏面板 + 上报脚本）
+4. ~~subsystem-4-dashboard-orchestra~~（✅ 已细化并验收，见 §6.4 状态行）
 5. `subsystem-5-haiku-dispatch`（rules.yaml 结构与判定清单）
 6. `subsystem-6-wechat-channel`（读 bridge.mjs 确认推送接口 + 出站/入站接入）
 

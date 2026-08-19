@@ -40,12 +40,20 @@
 - `scripts/run_card.py commands <card.md> [--arm ID]` 提取卡命令生成任务文件；`scripts/run_card.py ingest <metrics.json> --card <card.md> --research-root <root>` 入账（engine 三脚本只被调用不改动）
 - 验收 demo：`orchestra/demo/`（EXP-001 对照实验，研究根隔离在 demo/.research/）；验收报告 `reports/2026-08-experiment-loop-acceptance.md`
 
+## 仪表盘链路（mission 026 / 总 spec §6.4）
+
+- 数据流：4B Broker reporter 线程每 30s `POST /api/orchestra`（recent_tasks + host 负载/内存）→ 核桃派 usage-monitor 融合面板（状态条 + 最近任务 + 设备区 + DeepSeek/天气行）；Windows sync 脚本上报 last_sync
+- 鉴权：`X-Monitor-Token`（两 Pi 间流转；核桃派 override.conf / 4B config.json，均不入库）
+- 面板刷新纪律：内容变化才全刷；last_report 时间戳与负载抖动只走局刷（D10/D14）
+- 验收：`reports/2026-08-dashboard-acceptance.md`（reviewed: ok，含 D15 运行中帧）
+
 ## 部署连接（当前家庭网络）
 
 - 4B：WiFi `liudfs`，静态 IP `192.168.0.250`（NetworkManager 连接名 liudfs；备用：有线 DHCP）
 - 用法：`ORCHESTRA_SSH_HOST=192.168.0.250 [ORCHESTRA_REMOTE_ROOT=/mnt/broker] bash scripts/deploy_broker.sh`
 - REMOTE_ROOT 默认 `/mnt/broker`（U 盘 ext4，fstab 按 UUID 挂载）；SD 过渡期传 `~/broker-data`
-- 开学后宿舍网络需重新探测 IP 并更新本说明
+- **Tailscale 已装（三端同 tailnet）**：4B=`liuxfs`(100.111.75.58)、核桃派=`walnutpi`(100.64.2.60)、Windows=`laptop-w0cessade`；`ORCHESTRA_SSH_HOST` 为 env 驱动，切 tailnet 名零代码改动
+- **学校网络切换：见 `docs/school-network-switch.md`**（入学前必读）
 
 ## 冷备链（NAS 方案 A）
 

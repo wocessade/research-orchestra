@@ -10,9 +10,10 @@ Subcommands:
       validate the card, then delegate to the academic-research-engine scripts
       (validate_experiment_card.py / ingest_run.py) via subprocess.
 
-Stdlib only. The engine scripts live under the skill dir given by --engine-dir
-(default: ~/.claude/skills/academic-research-engine/scripts/) and are invoked
-with [sys.executable, script, ...]; they are never modified.
+Stdlib only. The engine scripts live under the Skill path declared and digest-
+locked by config/skills.json. ``--engine-dir`` may override the location for a
+controlled migration/test but cannot bypass the digest gate. Scripts are invoked
+with [sys.executable, script, ...] and are never modified.
 
 Card ``## Commands`` convention
 ------------------------------
@@ -30,7 +31,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-DEFAULT_ENGINE_DIR = Path.home() / ".claude" / "skills" / "academic-research-engine"
+import check_skills
+
+DEFAULT_SKILLS_MANIFEST = Path(__file__).resolve().parents[1] / "config" / "skills.json"
+INGEST_SKILL_ID = "academic-research-engine"
 
 _ARM_ANNOTATION_RE = re.compile(r"^\s*#\s*arm:\s*(\S+)\s*$")
 
@@ -162,6 +166,36 @@ def parse_card_id(text: str) -> str:
     raise ValueError("card front-matter has no id key")
 
 
+def resolve_ingest_engine(
+    manifest_path: Path, engine_dir: str | Path | None = None
+) -> Path:
+    """从 skills.json 解析并校验 ingest Skill；任何未锁定或漂移都硬失败。"""
+    try:
+        data = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+        check_skills.validate_manifest(data)
+    except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
+        raise ValueError(f"invalid skills manifest: {exc}") from exc
+
+    matches = [spec for spec in data["skills"] if spec["id"] == INGEST_SKILL_ID]
+    if len(matches) != 1:
+        raise ValueError(
+            f"skills manifest must contain exactly one {INGEST_SKILL_ID}"
+        )
+    spec = dict(matches[0])
+    if not spec["required"]:
+        raise ValueError(f"{INGEST_SKILL_ID} must be required for ingest")
+    if "orchestra/scripts/run_card.py ingest" not in spec["used_by"]:
+        raise ValueError(f"{INGEST_SKILL_ID} used_by does not declare run_card ingest")
+    if engine_dir is not None:
+        spec["path"] = str(Path(engine_dir))
+    inspected = check_skills.inspect_skill(spec)
+    if inspected["status"] != "ok":
+        raise ValueError(
+            f"{INGEST_SKILL_ID} contract gate failed: {inspected['status']}"
+        )
+    return Path(spec["path"]).expanduser()
+
+
 def do_commands(path: Path, arm: str | None = None) -> int:
     """CLI ``commands`` subcommand: print extracted commands; exit 2 on error."""
     try:
@@ -201,7 +235,16 @@ def do_ingest(args: argparse.Namespace) -> int:
         print(f"HARD: exp_id mismatch: metrics={exp_id} card={card_id}")
         return 2
 
-    engine_dir = Path(getattr(args, "engine_dir", None) or DEFAULT_ENGINE_DIR)
+    manifest_path = Path(
+        getattr(args, "skills_manifest", None) or DEFAULT_SKILLS_MANIFEST
+    )
+    try:
+        engine_dir = resolve_ingest_engine(
+            manifest_path, getattr(args, "engine_dir", None)
+        )
+    except ValueError as exc:
+        print(f"HARD: {exc}")
+        return 2
     scripts_dir = engine_dir / "scripts"
 
     validate_script = scripts_dir / "validate_experiment_card.py"
@@ -264,7 +307,12 @@ def main(argv: list[str] | None = None) -> int:
     ing_p.add_argument(
         "--engine-dir",
         default=None,
-        help=f"engine skill dir (default: {DEFAULT_ENGINE_DIR})",
+        help="override the Skill path for testing/migration; manifest digest still applies",
+    )
+    ing_p.add_argument(
+        "--skills-manifest",
+        default=str(DEFAULT_SKILLS_MANIFEST),
+        help="strict external Skill manifest and digest lock",
     )
     ing_p.add_argument(
         "--paper-dir", default=None, help="if set, update .paper/issues.csv and map"

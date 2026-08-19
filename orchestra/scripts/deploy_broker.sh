@@ -7,15 +7,37 @@ SSH_HOST="${ORCHESTRA_SSH_HOST:?用法: ORCHESTRA_SSH_HOST=192.168.x.x bash depl
 SSH_USER="${ORCHESTRA_SSH_USER:-liuxfs}"
 REMOTE_ROOT="${ORCHESTRA_REMOTE_ROOT:-/mnt/broker}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+GUARD_REMOTE="/tmp/orchestra-migration-guard-$$.py"
 
-# 1) 传代码
+# 1) 只把迁移门禁传到 /tmp 并预检。预检通过前不得覆盖任何在役代码、模板或 unit。
+cleanup_guard() {
+  ssh "$SSH_USER@$SSH_HOST" "rm -f '$GUARD_REMOTE'" >/dev/null 2>&1 || true
+}
+trap cleanup_guard EXIT
+scp -q "$ROOT/broker/migration_guard.py" "$SSH_USER@$SSH_HOST:$GUARD_REMOTE"
+ssh "$SSH_USER@$SSH_HOST" "REMOTE_ROOT='$REMOTE_ROOT' GUARD_REMOTE='$GUARD_REMOTE' bash -s" << 'PREFLIGHT'
+set -euo pipefail
+mkdir -p "$REMOTE_ROOT"/{tasks,db}
+guard_args=(
+  --tasks-dir "$REMOTE_ROOT/tasks"
+  --db-path "$REMOTE_ROOT/db/broker.db"
+)
+if [ -f /home/liuxfs/broker/config.json ]; then
+  guard_args+=(--config /home/liuxfs/broker/config.json)
+fi
+python3 "$GUARD_REMOTE" "${guard_args[@]}"
+PREFLIGHT
+cleanup_guard
+trap - EXIT
+
+# 2) 预检通过后才传在役代码、模板和 unit
 ssh "$SSH_USER@$SSH_HOST" 'mkdir -p /home/liuxfs/broker /home/liuxfs/broker/templates'
-scp -q "$ROOT"/broker/{db.py,taskfile.py,executor.py,dispatcher.py,__init__.py,inject_daily.sh,housekeeping.sh,send_email.py,config.example.json} "$SSH_USER@$SSH_HOST:/home/liuxfs/broker/"
+scp -q "$ROOT"/broker/{db.py,taskfile.py,executor.py,dispatcher.py,artifact_validators.py,radar_render.py,radar_notify.py,migration_guard.py,__init__.py,inject_daily.sh,housekeeping.sh,send_email.py,config.example.json} "$SSH_USER@$SSH_HOST:/home/liuxfs/broker/"
 scp -q "$ROOT"/scripts/backup_to_nas.sh "$SSH_USER@$SSH_HOST:/home/liuxfs/broker/"  # 审计 CONCERN-1：备份脚本本体此前从未随 deploy 传载
-scp -q "$ROOT"/templates/nightly-radar.md "$SSH_USER@$SSH_HOST:/home/liuxfs/broker/templates/"
+scp -q "$ROOT"/templates/nightly-radar-*.md "$SSH_USER@$SSH_HOST:/home/liuxfs/broker/templates/"
 scp -q "$ROOT"/broker/orchestra-broker.service "$ROOT"/broker/orchestra-timer.timer "$ROOT"/broker/orchestra-timer.service "$ROOT"/broker/orchestra-backup.service "$ROOT"/broker/orchestra-backup.timer "$ROOT"/broker/orchestra-backup-alert.service "$ROOT"/broker/orchestra-housekeeping.service "$ROOT"/broker/orchestra-housekeeping.timer "$ROOT"/broker/logrotate-orchestra.conf "$SSH_USER@$SSH_HOST:/tmp/"
 
-# 2) 远端：目录 + config.json（不存在时从 example 生成，路径按 REMOTE_ROOT 改写）
+# 3) 远端：目录 + config.json（不存在时从 example 生成，路径按 REMOTE_ROOT 改写）
 ssh "$SSH_USER@$SSH_HOST" "REMOTE_ROOT='$REMOTE_ROOT' bash -s" << 'REMOTE'
 set -euo pipefail
 mkdir -p "$REMOTE_ROOT"/{tasks,results,logs,db}
@@ -24,6 +46,8 @@ if [ ! -f config.json ]; then
   sed -e "s|/mnt/broker|$REMOTE_ROOT|g" config.example.json > config.json
   chmod 600 config.json
 fi
+# 四阶段模板替代旧单体模板；删除远端遗留，避免旧定时脚本或人工误注入。
+rm -f templates/nightly-radar.md
 sudo mv /tmp/orchestra-broker.service /tmp/orchestra-timer.timer /tmp/orchestra-timer.service /tmp/orchestra-backup.service /tmp/orchestra-backup.timer /tmp/orchestra-backup-alert.service /tmp/orchestra-housekeeping.service /tmp/orchestra-housekeeping.timer /etc/systemd/system/
 sudo mv /tmp/logrotate-orchestra.conf /etc/logrotate.d/orchestra-broker
 sudo cp /home/liuxfs/broker/send_email.py /usr/local/bin/ && sudo chmod 755 /usr/local/bin/send_email.py
@@ -33,7 +57,7 @@ sudo sed -i "s|/mnt/broker/logs|$REMOTE_ROOT/logs|g" /etc/systemd/system/orchest
 sudo sed -i "s|/mnt/broker/logs|$REMOTE_ROOT/logs|g" /etc/systemd/system/orchestra-backup-alert.service
 sed -i "s|/mnt/broker|$REMOTE_ROOT|g" /home/liuxfs/broker/backup_to_nas.sh
 # inject_daily.sh / housekeeping.sh / logrotate 中的路径按 REMOTE_ROOT 改写
-sed -i "s|/mnt/broker/tasks|$REMOTE_ROOT/tasks|g; s|/mnt/broker/logs|$REMOTE_ROOT/logs|g" /home/liuxfs/broker/inject_daily.sh /home/liuxfs/broker/housekeeping.sh
+sed -i "s|/mnt/broker/tasks|$REMOTE_ROOT/tasks|g; s|/mnt/broker/results|$REMOTE_ROOT/results|g; s|/mnt/broker/logs|$REMOTE_ROOT/logs|g" /home/liuxfs/broker/inject_daily.sh /home/liuxfs/broker/housekeeping.sh
 sudo sed -i "s|/mnt/broker/logs|$REMOTE_ROOT/logs|g" /etc/logrotate.d/orchestra-broker
 # 审计 INFO-5：新机器部署时凭据 drop-in 缺失会导致 dsh/邮件静默失败，主动告警
 if [ ! -f /etc/systemd/system/orchestra-broker.service.d/env.conf ]; then

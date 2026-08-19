@@ -287,6 +287,42 @@ class _FixtureMixin:
         )
         self.research_root = self.root / ".research"
         self.engine_dir = self.root / "engine"
+        scripts = self.engine_dir / "scripts"
+        scripts.mkdir(parents=True)
+        (self.engine_dir / "SKILL.md").write_text("# engine\n", encoding="utf-8")
+        for name in (
+            "validate_experiment_card.py", "ingest_run.py", "handoff_sync.py"
+        ):
+            (scripts / name).write_text("# fixture\n", encoding="utf-8")
+        self.manifest = self.root / "skills.json"
+        spec = {
+            "id": "academic-research-engine",
+            "source": "external",
+            "path": str(self.engine_dir),
+            "required": True,
+            "used_by": ["orchestra/scripts/run_card.py ingest"],
+            "entrypoints": [
+                "scripts/validate_experiment_card.py",
+                "scripts/ingest_run.py",
+                "scripts/handoff_sync.py",
+            ],
+            "contract_files": [
+                "SKILL.md",
+                "scripts/validate_experiment_card.py",
+                "scripts/ingest_run.py",
+                "scripts/handoff_sync.py",
+            ],
+            "expected_digest": None,
+            "input_contract": "experiment card.md and metrics.json",
+            "output_contract": ".research experiment run artifacts",
+        }
+        spec["expected_digest"] = run_card.check_skills.inspect_skill(
+            spec
+        )["actual_digest"]
+        self.manifest.write_text(json.dumps({
+            "schema_version": 1,
+            "skills": [spec],
+        }), encoding="utf-8")
 
     def _args(self, **overrides):
         defaults = dict(
@@ -294,6 +330,7 @@ class _FixtureMixin:
             card=str(self.card),
             research_root=str(self.research_root),
             engine_dir=str(self.engine_dir),
+            skills_manifest=str(self.manifest),
             paper_dir=None,
             open_neg_on_fail=False,
         )
@@ -408,7 +445,7 @@ class DoIngestTest(_FixtureMixin, unittest.TestCase):
         ]
         rc, _ = self._do_ingest(engine_dir=None)
         self.assertEqual(rc, 0)
-        expected = str(Path.home() / ".claude" / "skills" / "academic-research-engine")
+        expected = str(self.engine_dir)
         self.assertIn(expected, run.call_args_list[0].args[0][1])
         self.assertIn(expected, run.call_args_list[1].args[0][1])
 
@@ -419,6 +456,32 @@ class DoIngestTest(_FixtureMixin, unittest.TestCase):
         self.assertEqual(rc, 2)
         run.assert_not_called()
         self.assertIn("HARD:", out)
+
+    @mock.patch("run_card.subprocess.run")
+    def test_unlocked_skill_blocks_ingest(self, run):
+        data = json.loads(self.manifest.read_text(encoding="utf-8"))
+        data["skills"][0]["expected_digest"] = None
+        self.manifest.write_text(json.dumps(data), encoding="utf-8")
+        rc, out = self._do_ingest()
+        self.assertEqual(rc, 2)
+        run.assert_not_called()
+        self.assertIn("contract gate failed: unlocked", out)
+
+    @mock.patch("run_card.subprocess.run")
+    def test_drifted_skill_blocks_ingest(self, run):
+        (self.engine_dir / "SKILL.md").write_text("# drift\n", encoding="utf-8")
+        rc, out = self._do_ingest()
+        self.assertEqual(rc, 2)
+        run.assert_not_called()
+        self.assertIn("contract gate failed: drifted", out)
+
+    @mock.patch("run_card.subprocess.run")
+    def test_invalid_manifest_blocks_ingest(self, run):
+        self.manifest.write_text('{"schema_version": 1, "skills": []}', encoding="utf-8")
+        rc, out = self._do_ingest()
+        self.assertEqual(rc, 2)
+        run.assert_not_called()
+        self.assertIn("invalid skills manifest", out)
 
 
 class MainTest(_FixtureMixin, unittest.TestCase):
@@ -448,6 +511,8 @@ class MainTest(_FixtureMixin, unittest.TestCase):
                 str(self.card),
                 "--engine-dir",
                 str(self.engine_dir),
+                "--skills-manifest",
+                str(self.manifest),
                 "--research-root",
                 str(self.research_root),
             ],

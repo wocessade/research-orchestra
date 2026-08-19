@@ -42,6 +42,8 @@ def build_payload(conn, host_stats: dict | None = None) -> dict:
         "broker_health": "ok",
         "queue_len": queued + running,
         "active_tasks": running,
+        "blocked_tasks": len(db.list_tasks(conn, "blocked")),
+        "invalid_tasks": len(db.list_tasks(conn, "invalid")),
         "last_task": done[-1][0] if done else None,
         "recent_tasks": [
             {"slug": slug, "status": status, "ts": ts}
@@ -94,6 +96,46 @@ def _archive_task_file(f: Path, tasks_dir: Path) -> None:
     archive.mkdir(exist_ok=True)
     f.rename(archive / f.name)
 
+
+def _archive_by_slug(slug: str, tasks_dir: Path) -> None:
+    path = tasks_dir / f"{slug}.md"
+    if path.exists():
+        _archive_task_file(path, tasks_dir)
+
+
+def _find_dependency_cycles(specs: dict[str, taskfile.TaskSpec]) -> set[str]:
+    """返回当前活动任务图中位于依赖环上的 slug。"""
+    state: dict[str, int] = {}
+    stack: list[str] = []
+    cyclic: set[str] = set()
+
+    def visit(slug: str) -> None:
+        state[slug] = 1
+        stack.append(slug)
+        for dependency in specs[slug].depends_on:
+            if dependency not in specs:
+                continue
+            if state.get(dependency, 0) == 0:
+                visit(dependency)
+            elif state.get(dependency) == 1:
+                start = stack.index(dependency)
+                cyclic.update(stack[start:])
+        stack.pop()
+        state[slug] = 2
+
+    for slug in specs:
+        if state.get(slug, 0) == 0:
+            visit(slug)
+    return cyclic
+
+
+def _is_terminal(row: tuple | None, max_attempts: int) -> bool:
+    if row is None:
+        return False
+    return row[1] in ("done", "blocked", "invalid") or (
+        row[1] == "failed" and row[2] >= max_attempts
+    )
+
 def one_cycle(cfg: dict, conn, run=None, check_net_fn=None) -> dict:
     """单轮：注册新任务 → 重排队失败任务 → 执行 queued → 终态任务文件归档。
     run/check_net_fn 供测试注入。"""
@@ -104,6 +146,11 @@ def one_cycle(cfg: dict, conn, run=None, check_net_fn=None) -> dict:
 
     specs: dict[str, taskfile.TaskSpec] = {}
     for f in sorted(tasks_dir.glob("T-*.md")):
+        parts = f.name.split("-")
+        if len(parts) >= 5 and parts[2:4] == ["nightly", "radar"]:
+            marker = tasks_dir / f".radar-inject-{parts[1]}"
+            if marker.exists():
+                continue
         try:
             spec = taskfile.parse_taskfile(f)
         except ValueError as e:
@@ -117,12 +164,33 @@ def one_cycle(cfg: dict, conn, run=None, check_net_fn=None) -> dict:
         db.register_task(conn, spec.slug, spec.net, spec.result_dir)
         # 已终态的历史任务文件（如升级前的 done）同样归档，防积压
         row = db.get_task(conn, spec.slug)
-        if row and (row[1] == "done" or (row[1] == "failed" and row[2] >= max_attempts)):
+        if _is_terminal(row, max_attempts):
             _archive_task_file(f, tasks_dir)
 
     db.requeue_failed(conn, max_attempts)
 
-    executed, skipped_net = [], []
+    invalid_dependencies = []
+    cycle_slugs = _find_dependency_cycles(specs)
+    for slug, spec in specs.items():
+        current = db.get_task(conn, slug)
+        if current is not None and current[1] != "queued":
+            continue
+        missing = [
+            dependency for dependency in spec.depends_on
+            if dependency not in specs and db.get_task(conn, dependency) is None
+        ]
+        reasons = []
+        if slug in cycle_slugs:
+            reasons.append("dependency cycle")
+        if missing:
+            reasons.append("missing dependencies: " + ", ".join(missing))
+        if reasons:
+            error = "; ".join(reasons)
+            db.finish_task(conn, slug, "invalid", error)
+            invalid_dependencies.append({"slug": slug, "error": error})
+            _archive_by_slug(slug, tasks_dir)
+
+    executed, skipped_net, waiting_dependencies, blocked_dependencies = [], [], [], []
     for slug, _st, _a, net_req, _e in db.list_tasks(conn, "queued"):
         spec = specs.get(slug)
         if spec is None:
@@ -130,6 +198,30 @@ def one_cycle(cfg: dict, conn, run=None, check_net_fn=None) -> dict:
             # requeue_failed 永久循环（哨兵审计发现）
             if db.claim_task(conn, slug):
                 db.finish_task(conn, slug, "failed", "task file missing")
+            continue
+        incomplete = []
+        blockers = []
+        for dependency in spec.depends_on:
+            row = db.get_task(conn, dependency)
+            if row is None:
+                blockers.append(f"{dependency}: missing")
+            elif row[1] in ("blocked", "invalid"):
+                blockers.append(f"{dependency}: {row[1]}")
+            elif row[1] == "failed" and row[2] >= max_attempts:
+                blockers.append(f"{dependency}: failed after {row[2]} attempts")
+            elif row[1] != "done":
+                incomplete.append(dependency)
+        if blockers:
+            error = "blocked by dependencies: " + "; ".join(blockers)
+            db.finish_task(conn, slug, "blocked", error)
+            blocked_dependencies.append({"slug": slug, "error": error})
+            _archive_by_slug(slug, tasks_dir)
+            continue
+        if incomplete:
+            waiting_dependencies.append({
+                "slug": slug,
+                "dependencies": incomplete,
+            })
             continue
         if net_req == "required" and not check_net_fn():
             skipped_net.append(slug)
@@ -148,11 +240,17 @@ def one_cycle(cfg: dict, conn, run=None, check_net_fn=None) -> dict:
         log.info("task %s -> %s (%s)", slug, status, error or "-")
         row = db.get_task(conn, slug)
         # 终态（done，或 attempts 用尽的 failed）→ 归档任务文件
-        if row and (row[1] == "done" or (row[1] == "failed" and row[2] >= max_attempts)):
+        if _is_terminal(row, max_attempts):
             f = tasks_dir / f"{slug}.md"
             if f.exists():
                 _archive_task_file(f, tasks_dir)
-    return {"executed": executed, "skipped_net": skipped_net}
+    return {
+        "executed": executed,
+        "skipped_net": skipped_net,
+        "waiting_dependencies": waiting_dependencies,
+        "blocked_dependencies": blocked_dependencies,
+        "invalid_dependencies": invalid_dependencies,
+    }
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")

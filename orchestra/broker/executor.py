@@ -26,12 +26,20 @@ def check_net(host: str = "api.deepseek.com", port: int = 443, timeout: int = 3)
 def run_task(spec: TaskSpec, tasks_dir: str, results_root: str,
              dsh_profile: str = "headless") -> tuple[str, str | None]:
     """执行一个 TaskSpec。返回 (status, error)；status ∈ done|failed。"""
-    base = Path(results_root) / spec.result_dir
+    # result_dir 逃逸防护：解析后必须仍在 results_root 内，否则早退——
+    # 不创建任何目录、不写 state.json（漏洞本体：result_dir 含绝对路径或 .. 可越界落盘）
+    base = (Path(results_root) / spec.result_dir).resolve()
+    results_root_resolved = Path(results_root).resolve()
+    if base != results_root_resolved and results_root_resolved not in base.parents:
+        return "failed", f"result_dir escapes results_root: {spec.result_dir}"
     attempt = 1
-    while (base / f"attempt-{attempt}").exists():
-        attempt += 1
-    outdir = base / f"attempt-{attempt}"
-    outdir.mkdir(parents=True, exist_ok=True)
+    while True:
+        try:
+            outdir = base / f"attempt-{attempt}"
+            outdir.mkdir(parents=True)
+            break
+        except FileExistsError:
+            attempt += 1
 
     stdout, stderr, status, error = "", "", "done", None
     if spec.executor == "dsh":
@@ -76,7 +84,14 @@ def run_task(spec: TaskSpec, tasks_dir: str, results_root: str,
                 if os.name == "posix":
                     os.killpg(proc.pid, signal.SIGKILL)
                 else:
-                    proc.kill()
+                    # Windows：proc.kill() 只杀直接子进程（cmd.exe），
+                    # 孙进程留孤儿继续跑 → 重复计费+重复邮件（mission 027 codex 实测）。
+                    # taskkill /T 杀整棵进程树；非零退出码不抛异常，任务已判 failed。
+                    subprocess.run(
+                        ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                        capture_output=True,
+                        timeout=10,
+                    )
                 stdout, stderr = proc.communicate()
                 stdout, stderr = stdout or "", stderr or ""
             status, error = "failed", f"timeout after {spec.timeout}s"

@@ -1,0 +1,6 @@
+# dsh patch overlay: 质量型任务（实验跑批等）— 只覆盖默认模型为 pro
+- id: agent-default-model
+  name: '@deepseek-ai/dsh-agent-default-model'
+  config:
+    provider: deepseek-official
+    model: deepseek-v4-pro

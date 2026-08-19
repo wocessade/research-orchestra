@@ -1,0 +1,6 @@
+# dsh patch overlay: 省钱型任务（雷达评分等）— 只覆盖默认模型为 flash
+- id: agent-default-model
+  name: '@deepseek-ai/dsh-agent-default-model'
+  config:
+    provider: deepseek-official
+    model: deepseek-v4-flash

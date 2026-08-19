@@ -52,10 +52,10 @@
 
 注：帧2 采集于任务执行窗口内（13:26:54–13:28:24），但面板呈现的 broker 上报停留在 13:26:24（派发前）——Broker 主循环为「每轮 `one_cycle()` 同步执行全部任务 → 之后 `report_status()` → sleep 30」（`/home/liuxfs/broker/dispatcher.py` 155-158 行），执行期间 121s 无任何上报（`e2e-broker-post-gap.txt`：13:26:24 → 13:28:25）。因此「running」帧在面板上不可观测，active_tasks 恒为 0，任务状态以 done 一次性呈现。系统行为自洽（started_at 13:26:54 + elapsed_s 90.0 = done 13:28:24，与 heartbeat.txt、broker.log 三处一致），非故障；面板状态变化证据为 帧1（前）→ 帧3（后）完整跳变。
 
-## 四、测试记录（零回归，命令输出存证）
+## 四、测试记录（零回归，命令输出存证；哨兵审计复核口径见文末）
 
-- **Broker：39 passed** — `D:\Temp\subsystem-4\e2e-test-broker.txt`（`39 passed in 30.98s`，命令：`cd orchestra/broker && python3 -m pytest tests/ -q`）
-- **usage-monitor：62 passed + 1 既有基线 error** — `D:\Temp\subsystem-4\e2e-test-usage-monitor.txt`（62 passed；test_dashboard.py 采集期 FileNotFoundError [WinError 3] 为既有基线，自 Task 1 起记录于 `.tasks/active/026_subsystem-4-dashboard/STATE.md` 第 23 行「回归唯一失败为既有基线 test_dashboard ImportError，非新增」，D10 历史记录「56/57 仅既有基线失败」同见 STATE.md 第 26 行；本次套件已扩至 63 项，基线性质未变）
+- **Broker：41 passed（unittest）** — 哨兵审计实测 `python -m unittest discover -s tests -t .` = `OK`（41 = 基线 29 + D9 6 + D15 2 + D10 host 4；存档 `D:\Temp\subsystem-4\e2e-test-broker.txt` 的 `39 passed` 为 D15 前时点）
+- **usage-monitor：58 tests + 1 既有基线 error（unittest 为准）** — 哨兵审计实测 `py -3 -m unittest discover` = `Ran 58 tests, FAILED (errors=1)`，唯一 error = test_dashboard（模块级 `os.chdir('/home/liuxfs/usage-monitor')` 在 Windows 必然失败，既有基线非新增）。存档 `D:\Temp\subsystem-4\e2e-test-usage-monitor.txt` 的 `62 passed` 出自排除 test_dashboard 与 vendor 示例的 pytest 集合（pytest 全量会因该两者 collection error 中断）；两口径计数差异不影响零回归结论
 
 ## 五、遗留与发现
 
@@ -70,3 +70,4 @@
 |---|---|---|
 | CC | reviewed: ok（2026-08-19 复查：三帧 state JSON 关键值、full-refresh 日志行、broker.log done 行已逐项核对实测一致；三帧 PNG 非空白渲染；无手抄数字。验收项 5 的「运行中不可观测」已由 D15 修复任务承接，本报告遗留段如实记录。） | 2026-08-19 |
 | CC | reviewed: ok（D15 补充复查 2026-08-19：reporter 线程 16:05 实机部署（日志 `reporter thread started`）；d15-running-state.json 关键值逐项核对一致；d15-running-frame.png 为核桃派实机渲染；D17 事故（1A 适配器）与本次验收无关。） | 2026-08-19 |
+| 哨兵 | reviewed: ok（2026-08-19 独立审计：AC 1-8 逐条实测证据一致；部署 md5 与仓库一致；密钥零泄漏；18 commits 无署名行；2 MED（测试口径表述、未跟踪文件）+ 1 LOW 已处置——本报告 §四口径修正、计划文档与 d15 任务文件入库、POST 成功响应体补存档 `D:\Temp\subsystem-4\orchestra-post-ok.json`） | 2026-08-19 |

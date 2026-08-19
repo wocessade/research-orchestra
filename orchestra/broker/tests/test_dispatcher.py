@@ -2,6 +2,8 @@
 import json
 import os
 import tempfile
+import threading
+import time
 import unittest
 from unittest import mock
 
@@ -119,6 +121,35 @@ class TestDispatcher(unittest.TestCase):
         # attempts=1 < max_attempts → 下一轮重试；重试又崩则 attempts=2 终态
         dispatcher.one_cycle(self.cfg, self.conn, run=boom, check_net_fn=lambda: True)
         self.assertEqual(db.list_tasks(self.conn, "failed")[0][2], 2)
+
+    def test_reporter_loop_reports_until_stopped(self):
+        # D15：独立 reporter 线程——主循环执行长任务期间按 poll_interval 持续上报，
+        # stop_event 置位后退出（join 后调用数不再增长）
+        cfg = dict(self.cfg, poll_interval=0.05)
+        stop = threading.Event()
+        with mock.patch("dispatcher.report_status") as report:
+            t = threading.Thread(target=dispatcher._reporter_loop, args=(cfg, stop), daemon=True)
+            t.start()
+            deadline = time.time() + 5
+            while report.call_count < 3 and time.time() < deadline:
+                time.sleep(0.02)
+            self.assertGreaterEqual(report.call_count, 3)  # 持续上报（≥3 次）
+            stop.set()
+            t.join(timeout=2)
+            self.assertFalse(t.is_alive())  # 线程已结束
+            count = report.call_count
+            time.sleep(0.15)  # 大于 poll_interval：确认停止后不再上报
+            self.assertEqual(report.call_count, count)
+
+    def test_build_payload_includes_running_task(self):
+        # D15 面板可见性契约：running 任务必须同时出现在 active_tasks 与
+        # recent_tasks（面板「运行中」帧的数据来源）
+        db.register_task(self.conn, "T-20260819-d15", "optional", "results/T-20260819-d15")
+        db.claim_task(self.conn, "T-20260819-d15")  # status=running
+        payload = dispatcher.build_payload(self.conn)
+        self.assertEqual(payload["active_tasks"], 1)
+        self.assertEqual(payload["recent_tasks"][0]["slug"], "T-20260819-d15")
+        self.assertEqual(payload["recent_tasks"][0]["status"], "running")
 
     def test_build_payload_fields(self):
         # queued/running/done 混合

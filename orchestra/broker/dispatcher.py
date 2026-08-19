@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import signal
+import threading
 import time
 import urllib.request
 from pathlib import Path
@@ -70,6 +71,22 @@ def report_status(cfg: dict, conn) -> None:
         urllib.request.urlopen(req, timeout=5)
     except Exception as e:  # 上报失败不影响主循环
         log.warning("status report failed: %s", e)
+
+def _reporter_loop(cfg: dict, stop_event: threading.Event) -> None:
+    """独立上报线程（D15）：自持 SQLite 连接（WAL 支持与主循环并发读），
+    每 poll_interval 秒上报一次；主循环同步执行长任务期间上报不中断。
+    stop_event 置位（SIGTERM）后退出当前等待并结束循环（连接随线程关闭）。"""
+    conn = db.init_db(cfg["db_path"])
+    poll = float(cfg.get("poll_interval", 30))
+    try:
+        while not stop_event.is_set():
+            try:
+                report_status(cfg, conn)
+            except Exception:  # 上报异常不影响上报节奏，下个周期重试
+                log.exception("reporter loop error")
+            stop_event.wait(poll)
+    finally:
+        conn.close()
 
 def _archive_task_file(f: Path, tasks_dir: Path) -> None:
     """终态任务文件移入 tasks/archive/，避免队列目录无限积压。"""
@@ -139,11 +156,25 @@ def one_cycle(cfg: dict, conn, run=None, check_net_fn=None) -> dict:
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-    signal.signal(signal.SIGTERM, lambda *a: (_ for _ in ()).throw(SystemExit(0)))
     cfg = load_config()
     conn = db.init_db(cfg["db_path"])
     poll = float(cfg.get("poll_interval", 30))
+    stop_event = threading.Event()
+
+    def _on_sigterm(*_a):
+        stop_event.set()  # 通知 reporter 线程退出
+        raise SystemExit(0)
+
+    signal.signal(signal.SIGTERM, _on_sigterm)
     log.info("broker started (poll=%ss, db=%s)", poll, cfg["db_path"])
+    # D15：独立 reporter 线程——主循环 one_cycle 同步执行长任务期间（可分钟级）
+    # 无上报会造成面板 90s 阈值误判「Broker 离线」；reporter 自持 WAL 连接按
+    # poll 周期持续上报，与主循环解耦。主循环不再调用 report_status（防双报）。
+    # recover_running 仍在主循环内先于任务执行；reporter 首帧即使抢先上报
+    # 崩溃残留，30s 后自动纠正。
+    threading.Thread(target=_reporter_loop, args=(cfg, stop_event),
+                     name="reporter", daemon=True).start()
+    log.info("reporter thread started (interval=%ss)", poll)
     while True:
         try:
             # 每轮先回收上轮异常遗留的 running → failed（审计 CONCERN-4：
@@ -152,7 +183,6 @@ def main() -> None:
             if n:
                 log.info("recovered %d running task(s) -> failed", n)
             one_cycle(cfg, conn)
-            report_status(cfg, conn)
         except Exception:
             log.exception("cycle error")
         time.sleep(poll)

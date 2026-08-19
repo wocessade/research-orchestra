@@ -133,7 +133,7 @@ result: results/T-20260819-xxx/
 - **通信方式**（已核实）：① `codex exec "任务" --json`（事件 JSONL 流，CC Bash 直调解析复查，主用）② 文件总线（orchestra 任务/结果）③ 会话 resume/fork（按 session ID 恢复或分叉）④ dsh 子代理 `-codex` 后端（Broker 跑通后启用）
 - **三种模式**：互审（Codex 审 CC 代码，两边意见汇总，用户裁决）；独立实现（关键函数双实现跑同一测试，分歧处重点查）；claim 核验（adversarial-claim-check 双跑，结论不一致人工核查）
 - **验收**：找一段历史代码让 Codex 独立审，验证分歧点是否命中真问题
-- **状态（2026-08-19）**：subsystem-3 验收完成（报告 `orchestra/reports/2026-08-codex-dual-agent-acceptance.md`，状态 ok）。① 直调已脚本化：`orchestra/scripts/codex_exec.py`（codex exec --json 封装：NDJSON 事件解析/超时树杀/7 类错误分类/git 信任检查，36 mock 测试）+ `orchestra/scripts/codex_modes.py`（互审/双实现/claim 核验三模式，48 测试），scripts 全量 124 测试 OK；② 文件总线已验证可用（codex_exec 支持 prompt 文件/stdin + --out 落盘，codex 原生另有 `-o/--output-last-message` 直写末条消息）；③ resume/fork 验证存在（`codex exec resume` 按 UUID/thread name 续接 + `--last`；`codex exec fork` 按 UUID fork 新会话），v1 不脚本化；④ dsh 子代理 `-codex` 后端 out of scope（DECISIONS D20：Pi→OpenAI 网络路径未验证）。验收：历史代码独立审（broker/executor.py）codex 互审 3 findings、CC 判定 3/3 全真问题、0 误报 0 风格、3 条全为新问题，**命中率 3/3 = 100%**。
+- **状态（2026-08-19）**：subsystem-3 验收完成（报告 `orchestra/reports/2026-08-codex-dual-agent-acceptance.md`，状态 ok）。① 直调已脚本化：`orchestra/scripts/codex_exec.py`（codex exec --json 封装：NDJSON 事件解析/超时树杀/7 类错误分类/git 信任检查，43 mock 测试）+ `orchestra/scripts/codex_modes.py`（互审/双实现/claim 核验三模式，48 测试），scripts 全量 124 测试 OK；② 文件总线已验证可用（codex_exec 支持 prompt 文件/stdin + --out 落盘，codex 原生另有 `-o/--output-last-message` 直写末条消息）；③ resume/fork 验证存在（`codex exec resume` 按 UUID/thread name 续接 + `--last`；`codex exec fork` 按 UUID fork 新会话），v1 不脚本化；④ dsh 子代理 `-codex` 后端 out of scope（DECISIONS D20：Pi→OpenAI 网络路径未验证）。验收：历史代码独立审（broker/executor.py）codex 互审 3 findings、CC 判定 3/3 全真问题、0 误报 0 风格、3 条全为新问题，**命中率 3/3 = 100%**。
 
 ### 6.4 子系统 4：仪表盘适配（usage-monitor 增量扩展）
 

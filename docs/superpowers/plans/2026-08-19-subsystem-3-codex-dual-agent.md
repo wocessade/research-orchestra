@@ -84,7 +84,7 @@ codex_exec.py run <prompt-file|-> [--model X] [--timeout N] [--out DIR] [--json-
   - CLI 层 `main()`（argparse 按约定 A；prompt 走 --prompt-file 或 stdin）
 
 - [x] **Step 1: 写失败测试**（fixture 以真实冒烟流 `D:\Temp\codex-smoke-events.jsonl` 校准：正常 item.completed 流、认证失败事件、rate_limit 事件、超时、codex 未装、空流、WS 传输噪音事件、trusted-directory 拒绝）
-- [x] **Step 2-4: 红→绿→回归**（scripts/tests/ 下 unittest，从 orchestra/scripts/ 目录运行；discover 全量 Ran 76 OK = 36 新 + 39 既有 run_card 零回归）
+- [x] **Step 2-4: 红→绿→回归**（scripts/tests/ 下 unittest，从 orchestra/scripts/ 目录运行；discover 全量 Ran 76 OK = 43 新 + 33 既有 run_card 零回归，哨兵复核口径）
 - [x] **Step 5: 一次真实调用验证**（首轮 120s 超时暴露 Windows 管道句柄 bug→修复；复核 `--timeout 420` 通过：status=ok / text=codex-exec-real-ok / elapsed_s=127.9 / events=9 / exit 0，存档 `D:\Temp\subsystem-3\codex_exec-real.json`，超时证据备份 codex_exec-real-timeout.json）
 - [x] **Step 6: Commit** `feat: codex_exec.py - codex exec JSONL wrapper with error classification`（eb7cf6e，仅两新文件，无署名行）
 
@@ -119,7 +119,7 @@ codex_exec.py run <prompt-file|-> [--model X] [--timeout N] [--out DIR] [--json-
 - [x] **Step 1: 互审真实调用**：`codex_modes.py mutual-review orchestra/broker/executor.py` → review.json 存档（第 3 次调用成功：context「不动工具」+ --timeout 1800；前两次 600s 超时/误杀，证据备份）
 - [x] **Step 2: CC 逐条判定**：每条分歧标 真问题/误报/风格建议（对照已知缺陷档案：cwd 注入、attempt 递增、断网门、超时语义）；发现的新问题如实记录（3/3 真问题，全为新问题）
 - [x] **Step 3: 写验收报告**：判定表 + 命中率（数字引用 artifact）；顺带记录方式②③能力存在性验证结果（resume/fork 仅验证不脚本化）
-- [ ] **Step 4: Commit** `docs: subsystem-3 codex dual-agent acceptance report`
+- [x] **Step 4: Commit** `docs: subsystem-3 codex dual-agent acceptance report`（cf045f6，报告 + artifact + 计划勾选，无署名行）
 
 ### Task 5: 文档收尾
 
@@ -127,7 +127,7 @@ codex_exec.py run <prompt-file|-> [--model X] [--timeout N] [--out DIR] [--json-
 - Modify: `docs/superpowers/specs/2026-08-18-research-orchestra-design.md`（§6.3 状态行 + §13 勾 3 + 版本行 v7）
 - Modify: `D:\pythonProject\orchestra\README.md`（双 agent 节：脚本入口 + 模式说明 + 验收结论）
 
-- [ ] **Step 1-2: 更新 + Commit** `docs: spec §6.3 finalized with acceptance result`
+- [x] **Step 1-2: 更新 + Commit** `docs: spec §6.3 finalized with acceptance result`（35427f7，spec v7 + README 双 agent 节）
 
 ### Task 6: 哨兵审计 + 归档
 

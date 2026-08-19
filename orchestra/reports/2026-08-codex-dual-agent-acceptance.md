@@ -52,5 +52,5 @@
 ## Reviewed
 
 - Reviewed by CC（opus）：判定表 3/3 经源码独立复现（taskfile.py:48、executor.py:29/31-34/69-70），命中率口径见 §三
-- Reviewed by 哨兵：（Task 6 补）
+- Reviewed by 哨兵：2026-08-19 终审通过（AC 1-8 全成立；2 LOW + 1 cosmetic 已处置，处置记录见 mission AUDIT.md）
 - 状态：ok

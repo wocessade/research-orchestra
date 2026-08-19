@@ -1,0 +1,28 @@
+# Research program config — demo copy for orchestra subsystem-2 EXP-001
+# Research root: D:\pythonProject\orchestra\demo\.research\
+# Equivalent to the academic-research-engine templates/program.yaml,
+# with demo-local values (human_in_loop; no GPU; no tournament; zh).
+
+persona: explorer          # explorer | focused_paper | multi_project | lab_lead
+domain: ""                 # free text field / subfield
+language: zh               # zh | en
+compute_budget:
+  mode: human_in_loop      # human_in_loop | ci_cpu | optional_gpu (NEVER default GPU auto-run)
+  cpu_hours_per_week: 8
+  gpu_hours_per_week: 0    # default 0 — engine does not launch GPU jobs
+tournament:
+  enabled: false
+  max_parallel_hypotheses: 3
+  abort_when_budget_exhausted: true
+vault:
+  obsidian_root: null
+  zotero_library: null
+nature_skills:             # demo does not consume these
+  literature_pipeline: null
+  reader: null
+  weekly_review: null
+writing:
+  default_module: academic-journal   # academic-journal | academic-thesis
+  paper_dirs: []                     # multi_project: list of paper_dir paths
+active_rq: null                      # e.g. RQ-001 — required before EXP activation
+notes: "demo research root for subsystem-2 EXP-001 (isolated from any real research program)"

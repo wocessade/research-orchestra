@@ -70,15 +70,19 @@ else:
 FOOTER_H = 52
 
 # orchestra 融合面板 (D9): 紧凑状态条 + 最近任务列表 + DeepSeek/天气小字行
+# D10: 下半新增设备区 (Broker/核桃派 负载内存), 任务行高收紧 40→36
 ORCH_STATUS_Y = 58        # 状态条 (font_normal 单行)
-ORCH_LIST_TITLE_Y = 92    # 「最近任务」标题 (font_medium)
-ORCH_LIST_Y = 118         # 列表首行
-ORCH_LIST_ROW_H = 40      # 列表行高
+ORCH_LIST_TITLE_Y = 88    # 「最近任务」标题 (font_medium)
+ORCH_LIST_Y = 112         # 列表首行
+ORCH_LIST_ROW_H = 36      # 列表行高
 ORCH_LIST_MAX_ROWS = 5    # 最多 5 行
 ORCH_LIST_SLUG_W = 480    # slug 像素截断宽 = 60% 屏宽
 ORCH_STATUS_X = 500       # 状态标签列 x
 ORCH_RIGHT_X = 785        # 时间右对齐 x (800-15)
-ORCH_INFO_Y = 330         # DeepSeek/天气小字行
+ORCH_DEV_TITLE_Y = 300    # 「设备」标题 (font_medium)
+ORCH_DEV_ROW1_Y = 318     # 设备行1: 4B Broker
+ORCH_DEV_ROW2_Y = 342     # 设备行2: 核桃派 (本机)
+ORCH_INFO_Y = 378         # DeepSeek/天气小字行
 
 # 最近任务状态 → 中文标签 (未识别状态回退原串截断)
 ORCH_STATUS_LABELS = {
@@ -216,7 +220,11 @@ class EinkDashboard:
             "usage": state.get("usage", {}),
             "alerts": state.get("alerts", []),
             "weather": state.get("weather", {}),
-            "orchestra": state.get("orchestra", {}),
+            # D10: orchestra 排除 host — 负载/内存每分钟抖动只走局刷, 不触发全刷
+            "orchestra": {
+                k: v for k, v in (state.get("orchestra") or {}).items()
+                if k != "host"
+            },
             "orchestra_last_report": state.get("orchestra_last_report", {}),
         }
         # 上下文展示开启时, 上一会话变更也触发全刷
@@ -232,8 +240,9 @@ class EinkDashboard:
 
         不含 last_updated (每 60s 余额时间戳会无意义推刷);
         services 保留以便底栏健康状态可局刷更新。
-        orchestra 纳入: 内容变化走局刷; 面板决议由 _resolve_display_panel
-        输出, 变化 (idle↔orchestra) 由 data hash / panel 键走全刷。
+        orchestra (含 host) 与 self_status 纳入: 内容变化走局刷 (D10 设备区);
+        面板决议由 _resolve_display_panel 输出, 变化 (idle↔orchestra) 由
+        data hash / panel 键走全刷。
         """
         display_fields = {
             "panel": cls._resolve_display_panel(state),
@@ -246,6 +255,7 @@ class EinkDashboard:
             "cc_model": state.get("cc_model", ""),
             "orchestra": state.get("orchestra", {}),
             "orchestra_last_report": state.get("orchestra_last_report", {}),
+            "self_status": state.get("self_status", {}),
             "_time_minute": time.strftime("%H:%M"),
             "_date": time.strftime("%Y-%m-%d"),
         }
@@ -478,11 +488,32 @@ class EinkDashboard:
 
         self._draw_footer(draw, 15, FOOTER_Y, self.width - 30, state)
 
-    def _draw_orchestra(self, draw: ImageDraw.Draw, state: dict) -> None:
-        """Orchestra 融合面板 (D9): 紧凑状态条 + 最近任务列表 + 小字行
+    @staticmethod
+    def _broker_health(rep: dict, orch: dict, now: float) -> str:
+        """Broker 健康推导 (状态条与设备区共用): OK | 离线 | --"""
+        broker_ts = rep.get("broker") or 0
+        if not broker_ts:
+            return "--"
+        if now - broker_ts > ORCHESTRA_STALE_SEC:
+            return "离线"
+        h = orch.get("broker_health") or "unknown"
+        if h == "ok":
+            return "OK"
+        if h == "unknown":
+            return "--"
+        return h
 
-        废弃四卡版: 两态/单数字信息压成单行状态条, 最近任务列表为主内容,
-        底部一行放 DeepSeek 余额/用量与天气, 适配研究编排工作流。
+    @staticmethod
+    def _fmt_val(v, suffix: str = "") -> str:
+        """负载/内存显示: None → "--", 否则原值+后缀"""
+        return "--" if v is None else f"{v}{suffix}"
+
+    def _draw_orchestra(self, draw: ImageDraw.Draw, state: dict) -> None:
+        """Orchestra 融合面板 (D9+D10): 状态条 + 最近任务列表 + 设备区 + 小字行
+
+        D9: 两态/单数字信息压成单行状态条, 最近任务列表为主内容, 适配研究
+        编排工作流; D10: 下半新增设备区 (4B Broker / 核桃派 负载·内存),
+        DeepSeek 余额/用量与天气压到最底一行。
         """
         self._draw_title_bar(draw, state, show_date=True)
 
@@ -491,21 +522,7 @@ class EinkDashboard:
         now = time.time()
 
         # ── 状态条: Broker {OK|离线|--} · 队列 {N|--} · 运行 {N|--} · 同步 ──
-        broker_ts = rep.get("broker") or 0
-        if not broker_ts:
-            health = "--"
-        else:
-            age = now - broker_ts
-            if age <= ORCHESTRA_STALE_SEC:
-                h = orch.get("broker_health") or "unknown"
-                if h == "ok":
-                    health = "OK"
-                elif h == "unknown":
-                    health = "--"
-                else:
-                    health = h
-            else:
-                health = "离线"
+        health = self._broker_health(rep, orch, now)
         sync_ts = rep.get("sync") or 0
         sync_str = "--" if not sync_ts else self._fmt_age(sync_ts)
         q = orch.get("queue_len")
@@ -552,6 +569,27 @@ class EinkDashboard:
                 draw.text((ORCH_RIGHT_X - w, y), age_s, fill=0,
                           font=self.font_normal)
                 y += ORCH_LIST_ROW_H
+
+        # ── 设备区: 4B Broker / 核桃派 (本机) 负载·内存 ──
+        draw.text((15, ORCH_DEV_TITLE_Y), "设备", fill=0,
+                  font=self.font_medium)
+        host = orch.get("host") or {}
+        # 行1: Broker 在线状态 = 与状态条相同的新鲜度推导
+        dev_health = "在线" if health == "OK" else health
+        r1 = (
+            f"4B Broker  {dev_health}"
+            f" · 负载 {self._fmt_val(host.get('load1'))}"
+            f" · 内存 {self._fmt_val(host.get('mem_pct'), '%')}"
+        )
+        draw.text((15, ORCH_DEV_ROW1_Y), r1, fill=0, font=self.font_normal)
+        # 行2: 核桃派 (本机, 进程存活即 OK)
+        self_st = state.get("self_status") or {}
+        r2 = (
+            f"核桃派  OK"
+            f" · 负载 {self._fmt_val(self_st.get('load1'))}"
+            f" · 内存 {self._fmt_val(self_st.get('mem_pct'), '%')}"
+        )
+        draw.text((15, ORCH_DEV_ROW2_Y), r2, fill=0, font=self.font_normal)
 
         # ── DeepSeek/天气小字行 (整行超宽时先舍 desc 尾部字符) ──
         bal = state.get("balance") or {}
@@ -622,20 +660,13 @@ class EinkDashboard:
     def _draw_title_bar(
         self, draw: ImageDraw.Draw, state: dict, show_date: bool = False
     ) -> None:
-        """黑底白字标题栏 (y: 0 - TITLE_BAR_H)"""
+        """黑底白字标题栏 (y: 0 - TITLE_BAR_H)
+
+        D10: 移除 CC 状态字 (「[ ] 空闲」等) — 状态信息由各面板内容承担,
+        标题栏保持品牌 + 日期 + 时间, 所有面板共用同一标题栏一并生效。
+        """
         draw.rectangle([(0, 0), (self.width, TITLE_BAR_H)], fill=0)
         draw.text((12, 12), "DEEPSEEK", fill=1, font=self.font_title)
-
-        status_map = {
-            "idle": "[ ] 空闲",
-            "running": "[*] 运行中",
-            "waiting": "[?] 等待",
-            "error": "[X] 故障",
-            "compact-warning": "[!] 上下文",
-        }
-        status_text = status_map.get(state.get("cc_status", "idle"), "[ ] --")
-        # 状态字放大, 与标题同级
-        draw.text((175, 12), status_text, fill=1, font=self.font_title)
 
         if show_date:
             weekdays = "一二三四五六日"
@@ -887,8 +918,10 @@ def _demo_state() -> dict:
                 {"slug": "T-20260819-usb-smoke",
                  "status": "failed", "ts": now - 7200},
             ],
+            "host": {"load1": 0.3, "mem_pct": 38},
         },
         "orchestra_last_report": {"broker": now - 5, "sync": now - 180},
+        "self_status": {"load1": 0.4, "mem_pct": 45},
     }
 
 

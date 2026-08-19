@@ -29,6 +29,7 @@ USAGE_SCRAPE_INTERVAL = 300      # cookie REST 用量抓取
 EINK_CHECK_INTERVAL = 30         # 墨水屏渲染检查
 EINK_FORCE_FULL_REFRESH = 1800   # 每 30 分钟强制全刷清残影
 WEATHER_INTERVAL = 1200          # 天气 20 分钟
+SELF_STATUS_INTERVAL = 60        # 本机负载/内存采样
 
 # Playwright 回退默认关闭 (Pi 上易 OOM); 设 ENABLE_PLAYWRIGHT_FALLBACK=1 启用
 ENABLE_PLAYWRIGHT_FALLBACK = os.getenv(

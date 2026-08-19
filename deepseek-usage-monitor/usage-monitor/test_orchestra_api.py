@@ -25,6 +25,7 @@ ORCH_INIT = {
     "last_task": None,
     "last_sync": None,
     "recent_tasks": [],
+    "host": {},
 }
 
 
@@ -243,10 +244,58 @@ class OrchestraApiTest(unittest.TestCase):
         self.assertEqual(resp.get_json(), {"ok": True, "merged": ["recent_tasks"]})
         self.assertEqual(self.orch_state()["recent_tasks"], [])
 
+    # ─── host 合并 (D10: 设备负载/内存逐项校验) ──
+
+    def test_host_valid_merge(self):
+        resp = self.post_orchestra({"host": {"load1": 0.5, "mem_pct": 60}})
+        self.assertEqual(resp.get_json(), {"ok": True, "merged": ["host"]})
+        self.assertEqual(
+            self.orch_state()["host"], {"load1": 0.5, "mem_pct": 60}
+        )
+
+    def test_host_null_values_clears(self):
+        resp = self.post_orchestra({"host": {"load1": None, "mem_pct": None}})
+        self.assertEqual(resp.get_json(), {"ok": True, "merged": ["host"]})
+        self.assertEqual(
+            self.orch_state()["host"], {"load1": None, "mem_pct": None}
+        )
+
+    def test_host_invalid_items_dropped(self):
+        # 全部非法 → 不合并, host 不变
+        resp = self.post_orchestra(
+            {"host": {"load1": "heavy", "mem_pct": 101, "extra": 5}}
+        )
+        self.assertEqual(resp.get_json(), {"ok": True, "merged": []})
+        self.assertEqual(self.orch_state()["host"], {})
+        # 部分非法 → 合法项覆盖, 非法项保留原值
+        self.post_orchestra({"host": {"load1": 0.3, "mem_pct": 38}})
+        resp = self.post_orchestra({"host": {"load1": True, "mem_pct": 45}})
+        self.assertEqual(resp.get_json(), {"ok": True, "merged": ["host"]})
+        self.assertEqual(
+            self.orch_state()["host"], {"load1": 0.3, "mem_pct": 45}
+        )
+
+    def test_host_non_dict_ignored(self):
+        resp = self.post_orchestra({"host": [0.3, 38]})
+        self.assertEqual(resp.get_json(), {"ok": True, "merged": []})
+        self.assertEqual(self.orch_state()["host"], {})
+
+    def test_host_merged_echo_with_other_fields(self):
+        """merged 顺序回显: host 与其它字段同报时均在数组内"""
+        resp = self.post_orchestra(
+            {"queue_len": 4, "host": {"load1": 0.3, "mem_pct": 38}}
+        )
+        self.assertEqual(
+            resp.get_json(), {"ok": True, "merged": ["queue_len", "host"]}
+        )
+
     # ─── /api/dashboard 携带 orchestra 块 ──────
 
     def test_dashboard_returns_orchestra_blocks(self):
-        self.post_orchestra({"queue_len": 7, "recent_tasks": self._tasks(2)})
+        self.post_orchestra(
+            {"queue_len": 7, "recent_tasks": self._tasks(2),
+             "host": {"load1": 0.3, "mem_pct": 38}}
+        )
         resp = self.client.get("/api/dashboard", headers=AUTH)
         self.assertEqual(resp.status_code, 200)
         data = resp.get_json()
@@ -254,6 +303,17 @@ class OrchestraApiTest(unittest.TestCase):
         self.assertIn("orchestra_last_report", data)
         self.assertEqual(data["orchestra"]["queue_len"], 7)
         self.assertEqual(len(data["orchestra"]["recent_tasks"]), 2)
+        self.assertEqual(
+            data["orchestra"]["host"], {"load1": 0.3, "mem_pct": 38}
+        )
+
+    def test_dashboard_carries_self_status(self):
+        """self_status 初始块经 /api/dashboard 可达"""
+        resp = self.client.get("/api/dashboard", headers=AUTH)
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("self_status", resp.get_json())
+        self.assertIsNone(resp.get_json()["self_status"]["load1"])
+        self.assertIsNone(resp.get_json()["self_status"]["mem_pct"])
 
     # ─── /health 新鲜度 ────────────────────────
 

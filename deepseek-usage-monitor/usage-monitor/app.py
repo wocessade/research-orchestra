@@ -45,6 +45,7 @@ from config import (  # noqa: E402
     USAGE_SCRAPE_INTERVAL,
     EINK_CHECK_INTERVAL,
     WEATHER_INTERVAL,
+    SELF_STATUS_INTERVAL,
     USAGE_LOGIN_BACKOFF,
     BALANCE_WARN_THRESHOLD,
     BALANCE_CRITICAL_THRESHOLD,
@@ -96,8 +97,10 @@ state = {
         "last_task": None,
         "last_sync": None,
         "recent_tasks": [],
+        "host": {},  # Broker 所在设备负载/内存 (broker 上报)
     },
     "orchestra_last_report": {"broker": 0, "sync": 0},  # epoch 秒, 无上报 = 0
+    "self_status": {"load1": None, "mem_pct": None},  # 本机 (核桃派) 负载/内存
     "last_updated": {"balance": 0, "usage": 0, "status": 0, "weather": 0},
     "alerts": [],
     "network_latency_ms": 0,
@@ -365,6 +368,48 @@ def _run_weather() -> None:
     _request_eink_refresh()
 
 
+def read_self_status(
+    loadavg_path: str = "/proc/loadavg",
+    meminfo_path: str = "/proc/meminfo",
+) -> dict:
+    """读本机负载/内存 (Linux /proc)。文件缺失/解析失败 → 全 None。
+
+    load1 = /proc/loadavg 第一字段, 四舍五入保留 1 位小数;
+    mem_pct = round((MemTotal - MemAvailable) / MemTotal * 100) 整数。
+    """
+    status = {"load1": None, "mem_pct": None}
+    try:
+        with open(loadavg_path, "r", encoding="utf-8") as f:
+            parts = f.read().split()
+        status["load1"] = round(float(parts[0]), 1)
+    except (OSError, ValueError, IndexError):
+        pass
+    try:
+        fields = {}
+        with open(meminfo_path, "r", encoding="utf-8") as f:
+            for line in f:
+                if ":" in line:
+                    key, _, rest = line.partition(":")
+                    fields[key] = rest.split()[0]
+        total = int(fields["MemTotal"])
+        avail = int(fields["MemAvailable"])
+        if total > 0:
+            status["mem_pct"] = round((total - avail) / total * 100)
+    except (OSError, ValueError, KeyError, IndexError):
+        pass
+    return status
+
+
+def _run_self_status() -> None:
+    """本机负载/内存: 锁外读, 变化时锁内写 + 请求局刷 (与 weather 同模式)"""
+    status = read_self_status()
+    with state_lock:
+        if state.get("self_status") == status:
+            return
+        state["self_status"] = status
+    _request_eink_refresh()
+
+
 def _resolve_panel(status: str, current: str) -> str:
     if status in ("running", "waiting"):
         return "active"
@@ -387,6 +432,7 @@ def _snapshot_state() -> dict:
         snap["orchestra_last_report"] = dict(
             state.get("orchestra_last_report") or {}
         )
+        snap["self_status"] = dict(state.get("self_status") or {})
         return snap
 
 
@@ -517,11 +563,14 @@ def update_orchestra():
       "recent_tasks": [
         {"slug": "T-...", "status": "running", "ts": 1750000000.0},
         ...
-      ]
+      ],
+      "host": {"load1": 0.3, "mem_pct": 38}   # 设备负载/内存 (逐项校验)
     }
     字段任意子集; 非法字段忽略且不计入 merged。
     recent_tasks 必须为 list, 每项为含 slug/status/ts 的 dict; 非法项丢弃,
     合法后整表替换 (Broker 权威), 仅保留前 8 条。
+    host 必须为 dict; load1 (int/float 或 null)、mem_pct (0-100 int 或 null)
+    逐项校验, 非法丢弃、合法覆盖; merged 含 "host" 当且仅当至少一项合法。
     """
     data = request.get_json() or {}
     source = data.get("source", "broker")
@@ -597,6 +646,42 @@ def update_orchestra():
                 orch[field] = tasks[:8]
                 merged.append(field)
                 continue
+            elif field == "host":
+                if not isinstance(value, dict):
+                    log.warning(
+                        "orchestra: invalid host=%r ignored (not dict)", value
+                    )
+                    continue
+                host = dict(orch.get("host") or {})
+                ok = False
+                for key in ("load1", "mem_pct"):
+                    if key not in value:
+                        continue
+                    v = value[key]
+                    if v is None:
+                        host[key] = None
+                        ok = True
+                    elif key == "load1" and (
+                        isinstance(v, (int, float)) and not isinstance(v, bool)
+                    ):
+                        host[key] = v
+                        ok = True
+                    elif (
+                        key == "mem_pct"
+                        and isinstance(v, int)
+                        and not isinstance(v, bool)
+                        and 0 <= v <= 100
+                    ):
+                        host[key] = v
+                        ok = True
+                    else:
+                        log.warning(
+                            "orchestra: invalid host.%s=%r ignored", key, v
+                        )
+                if ok:
+                    orch["host"] = host
+                    merged.append("host")
+                continue
             orch[field] = value
             merged.append(field)
         state["orchestra_last_report"][source] = time.time()
@@ -667,16 +752,23 @@ if __name__ == "__main__":
         _run_weather, "interval", seconds=WEATHER_INTERVAL, **job_defaults
     )
     log.info("Weather scheduled every %ss", WEATHER_INTERVAL)
+    scheduler.add_job(
+        _run_self_status, "interval", seconds=SELF_STATUS_INTERVAL, **job_defaults
+    )
+    log.info("Self status scheduled every %ss", SELF_STATUS_INTERVAL)
 
     scheduler.start()
     _start_eink_worker()
     fetch_balance()
-    # 启动时后台拉用量/天气, 不阻塞监听端口
+    # 启动时后台拉用量/天气/本机状态, 不阻塞监听端口
     threading.Thread(
         target=_run_usage_scrape, name="boot-usage", daemon=True
     ).start()
     threading.Thread(
         target=_run_weather, name="boot-weather", daemon=True
+    ).start()
+    threading.Thread(
+        target=_run_self_status, name="boot-self-status", daemon=True
     ).start()
     _request_eink_refresh()
 

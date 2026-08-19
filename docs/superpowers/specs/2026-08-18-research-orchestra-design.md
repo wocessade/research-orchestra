@@ -103,7 +103,7 @@ result: results/T-20260819-xxx/
 
 **Broker（4B，Python stdlib + systemd，不上 Redis/Celery——队列规模是个位数任务，勿过度设计）：**
 
-- **队列持久化**：`broker.db`（SQLite WAL，Python 自带 sqlite3）；tasks 表字段：slug、executor、status（queued→running→done/failed）、attempts、net_req、result_path、时间戳；**broker.db 与 results/logs 全部落 2280 SSD（USB3 转接直挂），不落 SD**
+- **队列持久化**：`broker.db`（SQLite WAL，Python 自带 sqlite3）；tasks 表字段：slug、executor、status（queued→running→done/failed）、attempts、net_req、result_path、时间戳；**broker.db 与 results/logs 全部落闪迪 U 盘（/mnt/broker，2026-08-19 迁移完成），不落 SD**
 - **任务注入**：CC 写 `orchestra/tasks/T-*.md` → `git push` 或 SSH scp → Broker 轮询 tasks/ 目录（文件即队列项，SQLite 只记状态）
 - **dispatcher**：常驻 Python 守护进程（systemd service），取 queued 任务 → 调 dsh headless → 增量写 `results/T-*/step-NN.json` → 更新状态 → 状态上报 `POST /api/orchestra`
 - **中间结果持久化**：执行器每步增量落盘 checkpoint；dsh 会话日志天然可 **resume**（断点续跑，原生支持）
@@ -220,7 +220,7 @@ CC 写 tasks/T-*.md ──git push/SSH──> Broker 队列(SQLite) ──dispat
 | **4B 仅 2GB，dsh 内存占用未实测** | 冒烟测试即升级决策门：Minimal 模式跑通且稳定 → 留下；吃紧 → §14 上 Pi 5 8GB（触发条件已明确） |
 | Pi 存储可靠性（SD 写磨损） | **已解决**：闪迪 16G U 盘 ext4 直挂 /mnt/broker（fstab UUID+nofail，写入/WAL 冒烟通过；金士顿盘写入负载下拖死整机已弃用）；SSD+转接盒留作宿舍 NAS/冷备扩容候选 |
 | Broker 单点（4B 挂则常驻层停） | 核桃派冷备；队列目录 git 同步，手动切换（自动化主备切换明确不做，过度设计） |
-| 宿舍 NAS 待建（异地冷备缺失期） | git 同步 + SSD 直挂已覆盖主要风险；NAS 是冗余层非必需层，方案见 §14 |
+| 宿舍 NAS 待建（异地冷备缺失期） | git 同步 + 闪迪 U 盘直挂已覆盖主要风险；NAS 是冗余层非必需层，方案见 §14 |
 | 校园网宿舍-实验室是否互通未知 | 入学后实测；不通则 Tailscale/ZeroTier（§7 已定优先级） |
 | dsh 开发者预览（rc.7）接口可变 | 锁版本；升级看 changelog；执行层可替换（降级链） |
 | Windows 无 docker | headless 流程不需要；Hyper-V 可用，未来需要再评估 |

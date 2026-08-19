@@ -13,8 +13,8 @@
   py -3 deploy_to_pi.py
 
 环境变量:
-  PI_HOST       默认 192.168.0.223
-  PI_USER       默认 liuxfs
+  PI_HOST       默认 192.168.0.200 (核桃派)
+  PI_USER       默认 pi
   PI_PASS       密码 (与 PI_SSH_KEY 二选一)
   PI_SSH_KEY    私钥路径
   PI_PROJECT_DIR 默认 /home/<user>/usage-monitor
@@ -27,8 +27,8 @@ import sys
 
 import paramiko
 
-PI_HOST = os.getenv("PI_HOST", "192.168.0.223")
-PI_USER = os.getenv("PI_USER", "liuxfs")
+PI_HOST = os.getenv("PI_HOST", "192.168.0.200")
+PI_USER = os.getenv("PI_USER", "pi")
 PI_PASS = os.getenv("PI_PASS", "")
 PI_SSH_KEY = os.getenv("PI_SSH_KEY", "")
 PI_PROJECT_DIR = os.getenv(
@@ -43,16 +43,17 @@ FILES_TO_UPLOAD = [
     "usage_scraper.py",
     "weather.py",
     "requirements.txt",
-    "monitor.service",
     "setup_pi.sh",
     "test_partial_buffer.py",
     "docs/dual_panel.md",
 ]
 
+# 注意: 不上传 monitor.service —— 仓库里是 4B 旧时代的 unit (liuxfs/venv),
+# 核桃派在役的是 monitor.walnutpi.service (pi/系统 python/LED 引脚不同)。
+# systemd unit 与 MONITOR_TOKEN 由部署侧 (subsystem-4 Task 3) 在 Pi 上单独管理。
 PI_COMMANDS = [
     f"cd {PI_PROJECT_DIR} && chmod +x setup_pi.sh 2>/dev/null; true",
     "fc-list :lang=zh 2>/dev/null | grep -qi wqy || sudo apt-get install -y fonts-wqy-microhei",
-    f"sudo cp {PI_PROJECT_DIR}/monitor.service /etc/systemd/system/monitor.service",
     "sudo systemctl daemon-reload",
     "sudo systemctl restart monitor",
     "sleep 2",

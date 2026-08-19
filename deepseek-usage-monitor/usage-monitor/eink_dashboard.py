@@ -72,17 +72,17 @@ FOOTER_H = 52
 # orchestra 融合面板 (D9): 紧凑状态条 + 最近任务列表 + DeepSeek/天气小字行
 # D10: 下半新增设备区 (Broker/核桃派 负载内存), 任务行高收紧 40→36
 ORCH_STATUS_Y = 58        # 状态条 (font_normal 单行)
-ORCH_LIST_TITLE_Y = 88    # 「最近任务」标题 (font_medium)
-ORCH_LIST_Y = 112         # 列表首行
+ORCH_LIST_TITLE_Y = 88    # 「最近任务」标题 (font_title 加粗)
+ORCH_LIST_Y = 118         # 列表首行 (标题 24px 底 112 留 6px)
 ORCH_LIST_ROW_H = 36      # 列表行高
 ORCH_LIST_MAX_ROWS = 5    # 最多 5 行
 ORCH_LIST_SLUG_W = 480    # slug 像素截断宽 = 60% 屏宽
 ORCH_STATUS_X = 500       # 状态标签列 x
 ORCH_RIGHT_X = 785        # 时间右对齐 x (800-15)
-ORCH_DEV_TITLE_Y = 300    # 「设备」标题 (font_medium)
-ORCH_DEV_ROW1_Y = 318     # 设备行1: 4B Broker
-ORCH_DEV_ROW2_Y = 342     # 设备行2: 核桃派 (本机)
-ORCH_INFO_Y = 378         # DeepSeek/天气小字行
+ORCH_DEV_TITLE_Y = 306    # 「设备」标题 (font_title 加粗; 列表底 298 留 8px)
+ORCH_DEV_ROW1_Y = 336     # 设备行1: 4B Broker (标题底 330 留 6px, D11 拉开)
+ORCH_DEV_ROW2_Y = 358     # 设备行2: 核桃派 (本机)
+ORCH_INFO_Y = 386         # DeepSeek/天气小字行 (行2 底 380 留 6px)
 
 # 最近任务状态 → 中文标签 (未识别状态回退原串截断)
 ORCH_STATUS_LABELS = {
@@ -535,7 +535,7 @@ class EinkDashboard:
 
         # ── 最近任务列表 (主内容) ──
         draw.text((15, ORCH_LIST_TITLE_Y), "最近任务", fill=0,
-                  font=self.font_medium)
+                  font=self.font_title)
         tasks = orch.get("recent_tasks") or []
         if not tasks:
             msg = "（暂无上报）"
@@ -572,7 +572,7 @@ class EinkDashboard:
 
         # ── 设备区: 4B Broker / 核桃派 (本机) 负载·内存 ──
         draw.text((15, ORCH_DEV_TITLE_Y), "设备", fill=0,
-                  font=self.font_medium)
+                  font=self.font_title)
         host = orch.get("host") or {}
         # 行1: Broker 在线状态 = 与状态条相同的新鲜度推导
         dev_health = "在线" if health == "OK" else health

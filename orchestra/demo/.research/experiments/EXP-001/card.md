@@ -29,7 +29,7 @@ H-001（管线验证性假设，非科研结论）：同一抽取任务（demo �
 |-------|-------|
 | Dataset / corpus | demo 固定文本 material/extract_text.txt（约 150 字虚构研究公告，含实体/数值/关系字段） |
 | Baseline(s) | ctl 臂：单次 LLM API 调用（extract_single.py，deepseek-chat，temperature 0，response_format json_object） |
-| Method under test | trt 臂：dsh 多步 agent（Broker dsh executor：规划字段 → 逐字段抽取 → 核对 gold 格式 → 写 result.json → 共享评分） |
+| Method under test | trt 臂：dsh 多步 agent（Broker dsh executor：规划字段 → 逐字段抽取 → 核对 gold 格式 → 写 result_trt.json → 共享评分） |
 | Metrics | 字段级精确匹配正确率 accuracy = fields_correct / fields_total（gold.json 为金标准，两臂共用 score.py） |
 | Ablations | none |
 | Controls | 两臂共用 score.py、gold.json、extract_text.txt；评分前值做 strip 空白归一化后精确比对 |
@@ -63,15 +63,15 @@ If failed: choose `tune` (hyperparams) → `redesign` (protocol) → `rehypothes
 
 ## Commands
 
-命令用相对路径，执行体须先 cd 到 demo 目录。ctl 臂：单次调用抽取后评分；trt 臂：多步抽取由 dsh 执行器在评分前完成并写 result.json，此处只跑共享评分。
+命令用相对路径，执行体须先 cd 到 demo 目录。ctl 臂：单次调用抽取后评分；trt 臂：多步抽取由 dsh 执行器在评分前完成并写 result_trt.json（工作目录），此处只跑共享评分。两臂结果文件独立命名，防交叉污染。
 
 # arm: ctl
 ```bash
-python3 extract_single.py --text material/extract_text.txt --gold material/gold.json --out result.json
-python3 score.py --gold material/gold.json --result result.json --exp-id EXP-001 --out $OUTDIR/metrics.json
+python3 extract_single.py --text material/extract_text.txt --gold material/gold.json --out result_ctl.json
+python3 score.py --gold material/gold.json --result result_ctl.json --exp-id EXP-001 --out $OUTDIR/metrics.json
 ```
 
 # arm: trt
 ```bash
-python3 score.py --gold material/gold.json --result result.json --exp-id EXP-001 --out $OUTDIR/metrics.json
+python3 score.py --gold material/gold.json --result result_trt.json --exp-id EXP-001 --out $OUTDIR/metrics.json
 ```

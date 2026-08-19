@@ -55,6 +55,12 @@ COMPACT_THRESHOLD_TOKENS = 850000  # 对齐 CLAUDE_CODE_AUTO_COMPACT_WINDOW
 # 恢复显示: 改为 True 即可（需自行恢复 hooks 才有实时数据）
 SHOW_CC_CONTEXT = False
 
+# ─── Orchestra 状态面板 (subsystem-4) ─────────
+
+SHOW_ORCHESTRA = True        # 面板开关 (Task 2 起由 eink_dashboard 消费)
+ORCHESTRA_ROTATE_SEC = 60    # 状态块轮换周期 (秒)
+ORCHESTRA_STALE_SEC = 90     # 新鲜度阈值 = 3 × Broker poll 30s
+
 # ─── GPIO 引脚 (BCM 编号) ─────────────────────
 
 LED_RED_PIN = int(os.getenv("LED_RED_PIN", "5"))

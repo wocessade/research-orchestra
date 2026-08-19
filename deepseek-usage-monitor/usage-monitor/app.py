@@ -6,6 +6,7 @@
 API:
   GET  /api/dashboard   - 完整状态
   POST /api/status      - CC 状态上报
+  POST /api/orchestra   - Orchestra 状态上报
   GET  /health          - 健康检查
 """
 
@@ -52,6 +53,9 @@ from config import (  # noqa: E402
     MONITOR_TOKEN,
     LED_RED_PIN,
     LED_GREEN_PIN,
+    SHOW_ORCHESTRA,
+    ORCHESTRA_ROTATE_SEC,
+    ORCHESTRA_STALE_SEC,
 )
 
 logging.basicConfig(
@@ -86,6 +90,14 @@ state = {
     "cc_session_id": "",
     "last_session": {},  # session_end 后冻结的摘要
     "weather": {},
+    "orchestra": {
+        "broker_health": "unknown",
+        "queue_len": None,
+        "active_tasks": None,
+        "last_task": None,
+        "last_sync": None,
+    },
+    "orchestra_last_report": {"broker": 0, "sync": 0},  # epoch 秒, 无上报 = 0
     "last_updated": {"balance": 0, "usage": 0, "status": 0, "weather": 0},
     "alerts": [],
     "network_latency_ms": 0,
@@ -371,6 +383,10 @@ def _snapshot_state() -> dict:
         snap["last_updated"] = dict(state.get("last_updated") or {})
         snap["weather"] = dict(state.get("weather") or {})
         snap["last_session"] = dict(state.get("last_session") or {})
+        snap["orchestra"] = dict(state.get("orchestra") or {})
+        snap["orchestra_last_report"] = dict(
+            state.get("orchestra_last_report") or {}
+        )
         return snap
 
 
@@ -486,6 +502,62 @@ def update_status():
     return jsonify({"ok": True})
 
 
+@app.route("/api/orchestra", methods=["POST"])
+@require_token
+def update_orchestra():
+    """接收 Orchestra Broker 状态上报 (subsystem-4)
+
+    Body: {
+      "source": "broker|sync",   # 可选, 缺省/非法值按 "broker"
+      "broker_health": "up|down|...",
+      "queue_len": 3,
+      "active_tasks": 1,
+      "last_task": "T-20260819-e2e-dsh",
+      "last_sync": 1750000000.25
+    }
+    五个字段任意子集; 非法字段忽略且不计入 merged。
+    """
+    data = request.get_json() or {}
+    source = data.get("source", "broker")
+    if source not in ("broker", "sync"):
+        source = "broker"
+
+    merged = []
+    with state_lock:
+        orch = state["orchestra"]
+        for field, value in data.items():
+            if field == "source" or field not in orch:
+                continue
+            if field in ("queue_len", "active_tasks"):
+                if (
+                    isinstance(value, bool)
+                    or not isinstance(value, int)
+                    or value < 0
+                ):
+                    log.warning("orchestra: invalid %s=%r ignored", field, value)
+                    continue
+            elif field == "last_task":
+                if not isinstance(value, str) or not value.strip():
+                    log.warning("orchestra: invalid last_task=%r ignored", value)
+                    continue
+            elif field == "last_sync":
+                if isinstance(value, bool) or not isinstance(value, (int, float)):
+                    log.warning("orchestra: invalid last_sync=%r ignored", value)
+                    continue
+            elif field == "broker_health":
+                if not isinstance(value, str) or not value.strip():
+                    log.warning(
+                        "orchestra: invalid broker_health=%r ignored", value
+                    )
+                    continue
+            orch[field] = value
+            merged.append(field)
+        state["orchestra_last_report"][source] = time.time()
+
+    _request_eink_refresh()
+    return jsonify({"ok": True, "merged": merged})
+
+
 @app.route("/health")
 def health():
     with state_lock:
@@ -493,6 +565,7 @@ def health():
         svc = dict(state.get("services") or {})
         cc = state.get("cc_status")
         panel = state.get("cc_panel", "idle")
+        orch_rep = dict(state.get("orchestra_last_report") or {})
     now = time.time()
     return jsonify({
         "status": "ok",
@@ -507,6 +580,12 @@ def health():
             "usage": int(now - lu["usage"]) if lu.get("usage") else None,
             "status": int(now - lu["status"]) if lu.get("status") else None,
             "weather": int(now - lu["weather"]) if lu.get("weather") else None,
+            "orchestra_broker": (
+                int(now - orch_rep["broker"]) if orch_rep.get("broker") else None
+            ),
+            "orchestra_sync": (
+                int(now - orch_rep["sync"]) if orch_rep.get("sync") else None
+            ),
         },
     })
 

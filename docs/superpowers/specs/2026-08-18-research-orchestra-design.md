@@ -1,6 +1,6 @@
 # Research Orchestra — 以 Claude Code 为核心的科研-实验-论文框架（总架构设计）
 
-> 日期：2026-08-18 | 修订：2026-08-19（v2：VRAM 修正 12GB、Pi 任务代理三层架构、微信桥接入、网络分区与离线降级；v3：SSD 直挂存储、重型任务断网=排队断点续传（弃本地小模型硬扛）、主机移动网络方案、宿舍 NAS 待建、采购评估 §14；v4：4B 确认为 2GB（冒烟即升级决策门）、核桃派迁移完成（分机部署定稿）、§15 与 OpenClaw/Hermes 定位澄清；v5：subsystem-2 验收完成（实验卡 Commands 约定 + ingest 闭环）、存储/模板表述与现状同步；v6：subsystem-4 验收完成（融合面板 + orchestra 上报链路 + Broker reporter 线程 + Tailscale 三端 + 4B 兼职 NAS））
+> 日期：2026-08-18 | 修订：2026-08-19（v2：VRAM 修正 12GB、Pi 任务代理三层架构、微信桥接入、网络分区与离线降级；v3：SSD 直挂存储、重型任务断网=排队断点续传（弃本地小模型硬扛）、主机移动网络方案、宿舍 NAS 待建、采购评估 §14；v4：4B 确认为 2GB（冒烟即升级决策门）、核桃派迁移完成（分机部署定稿）、§15 与 OpenClaw/Hermes 定位澄清；v5：subsystem-2 验收完成（实验卡 Commands 约定 + ingest 闭环）、存储/模板表述与现状同步；v6：subsystem-4 验收完成（融合面板 + orchestra 上报链路 + Broker reporter 线程 + Tailscale 三端 + 4B 兼职 NAS）；v7：subsystem-3 双 agent 落地（codex exec 直调封装 + 互审/双实现/claim 三模式脚本化，独立审命中率 3/3））
 > 术语：CC = Claude Code（本机交互主脑）；dsh = DeepSeek Harness（执行层引擎）；Codex = OpenAI Codex CLI（副脑，后续加入）；Broker = Pi 任务代理服务器
 
 ## 1. 背景与目标
@@ -133,6 +133,7 @@ result: results/T-20260819-xxx/
 - **通信方式**（已核实）：① `codex exec "任务" --json`（事件 JSONL 流，CC Bash 直调解析复查，主用）② 文件总线（orchestra 任务/结果）③ 会话 resume/fork（按 session ID 恢复或分叉）④ dsh 子代理 `-codex` 后端（Broker 跑通后启用）
 - **三种模式**：互审（Codex 审 CC 代码，两边意见汇总，用户裁决）；独立实现（关键函数双实现跑同一测试，分歧处重点查）；claim 核验（adversarial-claim-check 双跑，结论不一致人工核查）
 - **验收**：找一段历史代码让 Codex 独立审，验证分歧点是否命中真问题
+- **状态（2026-08-19）**：subsystem-3 验收完成（报告 `orchestra/reports/2026-08-codex-dual-agent-acceptance.md`，状态 ok）。① 直调已脚本化：`orchestra/scripts/codex_exec.py`（codex exec --json 封装：NDJSON 事件解析/超时树杀/7 类错误分类/git 信任检查，36 mock 测试）+ `orchestra/scripts/codex_modes.py`（互审/双实现/claim 核验三模式，48 测试），scripts 全量 124 测试 OK；② 文件总线已验证可用（codex_exec 支持 prompt 文件/stdin + --out 落盘，codex 原生另有 `-o/--output-last-message` 直写末条消息）；③ resume/fork 验证存在（`codex exec resume` 按 UUID/thread name 续接 + `--last`；`codex exec fork` 按 UUID fork 新会话），v1 不脚本化；④ dsh 子代理 `-codex` 后端 out of scope（DECISIONS D20：Pi→OpenAI 网络路径未验证）。验收：历史代码独立审（broker/executor.py）codex 互审 3 findings、CC 判定 3/3 全真问题、0 误报 0 风格、3 条全为新问题，**命中率 3/3 = 100%**。
 
 ### 6.4 子系统 4：仪表盘适配（usage-monitor 增量扩展）
 
@@ -234,7 +235,7 @@ CC 写 tasks/T-*.md ──git push/SSH──> Broker 队列(SQLite) ──dispat
 后续细化 spec（逐个编写，建议顺序，编号与 §6 一一对应）：
 1. ~~subsystem-1-pi-broker~~（✅ 已细化并验收，mission 021）
 2. ~~subsystem-2-experiment-loop~~（✅ 已细化并验收，见 §6.2 状态行）
-3. `subsystem-3-codex-dual-agent`（CLI 安装 + 三模式脚本化）
+3. ~~subsystem-3-codex-dual-agent~~（✅ 已细化并验收，见 §6.3 状态行——与清单表述差异如实记于状态行：② 文件总线仅验证可用不脚本化、③ resume/fork 仅验证存在 v1 不脚本化、④ dsh `-codex` 后端 out of scope）
 4. ~~subsystem-4-dashboard-orchestra~~（✅ 已细化并验收，见 §6.4 状态行）
 5. `subsystem-5-haiku-dispatch`（rules.yaml 结构与判定清单）
 6. `subsystem-6-wechat-channel`（读 bridge.mjs 确认推送接口 + 出站/入站接入）

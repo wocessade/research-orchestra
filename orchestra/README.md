@@ -47,6 +47,15 @@
 - 面板刷新纪律：内容变化才全刷；last_report 时间戳与负载抖动只走局刷（D10/D14）
 - 验收：`reports/2026-08-dashboard-acceptance.md`（reviewed: ok，含 D15 运行中帧）
 
+## 双 agent（CC × Codex）（mission 027 / 总 spec §6.3）
+
+- 直调封装：`scripts/codex_exec.py run <prompt文件|-> [--model X] [--timeout N] [--out DIR] [--json-out PATH] [--skip-git-check]`——`codex exec --json` 直调：NDJSON 事件解析、超时树杀（Windows taskkill /T）、7 类错误分类（authentication / rate_limit / network / trust / sandbox / not_installed / unknown）、git 信任检查（非 git 目录自动加 `--skip-git-repo-check`）。exit code：0=ok 1=失败 2=未装 3=超时 4=认证失败
+- 三模式：`scripts/codex_modes.py mutual-review <diff文件> [--context 文件] [--timeout N] [--out review.json]`——codex 审 diff，返回 findings JSON 数组（severity/file/line/issue/suggestion）；`scripts/codex_modes.py dual-implement <spec文件> --impl-dir <CC实现目录> --tests-dir <测试目录> [--timeout N] [--out dual.json]`——codex 在 `<impl-dir>/codex_impl` 写平行实现，同一测试套件对两实现双跑，机械比对分歧（behavior/interface/style）；`scripts/codex_modes.py claim-check <claims.json> [--cc-verdicts 文件] [--timeout N] [--out claims.json]`——codex 逐条 verdict（true/false/unsure），与 CC 判定比对输出 disagree 索引
+- 输出：modes 各 `--out` 为含 status/findings|divergences|claims 的 JSON；codex_exec `--out` 落 text.txt + events.jsonl（原始事件流）
+- 验收：历史代码独立审（broker/executor.py）命中率 3/3 = 100%（3 findings 全真问题、0 误报 0 风格、全为新问题）；报告 `reports/2026-08-codex-dual-agent-acceptance.md`
+- 运维注意：本机 codex 冷启动 ~128s（WS 重连回退），互审类调用建议 `--timeout 900`+（验收实测 1800 成功）；编排默认 300/600/300（互审/claim/双实现）；超时与认证等错误分类含义见 codex_exec.py `_CLASSIFIERS`
+- 模型：`--model` 透传 codex，模型选择用户自理（总 spec §8 策略表）
+
 ## 部署连接（当前家庭网络）
 
 - 4B：WiFi `liudfs`，静态 IP `192.168.0.250`（NetworkManager 连接名 liudfs；备用：有线 DHCP）

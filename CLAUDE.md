@@ -10,6 +10,7 @@
 1. `orchestra/README.md` — 系统运行手册（命令/链路/运维）
 2. `docs/superpowers/specs/2026-08-18-research-orchestra-design.md` §13 — 总 spec 检查清单与各子系统状态
 3. `README.md` — 项目全景记录（第三方审查版：决策链、时间线、索引）
+4. `docs/lessons-learned.md` — 系统运行教训库（**每个 mission 归档时必须把新教训追加进去**）
 
 按任务范围再读对应 mission 档案：`.tasks/completed/NNN_*`（MISSION/STATE/DECISIONS/BRIEF/AUDIT，编号见目录）。
 

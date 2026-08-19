@@ -21,6 +21,7 @@
     net: required | optional
     result: T-YYYYMMDD-<slug>
     timeout: <秒，默认 3600>
+    model: flash | pro       # dsh 模型档位（可选，见「模型路由表」节）
     ---
     <执行体：dsh 任务的 prompt 全文，或 shell 任务的命令>
 

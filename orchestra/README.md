@@ -5,7 +5,7 @@
 | 目录 | 用途 |
 |------|------|
 | config/rules.yaml | 执行器分派规则与降级顺序（CC 分派前读） |
-| config/model-routing.md | 模型调度策略表（**预留**：用户另行维护，见总 spec §8） |
+| config/model-routing.json | 模型路由表（用户维护、系统只读，见「模型路由表」节） |
 | tasks/ | 任务文件总线：CC 写入，Broker 轮询 |
 | results/ | 执行器产出（attempt-N/ 目录：stdout/stderr/state.json） |
 | logs/ | broker.log 与执行日志 |
@@ -55,6 +55,13 @@
 - 验收：历史代码独立审（broker/executor.py）命中率 3/3 = 100%（3 findings 全真问题、0 误报 0 风格、全为新问题）；报告 `reports/2026-08-codex-dual-agent-acceptance.md`
 - 运维注意：本机 codex 冷启动 ~128s（WS 重连回退），互审类调用建议 `--timeout 900`+（验收实测 1800 成功）；编排默认 300/600/300（互审/claim/双实现）；超时与认证等错误分类含义见 codex_exec.py `_CLASSIFIERS`
 - 模型：`--model` 透传 codex，模型选择用户自理（总 spec §8 策略表）
+
+## 模型路由表（mission 029 / 总 spec §8）
+
+- 表：`config/model-routing.json`（用户维护、系统只读；值为抽象档位键，具体模型名在执行侧）
+- dsh：任务卡头 `model: flash|pro` → executor 映射 `--patch /mnt/broker/dsh-patches/{model}.yml`（patch 缺失任务 failed）
+- codex：CC 查表传 `--model`（Luna 杂活 / Terra 默认 / Sol 关键场景；production-fix 归 CC）
+- 纪律：长实验任务卡 `timeout` 必填
 
 ## 部署连接（当前家庭网络）
 

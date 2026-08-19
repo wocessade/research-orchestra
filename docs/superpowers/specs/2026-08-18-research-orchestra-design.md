@@ -1,6 +1,6 @@
 # Research Orchestra — 以 Claude Code 为核心的科研-实验-论文框架（总架构设计）
 
-> 日期：2026-08-18 | 修订：2026-08-19（v2：VRAM 修正 12GB、Pi 任务代理三层架构、微信桥接入、网络分区与离线降级；v3：SSD 直挂存储、重型任务断网=排队断点续传（弃本地小模型硬扛）、主机移动网络方案、宿舍 NAS 待建、采购评估 §14；v4：4B 确认为 2GB（冒烟即升级决策门）、核桃派迁移完成（分机部署定稿）、§15 与 OpenClaw/Hermes 定位澄清；v5：subsystem-2 验收完成（实验卡 Commands 约定 + ingest 闭环）、存储/模板表述与现状同步；v6：subsystem-4 验收完成（融合面板 + orchestra 上报链路 + Broker reporter 线程 + Tailscale 三端 + 4B 兼职 NAS）；v7：subsystem-3 双 agent 落地（codex exec 直调封装 + 互审/双实现/claim 三模式脚本化，独立审命中率 3/3））
+> 日期：2026-08-18 | 修订：2026-08-19（v2：VRAM 修正 12GB、Pi 任务代理三层架构、微信桥接入、网络分区与离线降级；v3：SSD 直挂存储、重型任务断网=排队断点续传（弃本地小模型硬扛）、主机移动网络方案、宿舍 NAS 待建、采购评估 §14；v4：4B 确认为 2GB（冒烟即升级决策门）、核桃派迁移完成（分机部署定稿）、§15 与 OpenClaw/Hermes 定位澄清；v5：subsystem-2 验收完成（实验卡 Commands 约定 + ingest 闭环）、存储/模板表述与现状同步；v6：subsystem-4 验收完成（融合面板 + orchestra 上报链路 + Broker reporter 线程 + Tailscale 三端 + 4B 兼职 NAS）；v7：subsystem-3 双 agent 落地（codex exec 直调封装 + 互审/双实现/claim 三模式脚本化，独立审命中率 3/3）；v8：模型路由表落地（dsh --patch 档位切换 + codex 三档映射约定））
 > 术语：CC = Claude Code（本机交互主脑）；dsh = DeepSeek Harness（执行层引擎）；Codex = OpenAI Codex CLI（副脑，后续加入）；Broker = Pi 任务代理服务器
 
 ## 1. 背景与目标
@@ -71,7 +71,7 @@ orchestra\
   README.md                # 系统说明、运行手册入口
   config\
     rules.yaml             # 执行器分派规则 + 网络分级（net: required|optional）+ 降级顺序
-    model-routing.md       # 模型调度策略表 —【用户另行维护，系统只读，§8】
+    model-routing.json     # 模型调度策略表 —【用户另行维护，系统只读，§8】
   tasks\                   # 任务文件总线（文件即队列项，CC 写入，Broker 轮询）
     T-{YYYYMMDD}-{slug}.md
   results\                 # 中间结果：结果文件、step-NN.json checkpoint、metrics.json、codex JSONL
@@ -94,6 +94,8 @@ result: results/T-20260819-xxx/
 ```
 
 > **v1 落地裁剪（mission 021 DECISIONS）**：priority/schedule/acceptance 三字段 v1 未实现——priority 在个位数队列规模下无意义（YAGNI）、schedule 由 systemd timer 承担、acceptance 由 CC 复查（reports/）承担。Broker v1 严格格式：`executor: dsh|shell`、`net: required|optional`、`result`、`timeout` + 执行体。字段语义保留，后续版本按需加回。
+
+> **纪律**：长实验任务卡 `timeout` 必须显式设置（防长任务堵塞队列挤占夜间雷达）
 
 **规则**：任务文件是唯一派发入口；CC 复查后写 `reports/` 并标注 `reviewed: ok|reject`；reject 标注原因留在 tasks/ 待重派或降级重派。
 
@@ -180,7 +182,7 @@ result: results/T-20260819-xxx/
 ## 8. 模型调度策略表（接口预留，out of scope）
 
 用户另行安排，后续讨论。本框架只约定：
-- 策略表位于 `orchestra/config/model-routing.md`，**用户维护，系统只读**
+- 策略表位于 `orchestra/config/model-routing.json`（用户维护、系统只读；值为抽象档位键，具体模型名在执行侧）
 - 执行器（dsh/codex）模型选择最终以策略表为准；本 spec 不预设模型-任务绑定
 - usage-monitor 已有用量/成本采集，成本量化直接消费现有数据（§3 接口不动）
 

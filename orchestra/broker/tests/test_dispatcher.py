@@ -18,11 +18,13 @@ result: T-20260819-a
 echo ok
 """
 
-def write_task(tasks_dir, name, executor="shell", net="optional"):
+def write_task(tasks_dir, name, executor="shell", net="optional", depends_on=None):
     md = (TASK_MD.replace("# T-20260819-a", f"# {name}")
                  .replace("executor: shell", f"executor: {executor}")
                  .replace("net: optional", f"net: {net}")
                  .replace("T-20260819-a", f"{name}"))
+    if depends_on:
+        md = md.replace("---\n", f"depends_on: {', '.join(depends_on)}\n---\n")
     with open(os.path.join(tasks_dir, f"{name}.md"), "w", encoding="utf-8") as f:
         f.write(md)
 
@@ -70,6 +72,126 @@ class TestDispatcher(unittest.TestCase):
         self.assertEqual(r["skipped_net"], ["T-20260819-a"])
         fake_run.assert_not_called()
         self.assertEqual(db.list_tasks(self.conn, "queued")[0][0], "T-20260819-a")
+
+    def test_dependency_waits_without_consuming_attempt(self):
+        write_task(self.cfg["tasks_dir"], "T-20260819-10-fetch")
+        write_task(
+            self.cfg["tasks_dir"],
+            "T-20260819-20-rank",
+            depends_on=["T-20260819-10-fetch"],
+        )
+        calls = []
+
+        def run(spec, *_args, **_kwargs):
+            calls.append(spec.slug)
+            if spec.slug.endswith("10-fetch"):
+                return "failed", "temporary"
+            return "done", None
+
+        result = dispatcher.one_cycle(
+            self.cfg, self.conn, run=run, check_net_fn=lambda: True
+        )
+        self.assertEqual(calls, ["T-20260819-10-fetch"])
+        self.assertEqual(
+            result["waiting_dependencies"],
+            [{
+                "slug": "T-20260819-20-rank",
+                "dependencies": ["T-20260819-10-fetch"],
+            }],
+        )
+        rank = db.get_task(self.conn, "T-20260819-20-rank")
+        self.assertEqual(rank[1], "queued")
+        self.assertEqual(rank[2], 0)
+
+    def test_dependency_runs_after_predecessor_finishes_same_cycle(self):
+        write_task(self.cfg["tasks_dir"], "T-20260819-10-fetch")
+        write_task(
+            self.cfg["tasks_dir"],
+            "T-20260819-20-rank",
+            depends_on=["T-20260819-10-fetch"],
+        )
+        calls = []
+
+        def run(spec, *_args, **_kwargs):
+            calls.append(spec.slug)
+            return "done", None
+
+        result = dispatcher.one_cycle(
+            self.cfg, self.conn, run=run, check_net_fn=lambda: True
+        )
+        self.assertEqual(
+            calls,
+            ["T-20260819-10-fetch", "T-20260819-20-rank"],
+        )
+        self.assertEqual(result["waiting_dependencies"], [])
+        self.assertEqual(len(db.list_tasks(self.conn, "done")), 2)
+
+    def test_missing_dependency_becomes_invalid_and_is_archived(self):
+        write_task(
+            self.cfg["tasks_dir"],
+            "T-20260819-child",
+            depends_on=["T-20260819-missing"],
+        )
+        result = dispatcher.one_cycle(
+            self.cfg, self.conn, run=mock.Mock(), check_net_fn=lambda: True
+        )
+        row = db.get_task(self.conn, "T-20260819-child")
+        self.assertEqual(row[1], "invalid")
+        self.assertIn("missing dependencies", row[4])
+        self.assertEqual(len(result["invalid_dependencies"]), 1)
+        self.assertTrue(os.path.exists(os.path.join(
+            self.cfg["tasks_dir"], "archive", "T-20260819-child.md"
+        )))
+
+    def test_injection_marker_hides_partial_radar_pipeline(self):
+        write_task(self.cfg["tasks_dir"], "T-20260819-nightly-radar-10-fetch")
+        marker = os.path.join(self.cfg["tasks_dir"], ".radar-inject-20260819")
+        open(marker, "w", encoding="utf-8").close()
+        run = mock.Mock(return_value=("done", None))
+        result = dispatcher.one_cycle(
+            self.cfg, self.conn, run=run, check_net_fn=lambda: True
+        )
+        self.assertEqual(result["executed"], [])
+        self.assertEqual(db.list_tasks(self.conn), [])
+        run.assert_not_called()
+
+    def test_dependency_cycle_becomes_invalid(self):
+        write_task(
+            self.cfg["tasks_dir"], "T-20260819-a",
+            depends_on=["T-20260819-b"],
+        )
+        write_task(
+            self.cfg["tasks_dir"], "T-20260819-b",
+            depends_on=["T-20260819-a"],
+        )
+        result = dispatcher.one_cycle(
+            self.cfg, self.conn, run=mock.Mock(), check_net_fn=lambda: True
+        )
+        self.assertEqual(
+            {row[0] for row in db.list_tasks(self.conn, "invalid")},
+            {"T-20260819-a", "T-20260819-b"},
+        )
+        self.assertEqual(len(result["invalid_dependencies"]), 2)
+
+    def test_terminal_failed_dependency_blocks_downstream(self):
+        write_task(self.cfg["tasks_dir"], "T-20260819-10-fetch")
+        write_task(
+            self.cfg["tasks_dir"], "T-20260819-20-rank",
+            depends_on=["T-20260819-10-fetch"],
+        )
+        failing = mock.Mock(return_value=("failed", "boom"))
+        first = dispatcher.one_cycle(
+            self.cfg, self.conn, run=failing, check_net_fn=lambda: True
+        )
+        self.assertEqual(len(first["waiting_dependencies"]), 1)
+        second = dispatcher.one_cycle(
+            self.cfg, self.conn, run=failing, check_net_fn=lambda: True
+        )
+        rank = db.get_task(self.conn, "T-20260819-20-rank")
+        self.assertEqual(rank[1], "blocked")
+        self.assertEqual(rank[2], 0)
+        self.assertIn("failed after 2 attempts", rank[4])
+        self.assertEqual(len(second["blocked_dependencies"]), 1)
 
     def test_idempotent_register(self):
         write_task(self.cfg["tasks_dir"], "T-20260819-a")
@@ -163,6 +285,8 @@ class TestDispatcher(unittest.TestCase):
         self.assertEqual(payload["queue_len"], 2)   # queued + running
         self.assertEqual(payload["active_tasks"], 1)
         self.assertEqual(payload["last_task"], "T-20260819-a")  # 最近 done slug
+        self.assertEqual(payload["blocked_tasks"], 0)
+        self.assertEqual(payload["invalid_tasks"], 0)
 
     def test_build_payload_recent_tasks(self):
         # 6 个任务：2 done、1 running、3 queued；时间戳直接写入保证排序确定性

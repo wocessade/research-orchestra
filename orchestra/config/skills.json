@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "skills": [
+    {
+      "id": "academic-research-engine",
+      "source": "external",
+      "path": "~/.claude/skills/academic-research-engine",
+      "required": true,
+      "used_by": [
+        "orchestra/scripts/run_card.py ingest"
+      ],
+      "entrypoints": [
+        "scripts/validate_experiment_card.py",
+        "scripts/ingest_run.py",
+        "scripts/handoff_sync.py"
+      ],
+      "contract_files": [
+        "SKILL.md",
+        "scripts/validate_experiment_card.py",
+        "scripts/ingest_run.py",
+        "scripts/handoff_sync.py"
+      ],
+      "expected_digest": null,
+      "input_contract": "experiment card.md and metrics.json",
+      "output_contract": ".research experiment run artifacts"
+    },
+    {
+      "id": "nature-literature-pipeline",
+      "source": "external",
+      "path": "~/.claude/skills/nature-literature-pipeline",
+      "required": false,
+      "used_by": [
+        "documented literature ingest integration"
+      ],
+      "entrypoints": [
+        "SKILL.md"
+      ],
+      "contract_files": [
+        "SKILL.md"
+      ],
+      "expected_digest": null,
+      "input_contract": "literature candidate or digest artifacts",
+      "output_contract": "literature ingest artifacts"
+    }
+  ]
+}

@@ -10,10 +10,24 @@ from unittest import mock
 import executor
 import taskfile
 
-def make_spec(body, executor="shell", timeout=30, model=None):
+def make_spec(
+    body,
+    executor="shell",
+    timeout=30,
+    model=None,
+    mode="execute",
+    detail="standard",
+    required_outputs=(),
+    json_outputs=(),
+    validation_output=None,
+):
     return taskfile.TaskSpec(
         slug="T-20260819-test", executor=executor, net="optional",
-        result_dir="T-20260819-test", timeout=timeout, body=body, model=model,
+        result_dir="T-20260819-test", timeout=timeout, body=body,
+        model=model, mode=mode, detail=detail,
+        required_outputs=required_outputs,
+        json_outputs=json_outputs,
+        validation_output=validation_output,
     )
 
 class TestShellExecutor(unittest.TestCase):
@@ -39,6 +53,8 @@ class TestShellExecutor(unittest.TestCase):
             state = json.load(f)
         self.assertEqual(state["status"], "done")
         self.assertEqual(state["executor"], "shell")
+        self.assertEqual(state["mode"], "execute")
+        self.assertEqual(state["detail"], "standard")
 
     def test_shell_fail_exit_code(self):
         spec = make_spec("exit 3")
@@ -47,8 +63,9 @@ class TestShellExecutor(unittest.TestCase):
         self.assertIn("exit code 3", error)
 
     def test_shell_timeout(self):
-        # cmd 原生 sleep 写法：ping -n 31 等待约 30s（测试约定在 Git Bash/Windows 下运行）
-        spec = make_spec("ping -n 31 127.0.0.1 >nul", timeout=1)
+        # Windows cmd 无原生 sleep，POSIX shell 直接用 sleep。
+        body = "ping -n 31 127.0.0.1 >nul" if os.name == "nt" else "sleep 2"
+        spec = make_spec(body, timeout=1)
         status, error = executor.run_task(spec, self.tasks, self.results)
         self.assertEqual(status, "failed")
         self.assertIn("timeout", error)
@@ -60,6 +77,97 @@ class TestShellExecutor(unittest.TestCase):
         self.assertEqual(status, "failed")
         self.assertIsNotNone(error)
 
+    def test_exit_zero_with_missing_output_fails_validation(self):
+        spec = make_spec("echo process-ok", required_outputs=("result.json",))
+        status, error = executor.run_task(spec, self.tasks, self.results)
+        self.assertEqual(status, "failed")
+        self.assertIn("artifact validation failed", error)
+        self.assertIn("missing required output", error)
+        outdir = os.path.join(self.results, "T-20260819-test", "attempt-1")
+        with open(os.path.join(outdir, "state.json"), encoding="utf-8") as f:
+            state = json.load(f)
+        self.assertEqual(state["output_validation"]["status"], "failed")
+
+    def test_validate_outputs_accepts_valid_json_and_passed_marker(self):
+        outdir = executor.Path(self.tmp.name) / "validation-ok"
+        outdir.mkdir()
+        (outdir / "result.json").write_text('{"items": [1]}', encoding="utf-8")
+        (outdir / "validation.json").write_text(
+            '{"status": "passed"}',
+            encoding="utf-8",
+        )
+        spec = make_spec(
+            "unused",
+            required_outputs=("result.json", "validation.json"),
+            json_outputs=("result.json", "validation.json"),
+            validation_output="validation.json",
+        )
+        self.assertEqual(executor.validate_task_outputs(spec, outdir), [])
+
+    def test_validate_outputs_rejects_invalid_json(self):
+        outdir = executor.Path(self.tmp.name) / "invalid-json"
+        outdir.mkdir()
+        (outdir / "result.json").write_text("{broken", encoding="utf-8")
+        spec = make_spec(
+            "unused",
+            required_outputs=("result.json",),
+            json_outputs=("result.json",),
+        )
+        errors = executor.validate_task_outputs(spec, outdir)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("invalid JSON output", errors[0])
+
+    def test_validate_outputs_rejects_failed_marker(self):
+        outdir = executor.Path(self.tmp.name) / "validation-failed"
+        outdir.mkdir()
+        (outdir / "validation.json").write_text(
+            '{"status": "failed"}',
+            encoding="utf-8",
+        )
+        spec = make_spec(
+            "unused",
+            required_outputs=("validation.json",),
+            json_outputs=("validation.json",),
+            validation_output="validation.json",
+        )
+        errors = executor.validate_task_outputs(spec, outdir)
+        self.assertEqual(
+            errors,
+            ["validation status is not passed: validation.json"],
+        )
+
+    def test_validate_outputs_rejects_symlink_escape(self):
+        if not hasattr(os, "symlink"):
+            self.skipTest("symlink unsupported")
+        outdir = executor.Path(self.tmp.name) / "symlink-output"
+        outdir.mkdir()
+        outside = executor.Path(self.tmp.name) / "outside.json"
+        outside.write_text('{"ok": true}', encoding="utf-8")
+        try:
+            os.symlink(outside, outdir / "result.json")
+        except OSError as exc:
+            self.skipTest(f"cannot create symlink: {exc}")
+        spec = make_spec(
+            "unused",
+            required_outputs=("result.json",),
+            json_outputs=("result.json",),
+        )
+        errors = executor.validate_task_outputs(spec, outdir)
+        self.assertIn("path escapes workspace", errors[0])
+
+    def test_result_dir_symlink_escape_is_rejected(self):
+        outside = executor.Path(self.tmp.name) / "outside-results"
+        outside.mkdir()
+        link = executor.Path(self.results) / "T-20260819-test"
+        try:
+            os.symlink(outside, link)
+        except OSError as exc:
+            self.skipTest(f"cannot create symlink: {exc}")
+        spec = make_spec("echo should-not-run")
+        with self.assertRaises(ValueError) as cm:
+            executor.run_task(spec, self.tasks, self.results)
+        self.assertIn("path escapes workspace", str(cm.exception))
+
     def test_attempt_increments(self):
         spec = make_spec("echo ok")
         executor.run_task(spec, self.tasks, self.results)
@@ -67,6 +175,13 @@ class TestShellExecutor(unittest.TestCase):
         base = os.path.join(self.results, "T-20260819-test")
         self.assertTrue(os.path.isdir(os.path.join(base, "attempt-1")))
         self.assertTrue(os.path.isdir(os.path.join(base, "attempt-2")))
+
+    def test_attempt_allocator_skips_existing_directories_atomically(self):
+        base = executor.Path(self.results) / "atomic"
+        (base / "attempt-1").mkdir(parents=True)
+        attempt, outdir = executor._allocate_attempt_dir(base)
+        self.assertEqual(attempt, 2)
+        self.assertTrue(outdir.is_dir())
 
     @mock.patch("subprocess.Popen")
     def test_shell_cwd_is_attempt_dir(self, mock_popen):
@@ -76,7 +191,9 @@ class TestShellExecutor(unittest.TestCase):
         spec = make_spec("echo ok")
         status, _ = executor.run_task(spec, self.tasks, self.results)
         self.assertEqual(status, "done")
-        outdir = os.path.join(self.results, "T-20260819-test", "attempt-1")
+        outdir = str(
+            (executor.Path(self.results) / "T-20260819-test" / "attempt-1").resolve()
+        )
         self.assertEqual(mock_popen.call_args.kwargs["cwd"], outdir)  # 任务工作区=attempt 目录
 
 class TestDshExecutor(unittest.TestCase):
@@ -100,7 +217,9 @@ class TestDshExecutor(unittest.TestCase):
         self.assertEqual(status, "done")
         args, kwargs = mock_popen.call_args
         # 与 executor 内 pathlib 归一化一致：分段 join，避免嵌入正斜杠不匹配
-        outdir = os.path.join(self.results, "T-20260819-test", "attempt-1")
+        outdir = str(
+            (executor.Path(self.results) / "T-20260819-test" / "attempt-1").resolve()
+        )
         self.assertIn("dsh", args[0][0])
         self.assertIn(outdir, args[0][3])  # cmd = [dsh, --profile, <profile>, prompt] → prompt 在索引 3
         self.assertEqual(kwargs["cwd"], outdir)  # dsh 沙箱 workspace-write：cwd 即输出目录
@@ -138,8 +257,37 @@ class TestDshExecutor(unittest.TestCase):
         executor.run_task(make_spec("分析数据", executor="dsh", model=None), self.tasks, self.results)
         self.assertNotIn("--patch", popen.call_args.args[0])
 
+    def test_build_dsh_prompt_applies_mode_and_detail(self):
+        spec = make_spec(
+            "检查这段代码",
+            executor="dsh",
+            mode="audit",
+            detail="deep",
+        )
+        outdir = executor.Path("/tmp/result")
+        prompt = executor.build_dsh_prompt(spec, outdir)
+        self.assertIn("任务模式: audit", prompt)
+        self.assertIn("反证", prompt)
+        self.assertIn("验证方法", prompt)
+        self.assertIn("输出详略: deep", prompt)
+        self.assertIn("只有新增信息才能增加篇幅", prompt)
+        self.assertIn("任务正文:\n检查这段代码", prompt)
+
+    def test_brief_mode_asks_to_remove_repetition(self):
+        spec = make_spec(
+            "汇报状态",
+            executor="dsh",
+            mode="brief",
+            detail="brief",
+        )
+        prompt = executor.build_dsh_prompt(spec, executor.Path("/tmp/result"))
+        self.assertIn("同义重复", prompt)
+        self.assertIn("紧凑输出", prompt)
+
+
 class PathValidationTest(unittest.TestCase):
-    """result_dir 路径逃逸防护（finding #1）：越界早退，不建目录不写 state.json。"""
+    """result_dir 路径逃逸防护（finding #1）：越界时 run_task 抛 ValueError（dispatcher 捕获判
+    failed），不建 attempt 目录不写 state.json。"""
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -159,9 +307,8 @@ class PathValidationTest(unittest.TestCase):
 
     def test_relative_escape_rejected_no_dir_created(self):
         spec = self._spec("../../evil")
-        status, error = executor.run_task(spec, self.tasks, self.results)
-        self.assertEqual(status, "failed")
-        self.assertIn("escapes", error)
+        with self.assertRaises(ValueError):
+            executor.run_task(spec, self.tasks, self.results)
         # 漏洞本体断言：逃逸目标目录不得创建、results 内外均不得出现 attempt 目录与 state.json
         escape_target = (Path(self.results) / "../../evil").resolve()
         self.assertFalse(escape_target.exists())
@@ -178,7 +325,7 @@ class PathValidationTest(unittest.TestCase):
         self.assertEqual(status, "done")
         self.assertIsNone(error)
         # outdir 落在 results_root 内（sub/dir/attempt-1），cwd 为工作区
-        outdir = os.path.join(self.results, "sub", "dir", "attempt-1")
+        outdir = str((Path(self.results) / "sub" / "dir" / "attempt-1").resolve())
         self.assertTrue(os.path.isdir(outdir))
         self.assertEqual(mock_popen.call_args.kwargs["cwd"], outdir)
         with open(os.path.join(outdir, "state.json"), encoding="utf-8") as f:
@@ -187,9 +334,8 @@ class PathValidationTest(unittest.TestCase):
     def test_absolute_result_dir_rejected(self):
         outside = os.path.join(self.tmp.name, "outside")
         spec = self._spec(outside)
-        status, error = executor.run_task(spec, self.tasks, self.results)
-        self.assertEqual(status, "failed")
-        self.assertIn("escapes", error)
+        with self.assertRaises(ValueError):
+            executor.run_task(spec, self.tasks, self.results)
         self.assertFalse(os.path.exists(outside))
         self.assertEqual(list(Path(self.tmp.name).rglob("state.json")), [])
 
@@ -228,7 +374,7 @@ class WindowsTreeKillTest(unittest.TestCase):
             ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
         )
         self.assertEqual(mock_run.call_args.kwargs["timeout"], 10)
-        self.assertIs(mock_run.call_args.kwargs.get("capture_output"), True)
+        self.assertIs(mock_run.call_args.kwargs.get("check"), False)
 
     @unittest.skipUnless(os.name == "nt", "Windows 分支：taskkill 整树杀")
     @mock.patch("subprocess.run")
@@ -279,10 +425,11 @@ class AtomicAttemptTest(unittest.TestCase):
         self.tmp.cleanup()
 
     def _flaky_mkdir(self, fail_first_n):
-        """构造 flaky Path.mkdir：前 fail_first_n 次抛 FileExistsError，之后走真 mkdir。"""
+        """构造 flaky Path.mkdir：前 fail_first_n 次 attempt-N mkdir 抛 FileExistsError，
+        之后走真 mkdir；非 attempt 目录（results 根/base）委托真函数。"""
         real_mkdir = Path.mkdir
         def flaky(self, *args, **kwargs):
-            if flaky.n < fail_first_n:
+            if self.name.startswith("attempt-") and flaky.n < fail_first_n:
                 flaky.n += 1
                 raise FileExistsError
             return real_mkdir(self, *args, **kwargs)

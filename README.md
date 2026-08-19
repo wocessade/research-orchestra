@@ -144,9 +144,10 @@
 **关键决策**：
 - 评分标准用 engine 真实六维（Topic 35/Method 20/Source 15/Network 10/Applied 10/Archival 10，topic<10 拒绝）——评分结果可入库复用
 - **邮件从 4B 直发**（stdlib smtplib）：实测 Pi 侧发送成功 → 修正总 spec §6.6 "邮件需 Windows" 的过时表述。降级链更新：微信（Windows）→ QQ 邮件（Pi 24/7）→ 墨水屏
-- 邮件幂等：/tmp/radar-sent-{{DATE}} 标记（/tmp 在 dsh 沙箱可写区，跨 attempt 稳定）
+- 邮件投递采用持久 at-most-once 状态：发送前写 `sending`，成功后写 `sent`；发送器明确报告未发送时写 `not_sent` 并允许重试，进程中断、锁冲突或模糊结果转为 `unknown` 并拒绝自动重发
 - 任务文件终态自动归档（防积压）+ 非法文件 .bad 归档
 - housekeeping 周日 04:00：dsh sessions 清理（+14 天）+ 磁盘告警邮件
+- **当前实现已阶段化**：单体任务拆为 `fetch → rank → render → notify`，通过可选 `depends_on` 串联；同日期注入原子互斥，Linux owner 以 PID+进程 starttime 防 PID 复用并可接管崩溃遗留 marker 补跑（无 `/proc` 时兼容回退）；rank 按 `arxiv_id` 精确核对 fetch 的 `title/url/categories/abstract`，并校验数量、ID 集合和 SHA-256；上游失败时下游不消耗重试次数，各阶段可独立恢复
 
 **dry-run 全链路验证**：真实抓取 60 篇 → 按 arXiv ID 去重 57 → 六维评分 → 选 5 篇（76/73/72/72/72）→ 邮件发送成功。中断恢复实战：attempt 1 被重启杀死 → 自动重试完成。
 
@@ -339,13 +340,15 @@ dsh 支持 deepseek-v4-pro / deepseek-v4-flash 切换（provider patch 覆盖）
 - `orchestra\reports\2026-08-experiment-loop-acceptance.md`（子系统 2 对照实验，数字全部引用 ingest artifact 路径，无手抄）
 - `orchestra\reports\2026-08-dashboard-acceptance.md`（子系统 4，8/8，含长任务「运行中帧」实测证据）
 - `orchestra\reports\2026-08-codex-dual-agent-acceptance.md`（子系统 3，命中率 3/3 判定表 + 口径与局限）
+- `orchestra\reports\2026-08-output-quality-refactor.md`（输出质量、严格协议、Skill ingest 门禁与雷达阶段化改造）
 - `orchestra\reports\artifacts\codex-review-executor.json`（codex 原始 findings 逐字存档）
 
 ### 代码与运行配置
-- `orchestra\broker\`（db/taskfile/executor/dispatcher，stdlib only，41 单测）
-- `orchestra\scripts\`（sync_push/pull、deploy_broker、backup_to_nas、run_card、codex_exec、codex_modes 等；124 单测）
+- `orchestra\broker\`（db/taskfile/executor/dispatcher、雷达校验/渲染/通知/迁移门禁，stdlib only；当前 88 单测）
+- `orchestra\scripts\`（sync_push/pull、deploy_broker、backup_to_nas、run_card、check_skills、codex_exec、codex_modes 等；当前 154 单测）
+- `orchestra\config\skills.json`（外部 Skill 严格 manifest；`run_card.py ingest` 在外部调用前执行摘要门禁）
 - `orchestra\nas\`（4B 兼职 NAS：nas_backup.sh 等）
-- `orchestra\templates\nightly-radar.md`（雷达任务模板）
+- `orchestra\templates\nightly-radar-*.md`（雷达四阶段任务模板）
 - `orchestra\README.md`（系统运行手册，含实验闭环/仪表盘链路/双 agent/4B NAS 节）
 - `orchestra\docs\school-network-switch.md`（学校网络切换预案）
 - 4B 侧：`/home/liuxfs/broker/`、`/mnt/broker/`、`/mnt/nas/`、systemd units + env.conf drop-in

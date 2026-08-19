@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS tasks (
     slug TEXT PRIMARY KEY,
-    status TEXT NOT NULL DEFAULT 'queued',  -- queued|running|done|failed
+    status TEXT NOT NULL DEFAULT 'queued',  -- queued|running|done|failed|blocked|invalid
     attempts INTEGER NOT NULL DEFAULT 0,
     net_req TEXT NOT NULL DEFAULT 'optional',
     result_path TEXT NOT NULL,

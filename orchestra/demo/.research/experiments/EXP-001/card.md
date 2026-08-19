@@ -51,6 +51,8 @@ H-001（管线验证性假设，非科研结论）：同一抽取任务（demo �
 |--------|--------|--------------|---------------|-------|
 | | | | | |
 
+| run-20260819-100117 | ingested | results/T-20260819-ctl-single/metrics.json |  | scored by score.py against gold.json |
+| run-20260819-100135 | ingested | results/T-20260819-trt-dsh/attempt-1/metrics.json |  | scored by score.py against gold.json |
 ## Failure-loop notes (M4)
 
 If failed: choose `tune` (hyperparams) → `redesign` (protocol) → `rehypothesis` (open NEG + RQ changelog). Do not post-hoc rewrite success criteria.

@@ -93,6 +93,17 @@ class FindRadarTest(unittest.TestCase):
             self.assertEqual(radar["top5"][0]["id"], "2608.16798")
             self.assertEqual(radar["top5"][0]["title"], "ClawGym II")  # 从 digest.json 补标题
 
+    def test_legacy_top5_empty_id_skipped(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            d = root / "T-20260819-nightly-radar" / "attempt-1"
+            _write(d, "state.json", _state("done"))
+            _write(d, "digest.json", [])
+            _write(d, "top5.json", [[76, "", {"topic": 31}]])
+            _write(d, "digest.txt", "x")
+            radar = find_radar(root)
+            self.assertEqual(radar["top5"], [])
+
     def test_partial_four_stage_without_render(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -142,6 +153,12 @@ class ScanAttemptsTest(unittest.TestCase):
             for i in range(5):
                 _write(root / f"T-{i}" / "attempt-1", "state.json", _state("done"))
             self.assertEqual(len(scan_attempts(root, limit=3)), 3)
+
+    def test_limit_zero(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write(root / "T-a" / "attempt-1", "state.json", _state("done"))
+            self.assertEqual(scan_attempts(root, limit=0), [])
 
 class ScanExperimentsTest(unittest.TestCase):
     def test_missing_root(self):

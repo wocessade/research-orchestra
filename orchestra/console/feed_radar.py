@@ -62,7 +62,8 @@ def _normalize_top5(top5_path: Path, papers_by_id: dict) -> list[dict]:
             rows.append({"id": aid, "title": item.get("title") or papers_by_id.get(aid, {}).get("title") or aid,
                          "total": item.get("total")})
         elif (isinstance(item, (list, tuple)) and len(item) >= 2
-              and isinstance(item[0], (int, float)) and isinstance(item[1], str)):
+              and isinstance(item[0], (int, float)) and isinstance(item[1], str)
+              and item[1].strip()):
             rows.append({"id": item[1], "title": papers_by_id.get(item[1], {}).get("title") or item[1],
                          "total": item[0]})
     return rows
@@ -144,7 +145,7 @@ def build_digest_html(radar: dict) -> str:
 
 def scan_attempts(results_root: Path, limit: int = 10) -> list[dict]:
     rows = []
-    if not results_root.is_dir():
+    if limit <= 0 or not results_root.is_dir():
         return rows
     dirs = sorted(results_root.iterdir(),
                   key=lambda p: (p.stat().st_mtime, p.name), reverse=True)

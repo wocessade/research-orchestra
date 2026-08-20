@@ -1,7 +1,6 @@
 import json
 import tempfile
 import unittest
-from datetime import datetime
 from pathlib import Path
 
 from feed_radar import (
@@ -94,15 +93,18 @@ class FindRadarTest(unittest.TestCase):
             self.assertEqual(radar["top5"][0]["id"], "2608.16798")
             self.assertEqual(radar["top5"][0]["title"], "ClawGym II")  # 从 digest.json 补标题
 
-    def test_missing_stage(self):
+    def test_partial_four_stage_without_render(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            _write(root / "T-20260819-10-fetch" / "attempt-1", "state.json", _state("done"))
-            _write(root / "T-20260819-30-render" / "attempt-1", "state.json", _state("done"))
-            _write(root / "T-20260819-30-render" / "attempt-1", "digest.json", [])
+            for slug in ("10-fetch", "20-rank"):
+                _write(root / f"T-20260819-{slug}" / "attempt-1", "state.json", _state("done"))
             radar = find_radar(root)
-            self.assertEqual(radar["stages"][1]["status"], "missing")
-
+            self.assertEqual(radar["mode"], "four-stage")
+            self.assertEqual(radar["digest_txt"], "")
+            self.assertEqual(radar["top5"], [])
+            self.assertIsNone(radar["validation"])
+            self.assertEqual(radar["stages"][2]["status"], "missing")
+            self.assertEqual(radar["stages"][3]["status"], "missing")
 
 class BuildDigestHtmlTest(unittest.TestCase):
     def test_escaping(self):
@@ -125,13 +127,14 @@ class ScanAttemptsTest(unittest.TestCase):
             self.assertEqual(by_task["T-a"]["attempt"], 2)
             self.assertEqual(by_task["T-a"]["status"], "done")
 
-    def test_limit(self):
+    def test_rows_ignore_malformed_attempt_dir(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            for i in range(5):
-                _write(root / f"T-{i}" / "attempt-1", "state.json", _state("done"))
-            self.assertEqual(len(scan_attempts(root, limit=3)), 3)
-
+            _write(root / "T-a" / "attempt-tmp", "state.json", _state("done"))
+            _write(root / "T-a" / "attempt-2", "state.json", _state("done"))
+            rows = scan_attempts(root)
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["attempt"], 2)
 
 class ScanExperimentsTest(unittest.TestCase):
     def test_missing_root(self):
@@ -150,6 +153,17 @@ class ScanExperimentsTest(unittest.TestCase):
             self.assertTrue(res["available"])
             self.assertEqual(res["cards"][0]["id"], "EXP-001")
             self.assertEqual(res["cards"][0]["status"], "designed")
+    def test_bad_card_skipped(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            valid = root / "experiments" / "EXP-good" / "card.md"
+            valid.parent.mkdir(parents=True)
+            valid.write_text("---\nid: EXP-good\nstatus: done\n---\n", encoding="utf-8")
+            bad = root / "experiments" / "EXP-bad" / "card.md"
+            bad.parent.mkdir(parents=True)
+            bad.write_bytes(b"\xff\xfe\xfa")
+            result = scan_experiments(root)
+            self.assertEqual([card["id"] for card in result["cards"]], ["EXP-good"])
 
 
 if __name__ == "__main__":

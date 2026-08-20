@@ -8,7 +8,6 @@ from __future__ import annotations
 import html
 import json
 import re
-from datetime import datetime
 from pathlib import Path
 
 _DIR = re.compile(r"^T-(\d{8})-(10-fetch|20-rank|30-render|40-notify|nightly-radar)$")
@@ -26,15 +25,18 @@ def _state(path: Path) -> dict:
 
 def best_attempt(task_dir: Path) -> Path | None:
     attempts = sorted(
-        (p for p in task_dir.glob("attempt-*") if (p / "state.json").exists()),
-        key=lambda p: int(p.name.split("-")[1]), reverse=True)
+        (p for p in task_dir.glob("attempt-*")
+         if re.fullmatch(r"attempt-(\d+)", p.name) and (p / "state.json").exists()),
+        key=lambda p: int(re.fullmatch(r"attempt-(\d+)", p.name).group(1)), reverse=True)
     return attempts[0] if attempts else None
 
 
 def _pick_artifact_attempt(task_dir: Path) -> Path | None:
     """优先 done 且有 digest.txt 的 attempt；否则第一个有 digest.txt 的。"""
-    attempts = sorted(task_dir.glob("attempt-*"),
-                      key=lambda p: int(p.name.split("-")[1]), reverse=True)
+    attempts = sorted(
+        (p for p in task_dir.glob("attempt-*")
+         if re.fullmatch(r"attempt-(\d+)", p.name)),
+        key=lambda p: int(re.fullmatch(r"attempt-(\d+)", p.name).group(1)), reverse=True)
     for att in attempts:
         if (att / "digest.txt").exists() and _state(att).get("status") == "done":
             return att
@@ -55,6 +57,8 @@ def _normalize_top5(top5_path: Path, papers_by_id: dict) -> list[dict]:
     for item in raw:
         if isinstance(item, dict):  # SOL 格式
             aid = item.get("arxiv_id")
+            if not isinstance(aid, str) or not aid.strip():
+                continue
             rows.append({"id": aid, "title": item.get("title") or papers_by_id.get(aid, {}).get("title") or aid,
                          "total": item.get("total")})
         elif (isinstance(item, (list, tuple)) and len(item) >= 2
@@ -76,7 +80,7 @@ def find_radar(root: Path) -> dict:
         return {"available": False}
     date_str = max(by_date)
     day = by_date[date_str]
-    if "30-render" in day:
+    if "10-fetch" in day or "20-rank" in day or "30-render" in day or "40-notify" in day:
         mode = "four-stage"
         stages = []
         for slug, label in _STAGES:
@@ -89,19 +93,21 @@ def find_radar(root: Path) -> dict:
             else:
                 row.update({"status": "missing", "time": None})
             stages.append(row)
-        art_dir = day["30-render"]
+        art_dir = day.get("30-render")
     else:
         mode = "legacy"
         task = day["nightly-radar"]
         stages = []
-        for att in sorted(task.glob("attempt-*"),
-                          key=lambda p: int(p.name.split("-")[1])):
+        for att in sorted(
+                (p for p in task.glob("attempt-*")
+                 if re.fullmatch(r"attempt-(\d+)", p.name)),
+                key=lambda p: int(re.fullmatch(r"attempt-(\d+)", p.name).group(1))):
             st = _state(att)
             stages.append({"name": att.name,
                            "status": st.get("status", "unknown"),
                            "time": st.get("started_at")})
         art_dir = task
-    att = _pick_artifact_attempt(art_dir)
+    att = _pick_artifact_attempt(art_dir) if art_dir else None
     top5, digest_txt, validation = [], "", None
     if att:
         papers = []
@@ -149,7 +155,7 @@ def scan_attempts(results_root: Path, limit: int = 10) -> list[dict]:
         if att is None:
             continue
         st = _state(att)
-        rows.append({"task": task_dir.name, "attempt": int(att.name.split("-")[1]),
+        rows.append({"task": task_dir.name, "attempt": int(re.fullmatch(r"attempt-(\d+)", att.name).group(1)),
                      "status": st.get("status", "unknown"),
                      "started_at": st.get("started_at"), "error": st.get("error")})
         if len(rows) >= limit:
@@ -163,7 +169,10 @@ def scan_experiments(research_root: Path) -> dict:
     if not root.is_dir():
         return {"available": False, "cards": cards}
     for card in sorted(root.glob("*/card.md")):
-        text = card.read_text(encoding="utf-8")
+        try:
+            text = card.read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            continue
         meta = {}
         if text.startswith("---"):
             parts = text.split("---", 2)

@@ -18,8 +18,14 @@
 
 - 本机原目录 `C:\Users\19041\.claude\skills\` 是**活副本**，会持续演化；仓库内是**快照**，不会自动同步（教训：事实漂移必须显式勘误，见 docs/lessons-learned.md L18）
 - 刷新方式：由 owner 重新打包替换，并在本 README 更新快照日期
-- `orchestra/config/skills.json` 的 `expected_digest` 目前为 null（unlocked 状态）；**锁定动作（`--lock-current --strict`）由 owner 审查后自行执行**，不要用仓库快照的 digest 替代本机校验
+- `orchestra/config/skills.json` 的 `expected_digest` 已于 2026-08-20 锁定（owner 审查后 `--lock-current --strict`）——仓库快照的 digest 仅供参照，**不要用快照的 digest 替代本机校验**
 
 ## 扫描声明
 
 打包前已做凭据秘密扫描（API key/token/password 模式），干净。
+
+## 重新锁定流程（2026-08-20 已首次锁定）
+
+- 锁定后 contract_files 任何改动 → `check_skills.py --strict` 显示 `drifted` → `run_card.py ingest` HARD 阻断
+- **恢复流程**：审查改动 → 重新执行 `python orchestra/scripts/check_skills.py --lock-current --strict` → 同步本快照目录（快照=上次审查基线，diff 可回答"自上次锁定改了什么"）
+- 审查深度与改动成正比：文案微调看 diff 即可；脚本逻辑改动需重过行为面（无网络/无 exec/写入范围/退出码契约）

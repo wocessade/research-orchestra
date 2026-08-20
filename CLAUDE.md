@@ -39,7 +39,7 @@
 ## 当前挂账（更新日期 2026-08-20）
 
 - **阶段定位（用户定调）**：整体工程进入收尾复核；【术】已足够，转入【道】——新任务优先产出论文/研究实体，纯基建项只记挂账不急着做
-- SOL 重构 + 030 修复已合并入库（a2d31b8）：四阶段雷达、artifact 校验、taskkill 树杀等需一次 Pi 部署窗口；skills.json expected_digest=null → 真实 ingest 被 HARD 阻断，skill 快照已入仓库（orchestra/skills/，兼容度分析见 docs/reports/2026-08-skills-orchestra-compat.md），待用户审查后 `--lock-current --strict`
+- SOL 重构 + 030 修复已合并入库（a2d31b8）：四阶段雷达、artifact 校验、taskkill 树杀等需一次 Pi 部署窗口；**skills.json digest 已锁定（2026-08-20，用户审查后 --lock-current --strict，ingest 门禁放行）**——skill 改动后需重新审查+锁定，流程见 orchestra/skills/README.md
 - 031 树状档首跑产出 SOL 终审报告（docs/reports/2026-08-sol-refactor-review.md）：**小包 A 已修复入库（739fdfd，1 HIGH+12 MED 全落地，broker 116/scripts 161 绿）**；挂账 B（Pi 部署验证）并入部署窗口
 - 入学前（2026-09）：宿舍-实验室互通实测、Tailscale 切换；弱密码整改 4B 已完成（2026-08-20），核桃派 pi 密码待上线后同步
 - 雷达→Zotero 直连**推迟到 9.8 开学后再设计**（方向已记 `docs/superpowers/plans/2026-08-20-radar-digest-reading-note.md`）

@@ -91,7 +91,7 @@ def cmd_refresh(args) -> int:
     try:
         msgs = parse_messages(
             (console / "messages.md").read_text(encoding="utf-8"))
-    except OSError as exc:
+    except (OSError, ValueError) as exc:
         msgs = {"latest": [], "pending": [], "alerts": []}
         notes.append(f"messages 读取失败: {exc}")
     (out / "messages.json").write_text(
@@ -113,6 +113,8 @@ def cmd_serve(args) -> int:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
+    finally:
+        server.server_close()
     return 0
 
 

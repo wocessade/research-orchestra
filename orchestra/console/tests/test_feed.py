@@ -70,6 +70,8 @@ class RefreshTest(unittest.TestCase):
         status = json.loads((self.out / "status.json").read_text(encoding="utf-8"))
         self.assertTrue(status["degraded"])
         self.assertIn("离线", status["walnut"])
+        for name in ("messages.json", "radar.json", "digest.html", "messages.html"):
+            self.assertTrue((self.out / name).exists(), name)
 
     def test_refresh_bad_schedule_keeps_ics_and_alerts(self):
         (self.console / "console-schedule.toml").write_text("[[personal]]", encoding="utf-8")

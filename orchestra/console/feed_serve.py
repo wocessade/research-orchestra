@@ -8,22 +8,27 @@ from pathlib import Path
 
 
 class FeedHandler(SimpleHTTPRequestHandler):
-    console_dir: Path | None = None
-    _messages_mtime: float = 0.0
-    _messages_cache: bytes | None = None
+    def __init__(self, *args, console_dir=None, **kwargs):
+        self.console_dir = Path(console_dir) if console_dir is not None else None
+        self._messages_mtime = 0.0
+        self._messages_cache = None
+        super().__init__(*args, **kwargs)
 
     def _refresh_messages(self) -> bytes:
-        src = self.console_dir / "messages.md"
-        mtime = src.stat().st_mtime
-        if self._messages_cache is None or mtime != self._messages_mtime:
-            from feed_messages import parse_messages
-            try:
+        empty = {"latest": [], "pending": [], "alerts": []}
+        try:
+            src = self.console_dir / "messages.md"
+            mtime = src.stat().st_mtime
+            if self._messages_cache is None or mtime != self._messages_mtime:
+                from feed_messages import parse_messages
                 data = parse_messages(src.read_text(encoding="utf-8"))
-            except (OSError, ValueError):
-                data = {"latest": [], "pending": [], "alerts": []}
+                self._messages_cache = json.dumps(
+                    data, ensure_ascii=False, indent=2).encode("utf-8")
+                self._messages_mtime = mtime
+        except (OSError, ValueError):
             self._messages_cache = json.dumps(
-                data, ensure_ascii=False, indent=2).encode("utf-8")
-            self._messages_mtime = mtime
+                empty, ensure_ascii=False, indent=2).encode("utf-8")
+            self._messages_mtime = 0.0
         return self._messages_cache
 
     def do_GET(self):  # noqa: N802
@@ -41,6 +46,6 @@ class FeedHandler(SimpleHTTPRequestHandler):
 def make_server(out_dir: Path, bind: str = "127.0.0.1",
                 port: int = 3100) -> ThreadingHTTPServer:
     out_dir.mkdir(parents=True, exist_ok=True)
-    FeedHandler.console_dir = out_dir.parent
-    handler = functools.partial(FeedHandler, directory=str(out_dir))
+    handler = functools.partial(
+        FeedHandler, directory=str(out_dir), console_dir=str(out_dir.parent))
     return ThreadingHTTPServer((bind, port), handler)

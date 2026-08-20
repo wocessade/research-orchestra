@@ -60,6 +60,12 @@ class ServeTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(json.loads(body), {"latest": [], "pending": [], "alerts": []})
 
+    def test_messages_missing_md_degrades(self):
+        (self.console / "messages.md").unlink()
+        status, body = self._get("/messages.json")
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body), {"latest": [], "pending": [], "alerts": []})
+
     def test_unknown_404(self):
         status, _ = self._get("/nope.json")
         self.assertEqual(status, 404)

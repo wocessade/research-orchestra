@@ -1,0 +1,26 @@
+title: Orchestra 控制台
+description: Research Orchestra 汇合面
+language: zh-Hans
+theme: dark
+color: slate
+fullWidth: true
+hideVersion: true
+disableUpdateCheck: true
+statusStyle: dot
+layout:
+  今天:
+    tab: 今天
+    style: row
+    columns: 2
+  雷达:
+    tab: 雷达
+    style: row
+    columns: 2
+  任务实验:
+    tab: 任务实验
+    style: row
+    columns: 2
+  系统:
+    tab: 系统
+    style: row
+    columns: 2

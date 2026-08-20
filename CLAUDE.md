@@ -44,4 +44,5 @@
 - 入学前（2026-09）：宿舍-实验室互通实测、Tailscale 切换；弱密码整改 4B 已完成（2026-08-20），核桃派 pi 密码待上线后同步
 - 雷达→Zotero 直连**推迟到 9.8 开学后再设计**（方向已记 `docs/superpowers/plans/2026-08-20-radar-digest-reading-note.md`）
 - 双 agent 想法池剩余项（resume 脚本化 / usage 统计）待选（模型路由表已落地，spec `docs/superpowers/specs/2026-08-20-model-routing-design.md`）
+- **GUI 控制台 v1 已上线（mission 034，43fd3a4 已 push）**：Homepage 127.0.0.1:3000 四页 + glue `orchestra/console/`（69 测试绿，Pi 零改动）；refresh 每 10 分钟 schtasks + serve/Homepage 启动文件夹自启；留言=CC 写 `orchestra/console/messages.md`；v1.5（tailnet 手机访问+Homepage 鉴权门）/v2（事件点击派任务、推送、实验 DDL 扫描、pending 卡明细）挂账；**上线后首次真实运行需留意 ORCHESTRA_MONITOR_TOKEN 是否在 schtasks 环境可见**（无 token 则 4B 区降级显示离线）
 - 待用户拍板：SD 旧副本删除、512G SSD 用途、宿舍 NAS、QQ bot

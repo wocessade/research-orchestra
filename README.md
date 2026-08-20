@@ -261,6 +261,18 @@
 
 ---
 
+### Mission 034（08-20）GUI 控制台 v1 — ✅ 完成（终审 READY TO MERGE，已 push）
+
+**目标**：以双层日历为核心的只读控制台，解决墨水屏信息密度不足 + CC 后台反馈受限（两痛点同源=缺汇合面）。设计 spec `docs/superpowers/specs/2026-08-20-console-design.md`，实施计划 `docs/superpowers/plans/2026-08-20-console-v1.md`。
+
+- **选型**：现成方案调研后定 Homepage（gethomepage v2.0.0 源码装 D:\Apps\homepage，node 直跑）——calendar widget 原生 ical 集成 + customapi + iframe 三件套；自研 FastAPI 被否决（用户：只做兼容修改不从 0 写）；Glance 日历无事件、Vikunja 无状态面板被否决
+- **glue**：`orchestra/console/` stdlib-only（console_feed.py refresh/serve + feed_schedule/messages/status/radar/serve 五模块，69 unittest 全绿）；四页 tab（今天/雷达/任务实验/系统）；双层日历双 ICS（system 定时器镜像 + personal 手录）；messages.md 留言/待决/告警（热重秒级）；Pi 侧零改动（只读 GET /api/dashboard + sync_pull 本地快照）
+- **关键决策**：只读+决策面板（审批/派任务回对话留痕）；Windows 本机 web（v1.5 可开 tailnet）；自启=schtasks refresh 每 10 分钟 + 启动文件夹 serve/Homepage（onlogon 计划任务非提权被拒，用户拍板）；Homepage v2 内置鉴权门留作 v1.5
+- **验收**：日历 vs Pi timer 逐条核对 / 留言往返 ≤5s / 断网降级演练 / 四页截图（D:\Temp\console-acceptance\）全 PASS
+- **过程收获**（8 任务 subagent-driven，15 轮审查+修复循环）：终审抓出 mock 夹具契约错位（4B 永远离线的隐形雷，读 monitor 真源码才暴露）；计划示例代码 4 处内在矛盾全部收敛修复；ICS 双 CR（Windows write_text 换行翻译）字节级实证并防回归；教训入库 L27-L31
+
+---
+
 ## 4. 关键议题与用户决策记录
 
 ### 4.1 手机桥接（讨论后暂缓）
@@ -297,6 +309,7 @@
 | 告警链 | 服务失败 OnFailure 告警 → 磁盘/备份邮件告警（Pi 直发 QQ 邮件） |
 | 降级链 | 微信（Windows 在线）→ QQ 邮件（Pi 24/7）→ 墨水屏（Pi） |
 | usage-monitor | 核桃派在役（本项目只增量扩展：已新增 POST /api/orchestra，三端点语义不变） |
+| GUI 控制台 | Homepage 127.0.0.1:3000 四页 tab（今天/雷达/任务实验/系统）+ glue serve 127.0.0.1:3100（stdlib）；refresh 每 10 分钟（schtasks）+ 自启走启动文件夹；只读消费 GET /api/dashboard + 本地 results 快照，Pi 零改动；使用说明 `orchestra/console/README.md` |
 
 **夜间雷达**：2026-08-19 23:30 首次真实定时注入已启动（dry-run 全链路已验证：60 篇 → 去重 57 → 六维评分 → 选 5 → 邮件成功）；明早用户 QQ 邮箱应收到第一封真实日报。
 
@@ -305,7 +318,7 @@
 ## 6. 遗留与待办清单
 
 ### 进行中
-- 无（mission 028-033 均已归档）
+- 无（mission 028-034 均已归档）
 
 ### 已承诺后续
 - **Pi 部署窗口（合并为一）**：SOL 重构（四阶段雷达/artifact 校验/taskkill 树杀）+ 小包 A 修复（notify 锁接管/send_email 拒信分类/inject 死循环防护/deploy stop 时序等 12 条）真机部署验证；notify 崩溃残留演练、inject 真实 /proc 首跑

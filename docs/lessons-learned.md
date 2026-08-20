@@ -48,3 +48,15 @@
 24. **Claude Code `!` 前缀无 TTY**：交互式命令（passwd 等）在 `!` 里跑不了；远程改密的非交互链 = 密钥认证 SSH + `printf '旧密\n' | sudo -S -v` 缓存凭据 + `chpasswd`/`smbpasswd -s`，改完用 `sudo -k && sudo -S -v` 反验新密。
 25. **功能重叠裁决模式**：本地交互 skill 与已上线自动化实现重叠时，以"已上线+有验证闭环"的为准（雷达 validator/SHA/at-most-once vs pipeline 交互版），对方独有增量并入计划而非另起炉灶（033 兼容度分析）。
 26. **快照型交付物必须带漂移声明**：skill 快照入仓库时 README 写明快照日期+活副本路径+刷新方式（L18 的文档化落地）。
+
+## G. 034 追加（2026-08-20）
+
+27. **Windows `write_text` 换行翻译毁行尾敏感产物**：生成的 ICS 用 `\r\n`，`Path.write_text` 默认 newline 翻译再叠加成 `\r\r\n`，ICAL.js 解析 0 事件（页面"无事件"而 69 个单测全绿）。规则：行尾敏感产物用 `newline=""` 或 write_bytes 写出，且回归测试用**字节级断言**（assertNotIn b"\r\r"）而非文本断言。
+
+28. **测试夹具必须锁真实契约，mock 假绿会掩盖系统级缺陷**：status 夹具按"假设形状" mock `orchestra_last_report={"ts": ...}`，真机契约是 `{"broker": ..., "sync": ...}`——4B 在真机上永远离线而测试全绿。终审读 monitor 源码（写入点）才暴露。规则：跨组件契约的夹具形状必须对照被调方**源码写入点**核实（不是 docstring），终审必须留一次"对照真实上游"的检查。
+
+29. **框架的启动自愈会复活你删掉的文件**：Homepage `checkAndCopyConfig` 在配置缺失时从 skeleton 重建——/MIR 删掉的 widgets.yaml 每次启动复活（stock 磁盘 widget 404）。规则：删框架配置前读其启动逻辑；持久修法=提交空文件（`[]`）占位，而非删除。
+
+30. **subagent 停滞/报错 ≠ 没干活**：两个"失败"的修复代理实际已完成实现并 commit（一个 stall 在报告阶段、一个报 prompt too long 前已落地）。规则：恢复先查 git log + 工作区 diff，账本（.superpowers/sdd/progress.md）是恢复地图；已 commit 的工作绝不重跑。
+
+31. **Windows 计划任务 onlogon 触发器非提权被拒**：schtasks /sc minute 可注册、/sc onlogon 拒绝访问。规则：用户级开机自启落地到用户启动文件夹（%APPDATA%\...\Startup），bat 用 start /min 最小化，无凭据内容可入库。

@@ -62,6 +62,9 @@ class RefreshTest(unittest.TestCase):
         ics_bytes = (self.out / "system.ics").read_bytes()
         self.assertNotIn(b"\r\r", ics_bytes)
         self.assertIn(b"BEGIN:VCALENDAR\r\n", ics_bytes)
+        personal_bytes = (self.out / "personal.ics").read_bytes()
+        self.assertNotIn(b"\r\r", personal_bytes)
+        self.assertIn(b"BEGIN:VCALENDAR\r\n", personal_bytes)
         ics = (self.out / "system.ics").read_text(encoding="utf-8")
         self.assertIn("夜间雷达", ics)
         self.assertIn("今天的事", (self.out / "personal.ics").read_text(encoding="utf-8"))
@@ -97,6 +100,9 @@ class RefreshTest(unittest.TestCase):
             self.assertTrue((self.out / name).exists(), name)
             self.assertIn("BEGIN:VCALENDAR",
                           (self.out / name).read_text(encoding="utf-8"))
+            raw = (self.out / name).read_bytes()
+            self.assertNotIn(b"\r\r", raw)
+            self.assertIn(b"BEGIN:VCALENDAR\r\n", raw)
 
 
 if __name__ == "__main__":

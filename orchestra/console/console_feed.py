@@ -58,6 +58,11 @@ def cmd_refresh(args) -> int:
             build_ics(expand_personal(sched["personal"], today - _WINDOW_BEFORE,
                                       today + _WINDOW_AFTER), "Personal"),
             encoding="utf-8")
+    else:
+        # 解析失败：已有 ICS 沿用；首次运行无产物时落空日历，保证八产物齐全
+        for name, cal in (("system.ics", "System"), ("personal.ics", "Personal")):
+            if not (out / name).exists():
+                (out / name).write_text(build_ics([], cal), encoding="utf-8")
 
     api = os.environ.get("ORCHESTRA_MONITOR_API", DEFAULT_MONITOR_API)
     token = os.environ.get("ORCHESTRA_MONITOR_TOKEN")

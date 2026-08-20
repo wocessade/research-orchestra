@@ -85,6 +85,16 @@ class RefreshTest(unittest.TestCase):
         self.assertIn("自动告警", msgs)
         self.assertIn("日程解析失败", msgs)
 
+    def test_refresh_bad_schedule_writes_empty_ics_on_first_run(self):
+        (self.console / "console-schedule.toml").write_text("[[personal]]", encoding="utf-8")
+        with mock.patch("console_feed.fetch_dashboard", side_effect=_fresh_monitor):
+            rc = cmd_refresh(self._args())
+        self.assertEqual(rc, 0)
+        for name in ("system.ics", "personal.ics"):
+            self.assertTrue((self.out / name).exists(), name)
+            self.assertIn("BEGIN:VCALENDAR",
+                          (self.out / name).read_text(encoding="utf-8"))
+
 
 if __name__ == "__main__":
     unittest.main()

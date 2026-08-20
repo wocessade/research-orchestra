@@ -28,7 +28,7 @@ class FeedHandler(SimpleHTTPRequestHandler):
                 except (OSError, ValueError):
                     self.server._messages_cache = json.dumps(
                         empty, ensure_ascii=False, indent=2).encode("utf-8")
-                    self.server._messages_mtime = 0.0
+                    self.server._messages_mtime = mtime  # 记录观测 mtime，坏文件不反复重解析
             return self.server._messages_cache
 
     def do_GET(self):  # noqa: N802

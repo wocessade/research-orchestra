@@ -61,6 +61,30 @@ class ServeTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(json.loads(body), {"latest": [], "pending": [], "alerts": []})
 
+    def test_messages_degraded_parsed_once(self):
+        # 坏文件也必须走 mtime 缓存：mtime 未变不重解析
+        import feed_messages
+
+        real_parse = feed_messages.parse_messages
+        calls = 0
+
+        def counting_parse(text):
+            nonlocal calls
+            calls += 1
+            return real_parse(text)
+
+        time.sleep(0.05)
+        (self.console / "messages.md").write_text(
+            "## 不是时间 — 空标题\nbody\n## 2026-08-21 09:00 —\nbody",
+            encoding="utf-8")
+        with mock.patch.object(feed_messages, "parse_messages", side_effect=counting_parse):
+            for _ in range(3):
+                status, body = self._get("/messages.json")
+                self.assertEqual(status, 200)
+                self.assertEqual(json.loads(body),
+                                 {"latest": [], "pending": [], "alerts": []})
+            self.assertEqual(calls, 1)
+
     def test_messages_missing_md_degrades(self):
         (self.console / "messages.md").unlink()
         status, body = self._get("/messages.json")

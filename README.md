@@ -1,7 +1,7 @@
 # Research Orchestra 项目全景记录（第三方审查版）
 
 > 生成：2026-08-19 ｜ 范围：本项目（Research Orchestra，科研-实验-论文框架）从最初讨论至今的完整过程记录
-> **更新：2026-08-19 深夜 ｜ 本次覆盖：mission 025/026/027 验收结论、基础设施新增（Tailscale 三端组网 / 4B 兼职 NAS / 仪表盘链路 / 学校网络切换预案）、总 spec 迭代至 v7——状态快照至 mission 027**
+> **更新：2026-08-20 ｜ 本次覆盖：mission 028-033（GitHub 上传 / 模型路由 / 并发两档实战 / SOL 协作者重构合并与深审 / 修复包落地 / skill 打包与兼容度分析）、教训库机制、阶段定位（工程收尾转道）——状态快照至 mission 033**
 > 用途：供第三方审查项目决策链、执行质量与当前状态
 > 所有事实均可在文末「原始记录索引」中溯源验证
 > 说明：本文档已合并总架构 spec（v7）的前提与背景信息（见 §1.4）；**总 spec 全文本身亦是审查对象**（见 §8 索引），本文档不替代 spec 正文
@@ -10,7 +10,7 @@
 
 ## 0. 一句话概括
 
-**用户在 2026-09 入学 CS 研究生前，搭建一套"方向无关的科研生产力系统"**：以 Claude Code（CC）为编排大脑、树莓派 4B 为 7×24 任务代理（Broker）、DeepSeek Harness（dsh）为无头执行引擎、核桃派为展示/异地冷备，覆盖「夜间文献雷达 → 实验管线闭环 → 论文产出」全链。两天内（08-18 ~ 08-19）完成总架构设计（总 spec 迭代至 v7）与 4 个已验收子系统（1 Pi Broker 地基 / 2 实验管线闭环 / 3 双 agent / 4 仪表盘），基础设施新增 Tailscale 三端组网、4B 兼职 NAS、墨水屏仪表盘链路；子系统 5 为编排层内部项（本文档不展开），子系统 6（微信桥）待后续。
+**用户在 2026-09 入学 CS 研究生前，搭建一套"方向无关的科研生产力系统"**：以 Claude Code（CC）为编排大脑、树莓派 4B 为 7×24 任务代理（Broker）、DeepSeek Harness（dsh）为无头执行引擎、核桃派为展示/异地冷备，覆盖「夜间文献雷达 → 实验管线闭环 → 论文产出」全链。08-18 ~ 08-19 完成总架构设计与 4 个已验收子系统；08-20 完成：GitHub private 仓协作（协作者 SOL 重构合并 + 深审 + 修复包全落地）、模型路由表（dsh 两档 + codex 三档）、**并发两档工作模式实战**（标准档 4-8 路 030/032、树状档 2 层≤12 叶子 031 首跑）、skill 快照打包与兼容度分析、教训库机制（26 条，三层知识锚）。**阶段定位（用户定调）：工程收尾复核，【术】已足够，转入【道】——新任务优先论文/研究实体。**
 
 ---
 
@@ -81,7 +81,7 @@
 | 2 | 实验管线闭环（engine × dsh） | ✅ 已验收（mission 025，对照实验两臂数字全经 ingest 入账） |
 | 3 | 双 agent 验证（CC × Codex） | ✅ 已验收（mission 027，独立审命中率 3/3 = 100%） |
 | 4 | 仪表盘适配（usage-monitor 扩展） | ✅ 已验收（mission 026，墨水屏融合面板 + 30s 状态上报 + 鉴权） |
-| 5 | haiku 分派规则（编排层） | ⏳ 未开始（编排层内部项，本文档不展开） |
+| 5 | 编排层（模型路由 + 并发分派规则） | ✅ 已落地（029 路由表 + 030/031/032 并发两档实战；约定 `docs/superpowers/specs/2026-08-20-concurrent-work-modes.md`） |
 | 6 | 通知与远程指挥通道（微信桥接入） | ⏳ 未开始（降级链已就绪：QQ 邮件 Pi 直发 + 墨水屏） |
 
 ---
@@ -234,6 +234,33 @@
 
 ---
 
+### Mission 028-029（08-19 ~ 08-20）GitHub 上传 + 模型路由表 — ✅ 完成
+
+- **028**：全景记录更新、GitHub private 仓 `wocessade/research-orchestra` 建成推送（1606=1606 文件一致）、协作者 zouxinhao0122 write 邀请、拓扑拆双图（总体架构+实验数据流，双 PASS）、秘密扫描修复（deploy 硬编码密码环境变量化）
+- **029**：模型路由表落地——`orchestra/config/model-routing.json`（用户维护、系统只读：dsh 雷达评分 flash / 实验 pro；codex 三档 Luna 杂活含视觉 / Terra 默认 / Sol 关键场景，production-fix 归 CC）；任务卡 `model: flash|pro` 字段 → executor 映射 dsh `--patch`（**实测陷阱：--patch 整体替换非深合并**）；端到端实证 flash 冒烟 26.7s done
+
+### Mission 030（08-20）并发标准档首秀 + executor 027 findings 修复 — ✅ 已验收
+
+- 用户定调并发工作方式：**opus 只接口（分析/派发/收敛审查/统一 commit），agent 不 commit**
+- 3 路 haiku 并行修复 027 审出的三条 finding（result_dir 逃逸 / attempt TOCTOU / Windows taskkill 树杀），副本隔离+diff 回流+验收解耦，验收 agent fidelity 逐行核对 100%
+- 同日协作者推送 **SOL 输出质量重构**（2974f61，35 文件 +4197/-190：artifact 校验 exit 0≠成功、mode/detail 提示词、雷达四阶段化、depends_on 调度图、注入互斥、Skill ingest 门禁、deploy 预检）——与本地 029 模型路由 8 提交 + 030 修复撞车
+
+### 合并与 Mission 031-032（08-20）SOL 深审 + 修复包 — ✅ 全闭环
+
+- **合并**（a2d31b8）：用户拍板"先 commit 030 再合并"——4 文件 10 冲突块人工裁决，原则"SOL 主体 + 保留 029 路由 + 并入我方 taskkill timeout=10"；修复 4 处 Windows 测试可移植性问题；broker 102 / scripts 154 全绿
+- **031 树状档首跑**（2 层×3 opus 子树×≤12 haiku 叶子 + 1 codex 交叉验证 leaf）= SOL 提交深审：**1 HIGH + 12 MED**（HIGH=check_skills Windows 路径逃逸；2 处多视角独立命中、0 假阳性；codex leaf 320s 跑通，GBK 编码坑入档）；验收 agent 亲核全部 HIGH/MED 证据属实；复盘数据回填约定文档（覆盖矩阵/根统一标尺/叶子落盘/GBK 四条新纪律）
+- **032 小包 A**（739fdfd）：12 条 finding 全按报告方案修复（TDD 先红后绿，5 路 haiku in-place 并行零冲突），验收 12/12 PASS；broker 116 / scripts 161 全绿
+- 教训库机制上线：`docs/lessons-learned.md`（26 条，4+1 类，维护协议=每 mission 归档必须追加）+ CLAUDE.md 锚 + memory 个人层
+
+### Mission 033（08-20）Skill 打包 + 兼容度分析 + 密码整改 — ✅ 完成
+
+- 协作者反馈找不到 skill → 10 个科研 skill 快照入仓库 `orchestra/skills/`（秘密扫描干净、漂移声明 README）
+- 兼容度分析（`docs/reports/2026-08-skills-orchestra-compat.md`）：pipeline vs 雷达裁决雷达为权威（validator/SHA/at-most-once 已上线）；pipeline 独有增量（PDF 精读/Zotero 归档）并入 9.8 计划；ingest→engine 强耦合唯一阻断=digest 未锁定；weekly-review 交互型不可进 dsh
+- 4B 登录+samba 密码整改完成（非交互链：密钥认证+sudo -S+chpasswd，反验通过）；NAS 经 Tailscale 外网可用（445 实测 P2P 直连）
+- nature-image2ppt（上游 nature-skills 新 skill）审查并安装：图片→可编辑 PPT 重建，与 PPTSkill 互补（重建 vs 新做）
+
+---
+
 ## 4. 关键议题与用户决策记录
 
 ### 4.1 手机桥接（讨论后暂缓）
@@ -241,9 +268,9 @@
 - 设想：7×24 平台能否承接手机桥接？结论：微信桥不能搬（依赖 Windows iLink），NapCat QQ bot 可行
 - **用户决定：QQ bot 暂缓**，其他继续推进
 
-### 4.2 模型切换（dsh Pro/Flash）— 留待后续
+### 4.2 模型切换（dsh Pro/Flash）— ✅ 已落地（mission 029）
 
-dsh 支持 deepseek-v4-pro / deepseek-v4-flash 切换（provider patch 覆盖）——接入 broker 列为独立待办（任务 header 加 model 字段）。
+任务卡 `model: flash|pro` 字段 → executor 映射 dsh `--patch /mnt/broker/dsh-patches/{model}.yml`（patch 缺失任务 failed）。统一模型路由表 `orchestra/config/model-routing.json`（用户维护、系统只读）；codex 三档由 CC 查表传 `--model`。
 
 ### 4.3 工作方式演变
 
@@ -265,7 +292,7 @@ dsh 支持 deepseek-v4-pro / deepseek-v4-flash 切换（provider patch 覆盖）
 | 定时任务 | 23:30 夜间雷达注入 / 每日 03:00 冷备到核桃派 / 每日 04:17 nas-backup（4B 盘内备份）/ 周日 04:00 housekeeping（均含 Persistent + Asia/Shanghai） |
 | 冷备链 | 核桃派 192.168.0.200（实验室）：rsync over ssh + samba Z:；恢复演练通过 |
 | 仪表盘链路 | 4B reporter 线程每 30s `POST /api/orchestra`（recent_tasks + host 负载/内存）→ 核桃派融合面板（队列/活跃任务/最近任务/设备状态区）；X-Monitor-Token 鉴权（两 Pi 间流转，不入库）；Windows sync 脚本上报 last_sync（实测 ~13s 新鲜） |
-| 4B 兼职 NAS | 西数 250G（sdb）ext4 挂 /mnt/nas（fstab UUID+nofail）+ samba `\\192.168.0.250\nas` + nas-backup.timer 每日 04:17 rsync `/mnt/broker/{results,logs}` → `/mnt/nas/backup/broker/`；压测 31.7MB/s 写 / 33.1MB/s 读（USB3 接口，实测速率冷备用足够；broker 未被拖死）；源码 `orchestra/nas/`（commit faf27f5）；定位：冷备 NAS（宿舍 NAS 预演） |
+| 4B 兼职 NAS | 西数 250G（sdb）ext4 挂 /mnt/nas（fstab UUID+nofail）+ samba `\\192.168.0.250\nas`（**Tailscale 外网可用：`\\100.111.75.58\nas`，2026-08-20 实测 445 P2P 直连**）+ nas-backup.timer 每日 04:17 rsync `/mnt/broker/{results,logs}` → `/mnt/nas/backup/broker/`；压测 31.7MB/s 写 / 33.1MB/s 读；源码 `orchestra/nas/`；定位：冷备 NAS（宿舍 NAS 预演）。**登录/samba 密码已整改（2026-08-20）** |
 | Tailscale | 三端同 tailnet：4B=liuxfs 100.111.75.58 / 核桃派=walnutpi 100.64.2.60 / Windows=laptop-w0cessade 100.103.79.3；宿舍↔实验室互通方案就绪，入学后切换实测（决策树见 `orchestra/docs/school-network-switch.md`） |
 | 告警链 | 服务失败 OnFailure 告警 → 磁盘/备份邮件告警（Pi 直发 QQ 邮件） |
 | 降级链 | 微信（Windows 在线）→ QQ 邮件（Pi 24/7）→ 墨水屏（Pi） |
@@ -278,20 +305,22 @@ dsh 支持 deepseek-v4-pro / deepseek-v4-flash 切换（provider patch 覆盖）
 ## 6. 遗留与待办清单
 
 ### 进行中
-- 无（mission 025/026/027 均已验收归档；当前唯一 active mission 为 028 全景记录更新与 GitHub 上传——即本文档本次更新，超出本次覆盖范围）
+- 无（mission 028-033 均已归档）
 
 ### 已承诺后续
-- **executor.py 3 条 finding 修复**（path 校验 1 行 / 原子 mkdir 2 行 / Windows taskkill /T），需 Pi 部署窗口（mission 027 验收列候选）
+- **Pi 部署窗口（合并为一）**：SOL 重构（四阶段雷达/artifact 校验/taskkill 树杀）+ 小包 A 修复（notify 锁接管/send_email 拒信分类/inject 死循环防护/deploy stop 时序等 12 条）真机部署验证；notify 崩溃残留演练、inject 真实 /proc 首跑
+- **digest 锁定**：skills.json expected_digest=null → 真实 ingest 当前 HARD 阻断；skill 快照已入仓库（`orchestra/skills/`），待用户审查后 `--lock-current --strict`（兼容度分析 docs/reports/2026-08-skills-orchestra-compat.md）
 - **Broker codex executor**（总 spec §6.3 通信方式④ dsh 子代理 `-codex` 后端：Pi→OpenAI 网络路径未验证，需代理方案——DECISIONS 已记录，单独任务）
-- **入学前（2026-09）**：弱密码整改 + 宿舍-实验室互通实测 + Tailscale 切换执行（决策树见 `orchestra/docs/school-network-switch.md`；实测结果决定是否仍走总 spec §7 候选优先级）；宿舍网络重配置
-- dsh flash/pro 模型切换接入 broker（任务 header model 字段 + patch 覆盖）
-- subsystem-5（haiku 分派规则，编排层内部项）、subsystem-6（微信桥接入）
+- **入学前（2026-09）**：宿舍-实验室互通实测 + Tailscale 切换执行（决策树见 `orchestra/docs/school-network-switch.md`）；**弱密码整改 4B 已完成，核桃派 pi 密码待上线后同步**
+- **雷达→Zotero 直连（9.8 开学后设计）**：方向已定——Pi 侧 pyzotero 直连（复用 pipeline skill 协议），兼容度分析 P1
+- subsystem-6（微信桥接入）
 
 ### 待用户拍板
 - SD 旧副本 ~/broker-data（636K 回退副本）是否删除
 - 512GB SSD 用途（宿舍 NAS/冷备扩容候选）
 - 宿舍 NAS 何时建（N100 触发式）
 - QQ bot 是否重启立项
+- nature-image2ppt 已安装（2026-08-20），是否纳入正式工作流
 
 ---
 
@@ -305,7 +334,8 @@ dsh 支持 deepseek-v4-pro / deepseek-v4-flash 切换（provider patch 覆盖）
 | 4B 供电（1A 适配器事故） | ✅ 已解（5V1A 适配器致 4B 用户态整体死亡——ping 活/服务死；用户实机反馈根因，教训入档：电源规格核查） |
 | Broker 单点 | 核桃派冷备 + git 同步（自动化主备切换明确不做） |
 | 校园网宿舍-实验室互通 | 降级为观察项：**Tailscale 三端已部署**，入学后实测切换（school-network-switch.md 互通决策树） |
-| executor.py 路径逃逸/竞态/树杀缺口（027 codex 审出） | 未修（Broker 零改动约束），列候选待 Pi 部署窗口 |
+| executor.py 路径逃逸/竞态/树杀缺口（027 codex 审出） | ✅ 已修（030 修复 + SOL 等价实现合并 a2d31b8 + 032 小包 A 加固；待 Pi 部署窗口验证） |
+| SOL 重构安全边界（031 深审 1 HIGH + 12 MED） | ✅ 已修（032 小包 A，739fdfd，验收 12/12 PASS；Pi 部署验证挂账 B） |
 | dsh 开发者预览接口可变 | 锁版本 0.1.0-rc.7；升级看 changelog |
 | dsh 沙箱限制（workspace-write） | 已适配（cwd=attempt 目录）；对后续任务设计有约束 |
 
@@ -324,40 +354,38 @@ dsh 支持 deepseek-v4-pro / deepseek-v4-flash 切换（provider patch 覆盖）
 - 学校网络切换预案（IP 依赖盘点/互通决策树/回退步骤）：`D:\pythonProject\orchestra\docs\school-network-switch.md`
 
 ### Mission 档案（含 MISSION 目标/STATE 进度/DECISIONS 决策链/BRIEF 简报/AUDIT 审计）
-- `.tasks\completed\020_research-orchestra-spec\`
-- `.tasks\completed\021_subsystem-1-pi-broker\`
-- `.tasks\completed\022_walnutpi-cold-backup\`
-- `.tasks\completed\023_nightly-radar-pipeline\`（含哨兵审计全记录）
-- `.tasks\completed\024_usb-storage-migration\`
-- `.tasks\completed\025_subsystem-2-experiment-loop\`
-- `.tasks\completed\026_subsystem-4-dashboard\`（含 D14/D17 记录）
-- `.tasks\completed\027_subsystem-3-codex-dual-agent\`
-- `.tasks\active\028_panorama-doc-github-upload\`（进行中：全景记录更新 + GitHub 私有仓上传；超出本次更新范围）
+- `.tasks\completed\020_research-orchestra-spec\` ～ `.tasks\completed\033_skill-pack-upload\`（完整编号链：020-033；028 GitHub 上传 / 029 模型路由 / 030 并发标准档 / 031 树状档首跑 / 032 修复包 / 033 skill 打包）
 
-### 验收报告
+### 验收报告与审查报告
 - `orchestra\reports\2026-08-e2e-acceptance.md`（子系统 1 E2E 三场景）
 - `orchestra\reports\2026-08-cold-backup-acceptance.md`（冷备链 6 项）
 - `orchestra\reports\2026-08-experiment-loop-acceptance.md`（子系统 2 对照实验，数字全部引用 ingest artifact 路径，无手抄）
 - `orchestra\reports\2026-08-dashboard-acceptance.md`（子系统 4，8/8，含长任务「运行中帧」实测证据）
 - `orchestra\reports\2026-08-codex-dual-agent-acceptance.md`（子系统 3，命中率 3/3 判定表 + 口径与局限）
-- `orchestra\reports\2026-08-output-quality-refactor.md`（输出质量、严格协议、Skill ingest 门禁与雷达阶段化改造）
+- `orchestra\reports\2026-08-output-quality-refactor.md`（SOL 输出质量重构自述报告；M-10 勘误已落地）
 - `orchestra\reports\artifacts\codex-review-executor.json`（codex 原始 findings 逐字存档）
+- `docs\reports\2026-08-sol-refactor-review.md`（031 树状档深审：1 HIGH + 12 MED，验收 agent 亲核证据）
+- `docs\reports\2026-08-skills-orchestra-compat.md`（033 skill 组兼容度：重叠裁决/耦合/集成 P0-P2）
 
 ### 代码与运行配置
-- `orchestra\broker\`（db/taskfile/executor/dispatcher、雷达校验/渲染/通知/迁移门禁，stdlib only；当前 88 单测）
-- `orchestra\scripts\`（sync_push/pull、deploy_broker、backup_to_nas、run_card、check_skills、codex_exec、codex_modes 等；当前 154 单测）
+- `orchestra\broker\`（db/taskfile/executor/dispatcher、雷达校验/渲染/通知/迁移门禁，stdlib only；**当前 116 单测**）
+- `orchestra\scripts\`（sync_push/pull、deploy_broker、backup_to_nas、run_card、check_skills、codex_exec、codex_modes 等；**当前 161 单测**）
 - `orchestra\config\skills.json`（外部 Skill 严格 manifest；`run_card.py ingest` 在外部调用前执行摘要门禁）
+- `orchestra\config\model-routing.json`（统一模型路由表：dsh 两档 + codex 三档）
+- `orchestra\skills\`（科研 skill 快照包：10 个，2026-08-20，含漂移声明 README）
 - `orchestra\nas\`（4B 兼职 NAS：nas_backup.sh 等）
 - `orchestra\templates\nightly-radar-*.md`（雷达四阶段任务模板）
 - `orchestra\README.md`（系统运行手册，含实验闭环/仪表盘链路/双 agent/4B NAS 节）
 - `orchestra\docs\school-network-switch.md`（学校网络切换预案）
+- `docs\lessons-learned.md`（系统运行教训库 26 条：每 mission 归档必须追加）
+- `docs\superpowers\specs\2026-08-20-model-routing-design.md`、`2026-08-20-concurrent-work-modes.md`（路由/并发两档约定）
 - 4B 侧：`/home/liuxfs/broker/`、`/mnt/broker/`、`/mnt/nas/`、systemd units + env.conf drop-in
 
 ### 协作记忆（跨会话）
 - `C:\Users\19041\.claude\projects\D--pythonProject\memory\MEMORY.md`（索引）及同目录各 memory 文件
 
 ### git 提交链
-- `D:\pythonProject`（早期关键 commit：0e659b7 spec v1、1a6c920 spec v4、e3e8222 dsh cwd 修复、2e4221f 哨兵审计修复、334ee9b User=liuxfs；本次区间：7e25ca9 025 两臂执行、4e3e73c D14 刷屏修复、ea0c907 reporter 线程、d7cd05a last_sync、faf27f5 4B NAS、eb7cf6e/980f266 codex 直调封装与三模式、cf045f6 027 验收报告、35427f7 总 spec v7 定稿、d6e7f61 双 agent 头脑风暴存档）
+- `D:\pythonProject`（早期关键 commit：0e659b7 spec v1、1a6c920 spec v4、e3e8222 dsh cwd 修复、2e4221f 哨兵审计修复、334ee9b User=liuxfs；027 区间：7e25ca9~d6e7f61；**028-033 关键：eee8589 030 三修复、a2d31b8 SOL 合并、0aa606d 并发约定、c236a4f/3c6fa62 031 深审报告、739fdfd 032 小包 A、180f1cb 教训库、9df8f00 skill 快照、3708d4d 兼容度分析、edfe665 密码整改收尾**）
 
 ---
 
@@ -376,3 +404,4 @@ dsh 支持 deepseek-v4-pro / deepseek-v4-flash 切换（provider patch 覆盖）
 1. **总 spec §2/§4 存储描述未同步**：spec 正文 §2（4B 行「存储」列）与 §4（存储注释）仍写「2280 SSD 经 USB3 转接盒直挂，系统与 broker 数据落 SSD」；实际已改为闪迪 U 盘 ext4 直挂 /mnt/broker（本文档 §3 Mission 024、§5）。spec §12/§14 已更新为 U 盘方案，但 §2/§4 未同步——审查 spec 时注意两处矛盾表述。**【2026-08-19 深夜复核】已解决**：总 spec v5 起 §2/§4 已同步为闪迪 U 盘表述（v7 现状一致），本条不再构成审查关注点。
 2. **总 spec §5 任务模板未同步**：模板仍含 priority/schedule/acceptance 三字段；Mission 021 已裁掉这三字段（偏离记录在案，见本文档 §3 Mission 021 关键决策第 2 条）。审查 spec 时注意。**【复核】部分保留**：模板块仍展示三字段（规范形态），但 spec §5 正下方已加「v1 落地裁剪（mission 021 DECISIONS）」说明块——偏差已在 spec 内记录，本条降级为历史记录。
 3. **本文档内部交叉引用指向有误**：§2 总线② 注「（v1 用 scp，见 §4.2）」，而 §4.2 实为「模型切换」章节，scp 偏离实际记录在 §3 Mission 021——该引用错误仅在此指出，原文未改动。**【复核】已解决**：本文档 §2 总线② 引用已修正为「见 §3 Mission 021」（mission 025 副线处置）。
+4. **【2026-08-20 复核，协作者协作相关】**：协作者 SOL 重构（2974f61）与本地 029/030 工作撞车，合并裁决原则与过程见 §3「合并与 Mission 031-032」——同文件双轨改动的人工逐块裁决模式已入教训库 L17。SOL 自述报告存在 4 类"声称 vs 实现"偏差（notify 恢复原则、Windows 路径拒绝、traceback 泄漏、Skill 状态漂移），全部经 031 深审核实并已修复（032 小包 A）或勘误（M-10）。skill 快照包 `orchestra/skills/` 为 2026-08-20 快照，与 owner 本机活副本的关系见其 README 漂移声明。

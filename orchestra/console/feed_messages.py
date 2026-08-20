@@ -79,11 +79,13 @@ def build_messages_html(msgs: dict) -> str:
 def append_alert(messages_path: Path, text: str) -> bool:
     """追加自动告警留言；最后一个原始分节含相同告警行则跳过。返回是否追加。"""
     existing = messages_path.read_text(encoding="utf-8") if messages_path.exists() else ""
-    sections = re.split(r"(?m)^## ", existing)
-    final_section = sections[-1] if sections else ""
+    lines = existing.splitlines()
+    section_starts = [i for i, line in enumerate(lines) if line.startswith("## ")]
     expected = f"- 告警：{text}"
-    if any(line.strip() == expected for line in final_section.splitlines()):
-        return False
+    if section_starts:
+        final_section = lines[section_starts[-1] + 1:]
+        if any(line == expected for line in final_section):
+            return False
     stamp = datetime.now().strftime("%Y-%m-%d %H:%M")
     with messages_path.open("a", encoding="utf-8") as f:
         f.write(f"\n## {stamp} — 自动告警\n- 告警：{text}\n")

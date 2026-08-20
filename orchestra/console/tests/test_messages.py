@@ -71,13 +71,26 @@ class BuildMessagesHtmlTest(unittest.TestCase):
 
 
 class AppendAlertTest(unittest.TestCase):
-    def test_append_and_dedup(self):
+    def test_append_when_no_section_header(self):
         import tempfile
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "messages.md"
+            p.write_text("- 告警：usage-monitor 不可达\n", encoding="utf-8")
             self.assertTrue(append_alert(p, "usage-monitor 不可达"))
-            self.assertFalse(append_alert(p, "usage-monitor 不可达"))
-            self.assertEqual(p.read_text(encoding="utf-8").count("usage-monitor"), 1)
+            content = p.read_text(encoding="utf-8")
+            self.assertIn("— 自动告警\n- 告警：usage-monitor 不可达\n", content)
+
+    def test_append_not_matched_by_indented_line(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "messages.md"
+            p.write_text(
+                "## 2026-08-21 08:00 — 正常留言\n"
+                "  - 告警：usage-monitor 不可达\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(append_alert(p, "usage-monitor 不可达"))
+
     def test_body_prose_does_not_trigger_dedup(self):
         import tempfile
         with tempfile.TemporaryDirectory() as tmp:

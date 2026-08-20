@@ -34,6 +34,11 @@ _WINDOW_BEFORE = timedelta(days=30)
 _WINDOW_AFTER = timedelta(days=60)
 
 
+def _write_raw(path: Path, text: str) -> None:
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        f.write(text)
+
+
 def cmd_refresh(args) -> int:
     console = Path(args.console_dir)
     out = Path(args.out_dir)
@@ -50,19 +55,19 @@ def cmd_refresh(args) -> int:
 
     today = datetime.now().date()
     if sched is not None:
-        (out / "system.ics").write_text(
+        _write_raw(
+            out / "system.ics",
             build_ics(expand_system(sched["system"], today - _WINDOW_BEFORE,
-                                    today + _WINDOW_AFTER), "System"),
-            encoding="utf-8")
-        (out / "personal.ics").write_text(
+                                    today + _WINDOW_AFTER), "System"))
+        _write_raw(
+            out / "personal.ics",
             build_ics(expand_personal(sched["personal"], today - _WINDOW_BEFORE,
-                                      today + _WINDOW_AFTER), "Personal"),
-            encoding="utf-8")
+                                      today + _WINDOW_AFTER), "Personal"))
     else:
         # 解析失败：已有 ICS 沿用；首次运行无产物时落空日历，保证八产物齐全
         for name, cal in (("system.ics", "System"), ("personal.ics", "Personal")):
             if not (out / name).exists():
-                (out / name).write_text(build_ics([], cal), encoding="utf-8")
+                _write_raw(out / name, build_ics([], cal))
 
     api = os.environ.get("ORCHESTRA_MONITOR_API", DEFAULT_MONITOR_API)
     token = os.environ.get("ORCHESTRA_MONITOR_TOKEN")

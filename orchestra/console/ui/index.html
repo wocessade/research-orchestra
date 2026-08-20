@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Orchestra 控制台</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <div>
+          <div class="brand-name">Research Orchestra</div>
+          <div class="brand-sub">控制台 · 只读汇合面</div>
+        </div>
+      </div>
+      <nav class="tabs" role="tablist" aria-label="页面">
+        <button type="button" class="tab is-active" data-tab="today" role="tab" aria-selected="true">今天</button>
+        <button type="button" class="tab" data-tab="radar" role="tab" aria-selected="false">雷达</button>
+        <button type="button" class="tab" data-tab="tasks" role="tab" aria-selected="false">任务实验</button>
+        <button type="button" class="tab" data-tab="system" role="tab" aria-selected="false">系统</button>
+      </nav>
+      <div class="topbar-meta">
+        <span id="clock" class="mono time">—</span>
+        <button type="button" id="btn-refresh" class="btn-ghost" title="立即重载数据">刷新</button>
+      </div>
+    </header>
+
+    <div id="banner" class="banner hidden" role="status"></div>
+
+    <main>
+      <section id="page-today" class="page is-active" role="tabpanel">
+        <div class="pulse" id="pulse"></div>
+        <div class="grid-today">
+          <section class="panel">
+            <header class="panel-head">
+              <h2 class="panel-title">日程</h2>
+              <span class="legend">
+                <i class="dot system"></i>系统
+                <i class="dot personal"></i>个人
+              </span>
+            </header>
+            <div id="agenda" class="agenda"></div>
+          </section>
+          <div class="stack">
+            <section class="panel">
+              <header class="panel-head">
+                <h2 class="panel-title">下一触发</h2>
+              </header>
+              <div id="next-list" class="next-list"></div>
+            </section>
+            <section class="panel">
+              <header class="panel-head">
+                <h2 class="panel-title">留言</h2>
+                <span id="msg-count" class="chip muted">0</span>
+              </header>
+              <div id="messages-latest" class="msg-list"></div>
+            </section>
+            <section class="panel tone-pending">
+              <header class="panel-head">
+                <h2 class="panel-title">待决</h2>
+                <span id="pending-count" class="chip pending">0</span>
+              </header>
+              <div id="messages-pending" class="msg-list"></div>
+            </section>
+            <section class="panel tone-alert">
+              <header class="panel-head">
+                <h2 class="panel-title">告警</h2>
+                <span id="alert-count" class="chip alert">0</span>
+              </header>
+              <div id="messages-alerts" class="msg-list"></div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <section id="page-radar" class="page" role="tabpanel" hidden>
+        <div class="radar-meta" id="radar-meta"></div>
+        <div class="grid-radar">
+          <section class="panel">
+            <header class="panel-head">
+              <h2 class="panel-title">阶段时间线</h2>
+            </header>
+            <div id="radar-stages" class="stages"></div>
+          </section>
+          <section class="panel">
+            <header class="panel-head">
+              <h2 class="panel-title">Top5</h2>
+              <span class="hint">五维总分</span>
+            </header>
+            <div id="radar-top5" class="top5"></div>
+          </section>
+        </div>
+        <section class="panel digest-panel">
+          <header class="panel-head">
+            <h2 class="panel-title">日报全文</h2>
+          </header>
+          <pre id="radar-digest" class="digest"></pre>
+        </section>
+      </section>
+
+      <section id="page-tasks" class="page" role="tabpanel" hidden>
+        <div class="pulse" id="tasks-pulse"></div>
+        <div class="grid-tasks">
+          <section class="panel">
+            <header class="panel-head">
+              <h2 class="panel-title">最近任务</h2>
+            </header>
+            <div id="recent-tasks" class="table"></div>
+          </section>
+          <section class="panel">
+            <header class="panel-head">
+              <h2 class="panel-title">最近 attempt</h2>
+            </header>
+            <div id="attempts" class="table"></div>
+          </section>
+          <section class="panel">
+            <header class="panel-head">
+              <h2 class="panel-title">实验卡</h2>
+            </header>
+            <div id="experiments" class="table"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="page-system" class="page" role="tabpanel" hidden>
+        <div id="devices" class="devices"></div>
+        <div class="grid-system">
+          <section class="panel">
+            <header class="panel-head">
+              <h2 class="panel-title">定时器下次触发</h2>
+            </header>
+            <div id="system-next" class="next-list"></div>
+          </section>
+          <section class="panel">
+            <header class="panel-head">
+              <h2 class="panel-title">数据新鲜度</h2>
+            </header>
+            <dl id="system-meta" class="meta-grid"></dl>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <span>数据源 <span class="mono">127.0.0.1:3100</span></span>
+      <span id="foot-gen" class="time">—</span>
+    </footer>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>

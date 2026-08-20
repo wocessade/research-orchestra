@@ -136,6 +136,13 @@ class ScanAttemptsTest(unittest.TestCase):
             self.assertEqual(len(rows), 1)
             self.assertEqual(rows[0]["attempt"], 2)
 
+    def test_limit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for i in range(5):
+                _write(root / f"T-{i}" / "attempt-1", "state.json", _state("done"))
+            self.assertEqual(len(scan_attempts(root, limit=3)), 3)
+
 class ScanExperimentsTest(unittest.TestCase):
     def test_missing_root(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -1,4 +1,5 @@
 import unittest
+from datetime import datetime, timedelta
 from unittest import mock
 
 from feed_status import (
@@ -89,10 +90,17 @@ class AggregateTest(unittest.TestCase):
 
     def test_offline_degraded(self):
         status = aggregate(None, "no_token", _SCHED, NOW)
-        self.assertIn("离线", status["4b"])
-        self.assertIn("离线", status["walnut"])
+        self.assertIn("未配置 token", status["4b"])
+        self.assertIn("未配置 token", status["walnut"])
+        self.assertNotIn("离线", status["4b"])
         self.assertTrue(status["degraded"])
         self.assertEqual(status["degraded_reason"], "no_token")
+
+    def test_network_error_is_offline(self):
+        status = aggregate(None, "timed out", _SCHED, NOW)
+        self.assertIn("离线", status["4b"])
+        self.assertIn("离线", status["walnut"])
+        self.assertEqual(status["degraded_reason"], "timed out")
 
     def test_recent_tasks_truncated(self):
         status = aggregate(DASH, None, _SCHED, NOW)
@@ -104,6 +112,30 @@ class AggregateTest(unittest.TestCase):
         self.assertIn(status["next"][0]["label"],
                       {"雷达", "冷备到核桃派", "NAS 盘内备份", "周日整理"})
         self.assertIn("后", status["next"][0]["in_text"])
+
+    def test_upcoming_personal_from_schedule(self):
+        now_dt = datetime.fromtimestamp(NOW)
+        soon = now_dt.date() + timedelta(days=2)
+        sched = {
+            "system": {"radar": "23:30"},
+            "personal": [{
+                "date": soon,
+                "time": now_dt.time().replace(hour=9, minute=0, second=0, microsecond=0),
+                "title": "组会",
+                "note": "",
+                "done": False,
+                "done_dates": [],
+                "repeat": "",
+                "id": "p1",
+            }],
+        }
+        status = aggregate(DASH, None, sched, NOW)
+        self.assertEqual(status["upcoming_personal"][0]["title"], "组会")
+        self.assertEqual(status["upcoming_personal"][0]["days_left"], 2)
+
+    def test_upcoming_empty_without_schedule(self):
+        status = aggregate(DASH, None, None, NOW)
+        self.assertEqual(status["upcoming_personal"], [])
 
     def test_fresh_exactly_at_boundary_is_online(self):
         dashboard = {"orchestra_last_report": {"ts": NOW - FRESH_S},

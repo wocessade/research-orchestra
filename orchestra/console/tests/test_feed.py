@@ -59,6 +59,8 @@ class RefreshTest(unittest.TestCase):
         self.assertIn("在线", status["4b"])
         self.assertEqual(status["queue_len"], 1)
         self.assertEqual(status["experiments"], {"available": False, "cards": []})
+        self.assertIn("upcoming_personal", status)
+        self.assertIsInstance(status["upcoming_personal"], list)
         ics_bytes = (self.out / "system.ics").read_bytes()
         self.assertNotIn(b"\r\r", ics_bytes)
         self.assertIn(b"BEGIN:VCALENDAR\r\n", ics_bytes)
@@ -75,7 +77,7 @@ class RefreshTest(unittest.TestCase):
         self.assertEqual(rc, 0)  # 降级不报错
         status = json.loads((self.out / "status.json").read_text(encoding="utf-8"))
         self.assertTrue(status["degraded"])
-        self.assertIn("离线", status["walnut"])
+        self.assertIn("未配置 token", status["walnut"])
         for name in ("messages.json", "radar.json", "digest.html", "messages.html"):
             self.assertTrue((self.out / name).exists(), name)
 

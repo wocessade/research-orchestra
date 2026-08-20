@@ -75,9 +75,10 @@
 
 ## GUI 控制台（mission 034 / 总 spec 汇合面）
 
-- Homepage（127.0.0.1:3000，四页 tab：今天/雷达/任务实验/系统）+ glue `console/console_feed.py`（refresh 每 10 分钟 + serve 127.0.0.1:3100，stdlib only）
-- 数据流（零改动）：usage-monitor `GET /api/dashboard`（只读）→ status.json；sync_pull 本地快照 → radar.json/attempts；console-schedule.toml → 双 ICS 双层日历（system 定时器镜像 + personal 手录）；messages.md（CC 留言/待决/告警，入库审计轨迹）→ messages.json
-- 详见 `console/README.md`；设计 `docs/superpowers/specs/2026-08-20-console-design.md`
+- **v2 默认入口**：自研浅色 SPA `http://127.0.0.1:3100/`（与 glue 八产物同端口）。Homepage `:3000` 配置保留回退，不再作为主路径。
+- glue `console/console_feed.py`：refresh 每 10 分钟 + serve 127.0.0.1:3100，stdlib only
+- 数据流：usage-monitor `GET /api/dashboard`（只读）→ status.json（含 `upcoming_personal`）；sync_pull 本地快照 → radar.json（可按日期回看）；console-schedule.toml → 双 ICS；个人层可在 UI 增删改（系统层只读）；messages.md → 待决/告警
+- Agent 协议与使用说明：`console/README.md`；设计 `docs/superpowers/specs/2026-08-20-console-design.md`；SOL 复审任务书 `docs/superpowers/specs/2026-08-20-console-v2-beautify.md`
 
 ## 双 agent（CC × Codex）（mission 027 / 总 spec §6.3）
 

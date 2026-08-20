@@ -69,18 +69,46 @@ def _normalize_top5(top5_path: Path, papers_by_id: dict) -> list[dict]:
     return rows
 
 
-def find_radar(root: Path) -> dict:
-    if not root.is_dir():
-        return {"available": False}
+def _index_radar(root: Path) -> dict:
     by_date = {}
+    if not root.is_dir():
+        return by_date
     for p in root.iterdir():
         m = _DIR.match(p.name)
         if p.is_dir() and m:
             by_date.setdefault(m.group(1), {})[m.group(2)] = p
-    if not by_date:
-        return {"available": False}
-    date_str = max(by_date)
-    day = by_date[date_str]
+    return by_date
+
+
+def _iso_date(compact: str) -> str:
+    return f"{compact[:4]}-{compact[4:6]}-{compact[6:]}"
+
+
+def _compact_date(value: str | None) -> str | None:
+    if not value:
+        return None
+    digits = re.sub(r"\D", "", value)
+    return digits if len(digits) == 8 else None
+
+
+def list_radar_dates(root: Path, limit: int = 14) -> list[dict]:
+    """最近若干期日报索引（不含正文），新→旧。"""
+    by_date = _index_radar(root)
+    rows = []
+    for compact in sorted(by_date, reverse=True)[:limit]:
+        day = by_date[compact]
+        four = any(k in day for k in ("10-fetch", "20-rank", "30-render", "40-notify"))
+        art_dir = day.get("30-render") if four else day.get("nightly-radar")
+        att = _pick_artifact_attempt(art_dir) if art_dir else None
+        rows.append({
+            "date": _iso_date(compact),
+            "mode": "four-stage" if four else "legacy",
+            "has_digest": bool(att and (att / "digest.txt").exists()),
+        })
+    return rows
+
+
+def _radar_from_day(compact: str, day: dict) -> dict:
     if "10-fetch" in day or "20-rank" in day or "30-render" in day or "40-notify" in day:
         mode = "four-stage"
         stages = []
@@ -126,9 +154,31 @@ def find_radar(root: Path) -> dict:
             validation = json.loads((att / "validation.json").read_text(encoding="utf-8"))
         except (OSError, ValueError):
             pass
-    return {"available": True, "date": f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:]}",
+    for row in top5:
+        aid = row.get("id") or ""
+        row["abs_url"] = f"https://arxiv.org/abs/{aid}" if aid else ""
+        row["pdf_url"] = f"https://arxiv.org/pdf/{aid}" if aid else ""
+    return {"available": True, "date": _iso_date(compact),
             "mode": mode, "stages": stages, "top5": top5,
             "validation": validation, "digest_txt": digest_txt}
+
+
+def find_radar(root: Path, date: str | None = None) -> dict:
+    by_date = _index_radar(root)
+    if not by_date:
+        return {"available": False}
+    compact = _compact_date(date)
+    if date and not compact:
+        return {"available": False, "date": date, "error": "bad_date"}
+    if compact:
+        if compact not in by_date:
+            return {"available": False, "date": _iso_date(compact), "error": "not_found"}
+        payload = _radar_from_day(compact, by_date[compact])
+    else:
+        latest = max(by_date)
+        payload = _radar_from_day(latest, by_date[latest])
+    payload["history"] = list_radar_dates(root)
+    return payload
 
 
 def build_digest_html(radar: dict) -> str:

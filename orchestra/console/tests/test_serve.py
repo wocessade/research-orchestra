@@ -18,6 +18,10 @@ class ServeTest(unittest.TestCase):
         self.out.mkdir(parents=True)
         (self.console / "messages.md").write_text(
             "## 2026-08-21 08:00 — 早上好\n第一条\n", encoding="utf-8")
+        (self.console / "console-schedule.toml").write_text(
+            '[system]\nradar = "23:30"\n[[personal]]\n'
+            'date = "2026-09-01"\ntime = "09:00"\ntitle = "开学报到"\n',
+            encoding="utf-8")
         self.server = make_server(self.out, "127.0.0.1", 0)
         self.port = self.server.server_address[1]
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
@@ -35,6 +39,19 @@ class ServeTest(unittest.TestCase):
         body = resp.read()
         conn.close()
         return resp.status, body
+
+    def _json(self, method, path, payload=None):
+        conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
+        body = None
+        headers = {}
+        if payload is not None:
+            body = json.dumps(payload).encode("utf-8")
+            headers["Content-Type"] = "application/json"
+        conn.request(method, path, body=body, headers=headers)
+        resp = conn.getresponse()
+        raw = resp.read()
+        conn.close()
+        return resp.status, json.loads(raw.decode("utf-8"))
 
     def test_static_file(self):
         (self.out / "hello.txt").write_text("hi", encoding="utf-8")
@@ -155,9 +172,72 @@ class ServeTest(unittest.TestCase):
         finally:
             tmp2.cleanup()
 
+    def test_radar_api_lookup(self):
+        results = self.console.parent / "results"
+        d = results / "T-20260819-nightly-radar" / "attempt-1"
+        d.mkdir(parents=True)
+        (d / "state.json").write_text(
+            json.dumps({"slug": "T-x", "status": "done", "started_at": "t"}),
+            encoding="utf-8")
+        (d / "digest.txt").write_text("文献日报 lookup\n", encoding="utf-8")
+        (d / "top5.json").write_text("[]", encoding="utf-8")
+        self.server.results_root = results
+        status, data = self._json("GET", "/api/radar?date=2026-08-19")
+        self.assertEqual(status, 200)
+        self.assertTrue(data["available"])
+        self.assertIn("lookup", data["digest_txt"])
+
     def test_unknown_404(self):
         status, _ = self._get("/nope.json")
         self.assertEqual(status, 404)
+
+    def test_personal_crud_http(self):
+        status, data = self._json("GET", "/api/personal")
+        self.assertEqual(status, 200)
+        self.assertEqual(data["personal"][0]["title"], "开学报到")
+        status, data = self._json("POST", "/api/personal", {
+            "date": "2026-09-03", "time": "10:00", "title": "组会",
+        })
+        self.assertEqual(status, 200)
+        self.assertEqual(len(data["personal"]), 2)
+        toml = (self.console / "console-schedule.toml").read_text(encoding="utf-8")
+        self.assertIn("组会", toml)
+        self.assertIn('radar = "23:30"', toml)
+        ics = (self.out / "personal.ics").read_text(encoding="utf-8")
+        self.assertIn("组会", ics)
+        new_id = [p["id"] for p in data["personal"] if p["title"] == "组会"][0]
+        status, data = self._json("PUT", "/api/personal", {
+            "id": new_id, "date": "2026-09-03", "time": "11:00", "title": "组会改期",
+        })
+        self.assertEqual(status, 200)
+        self.assertTrue(any(p["title"] == "组会改期" for p in data["personal"]))
+        rid = [p["id"] for p in data["personal"] if p["title"] == "组会改期"][0]
+        status, data = self._json("DELETE", f"/api/personal?id={rid}")
+        self.assertEqual(status, 200)
+        self.assertEqual([p["title"] for p in data["personal"]], ["开学报到"])
+        status, data = self._json("DELETE", "/api/personal?id=missing")
+        self.assertEqual(status, 404)
+        status, data = self._json("POST", "/api/personal", {
+            "date": "2026-09-03", "time": "99:00", "title": "坏",
+        })
+        self.assertEqual(status, 400)
+
+    def test_personal_post_does_not_touch_system(self):
+        self._json("POST", "/api/personal", {
+            "date": "2026-09-08", "time": "08:00", "title": "实验",
+        })
+        after = (self.console / "console-schedule.toml").read_text(encoding="utf-8")
+        self.assertIn('radar = "23:30"', after)
+        self.assertIn("实验", after)
+
+    def test_personal_done_toggle(self):
+        status, data = self._json("GET", "/api/personal")
+        ident = data["personal"][0]["id"]
+        status, data = self._json("POST", "/api/personal/done", {"id": ident})
+        self.assertEqual(status, 200)
+        self.assertTrue(data["personal"][0]["done"])
+        toml = (self.console / "console-schedule.toml").read_text(encoding="utf-8")
+        self.assertIn("done = true", toml)
 
 
 if __name__ == "__main__":

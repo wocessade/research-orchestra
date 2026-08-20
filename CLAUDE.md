@@ -35,6 +35,17 @@
 - 模型路由：任务卡 `model: flash|pro` 字段（dsh --patch）；codex 三档由 CC 查 `orchestra/config/model-routing.json` 透传
 - 并发两档：标准档（4-8 路扁平，030 已实战）/ 树状档（2 层×≤3 子树×≤12 叶子，031 首跑）；opus 只接口+统一 commit，agent 不 commit；约定 `docs/superpowers/specs/2026-08-20-concurrent-work-modes.md`
 - 测试：broker 102 unittest / scripts 154（discover 从各自目录跑；Windows 上 3 个平台正当 skip）
+- 控制台：`http://127.0.0.1:3100/`（`python orchestra/console/console_feed.py serve`）；数据刷新 `python orchestra/console/console_feed.py refresh`
+  - **留言协议**（写 `orchestra/console/messages.md`，serve 约 5s 热重）：
+    ```
+    ## YYYY-MM-DD HH:MM — 标题
+    正文（进「最新」）
+    - 待决：事项（可多行，进待决栏）
+    - 告警：事项（可多行，进告警栏）
+    ```
+    删掉对应 `- 待决：` / `- 告警：` 行，卡片即消失。挂账权威仍是本文件「当前挂账」，留言只放增量事件，不复制挂账全文。
+  - 个人日程：控制台首页可增删改，或改 `orchestra/console/console-schedule.toml` 的 `[[personal]]`；系统层（雷达/备份）只读。用法见 `orchestra/console/README.md`
+  - **日程将近提醒**：读 `console-schedule.toml` 或 `status.json` 的 `upcoming_personal`（未来 14 天未完成个人事项）。会话开头或收束时：48 小时内必须口头提醒，7 天内顺带一句，8–14 天轻提一次。不要每 10 分钟往 `messages.md` 刷提醒。
 
 ## 当前挂账（更新日期 2026-08-20）
 
@@ -44,5 +55,5 @@
 - 入学前（2026-09）：宿舍-实验室互通实测、Tailscale 切换；弱密码整改 4B 已完成（2026-08-20），核桃派 pi 密码待上线后同步
 - 雷达→Zotero 直连**推迟到 9.8 开学后再设计**（方向已记 `docs/superpowers/plans/2026-08-20-radar-digest-reading-note.md`）
 - 双 agent 想法池剩余项（resume 脚本化 / usage 统计）待选（模型路由表已落地，spec `docs/superpowers/specs/2026-08-20-model-routing-design.md`）
-- **GUI 控制台 v1 已上线（mission 034，43fd3a4 已 push）**：Homepage 127.0.0.1:3000 四页 + glue `orchestra/console/`（69 测试绿，Pi 零改动）；refresh 每 10 分钟 schtasks + serve/Homepage 启动文件夹自启；留言=CC 写 `orchestra/console/messages.md`；v1.5（tailnet 手机访问+Homepage 鉴权门）/v2（事件点击派任务、推送、实验 DDL 扫描、pending 卡明细）挂账；**ORCHESTRA_MONITOR_TOKEN 已配用户环境变量（2026-08-20 晚验证三端在线；值同步自 4B config.json，绝不入库/入对话）**——schtasks 需用户重登一次后继承
+- **GUI 控制台 v2 主入口已换到 3100**（mission 034 的 v1 Homepage 仍作回退）：自研浅色 SPA `http://127.0.0.1:3100/` + glue `orchestra/console/`（86 测试绿，Pi 零改动）；个人日程可编、月历只标个人、任务四态、临近提醒（`upcoming_personal`）；留言=写 `orchestra/console/messages.md`；**ORCHESTRA_MONITOR_TOKEN 已配用户环境变量（值绝不入库/入对话）**——schtasks 需用户重登一次后继承。SOL 复审见 `docs/superpowers/specs/2026-08-20-console-v2-beautify.md` §0；v1.5（tailnet 手机访问）仍挂账
 - 待用户拍板：SD 旧副本删除、512G SSD 用途、宿舍 NAS、QQ bot

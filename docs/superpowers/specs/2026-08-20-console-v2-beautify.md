@@ -1,12 +1,27 @@
 # 控制台 v2 美化移交任务书（致 SOL）
 
 > 已由 Grok 接手（2026-08-20）
-> Grok 交付（2026-08-20）：自研浅色 SPA 挂 3100；Homepage 配置保留回退；69 测试绿；截图见 `D:\Temp\console-acceptance-v2\`
+> Grok 交付（2026-08-20）：自研浅色 SPA 挂 3100；Homepage 配置保留回退；当时 69 测试绿；截图见 `D:\Temp\console-acceptance-v2\`
+> **Grok 续作已入库（2026-08-20 夜，owner 将 push）**：个人日程可写、月历只标个人、雷达往期、任务四态、临近提醒；console 测试 **86 绿**。SOL 请从这一版复审，不要从 Homepage/3000 重做。
 
 - 日期：2026-08-20 · 移交：owner（CC 协调）→ SOL
-- 上一阶段：v1 已上线（mission 034，`43fd3a4`，69 unittest 全绿，四页功能验收通过）
+- 上一阶段：v1 已上线（mission 034，`43fd3a4`）；v2 主入口已换成 `http://127.0.0.1:3100/`
 
 > **接力顺序（2026-08-20 晚 owner 定）**：① Grok（本地，全权限）先做 v2 美化，改完由 owner push → ② SOL 再接手：对 Grok 成果复审 + 精修 + 按 §6 验收自评回填。接手方在本文顶部加一行「> 已由 XXX 接手（日期）」标注，避免重复劳动。
+
+## 0. 致 SOL（读完再动手）
+
+Grok 没有停在「换皮」。你接手时仓库里已经是可跑的 v2，不是任务书初稿里的 Homepage 方案。
+
+**先看这些：**
+
+1. 打开 `http://127.0.0.1:3100/`（不是 3000）。Homepage 配置仍在 `console/homepage/`，只作回退。
+2. 使用说明以 `orchestra/console/README.md` 为准（含 Agent 留言协议、个人日程、临近提醒）。
+3. 八产物文件名没丢；`status.json` **多了** `upcoming_personal`，雷达有 `GET /api/radar?date=`，个人日程有 `/api/personal` 写路径（只动 `[[personal]]`，系统层只读）。测例现在是 86，不是 69。
+4. 复审重点：视觉/信息密度、临近条和月历是否好读、任务四栏空态是否误导。**不要**为目录整齐去搬 `broker/` `results/` `skills/` `homepage/`。
+5. Pi 零改动这条红线仍在。美化不够就改 `console/ui/`；契约不够就说明理由并补测试，不要另起 glue。
+
+owner REJECT 四点（浅色/对比度/密度/字号）Grok 已按浅色高密度做完；你若觉得还丑，精修 UI，不必推倒。
 
 
 ## 1. 任务一句话

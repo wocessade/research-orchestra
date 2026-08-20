@@ -116,7 +116,10 @@ def cmd_refresh(args) -> int:
 
 def cmd_serve(args) -> int:
     from feed_serve import make_server
-    server = make_server(Path(args.out_dir), args.bind, args.port)
+    here = Path(__file__).resolve().parent
+    server = make_server(
+        Path(args.out_dir), args.bind, args.port,
+        results_root=Path(getattr(args, "results_root", here.parent / "results")))
     if sys.stdout is not None:  # pythonw 无 stdout，print 会崩
         print(f"console feed serving {args.out_dir} "
               f"at http://{args.bind}:{args.port}/ "
@@ -145,6 +148,7 @@ def main(argv=None) -> int:
     s.add_argument("--out-dir", default=str(here / "out"))
     s.add_argument("--bind", default="127.0.0.1")
     s.add_argument("--port", type=int, default=3100)
+    s.add_argument("--results-root", default=str(here.parent / "results"))
     s.set_defaults(fn=cmd_serve)
     args = parser.parse_args(argv)
     return args.fn(args)

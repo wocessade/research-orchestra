@@ -62,3 +62,7 @@
 31. **Windows 计划任务 onlogon 触发器非提权被拒**：schtasks /sc minute 可注册、/sc onlogon 拒绝访问。规则：用户级开机自启落地到用户启动文件夹（%APPDATA%\...\Startup），bat 用 start /min 最小化，无凭据内容可入库。
 
 32. **schtasks 只继承登录时的用户环境快照**：用户环境变量（setx）改后，已在运行的计划任务仍看不到新值，需登出重登才继承——手动 refresh 验证通过但下个 10 分钟 tick 又回到降级。规则：改用户环境变量后验证分两步：①手动跑验证值正确 ②提醒用户重登并等一个 tick 再确认计划任务路径。
+
+## H. 控制台收束（2026-08-20）
+
+33. **Agent 看日程靠结构化字段，不靠刷留言**：个人临近事项进 `status.json.upcoming_personal` + CLAUDE.md 口头提醒协议；refresh 每 10 分钟跑一次，往 `messages.md` 自动追加会刷屏。卡片栏只放需要人拍板的待决/告警。

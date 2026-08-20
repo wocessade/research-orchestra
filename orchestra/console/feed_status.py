@@ -11,7 +11,7 @@ import urllib.error
 import urllib.request
 from datetime import datetime
 
-from feed_schedule import next_system_events
+from feed_schedule import next_system_events, upcoming_personal
 
 DEFAULT_MONITOR_API = "http://192.168.0.200:5000/api/orchestra"
 FRESH_S = 120  # orchestra 最后上报 2 分钟内判在线
@@ -97,17 +97,27 @@ def aggregate(dashboard: dict | None, fetch_error: str | None,
         for n in next_system_events(schedule["system"], datetime.fromtimestamp(now)):
             nexts.append({"label": n["label"], "at": n["at"].strftime("%H:%M"),
                           "in_text": _in(n["at"].timestamp(), now)})
+    if fetch_error == "no_token":
+        four_b = walnut = "未配置 token"
+    else:
+        four_b = _device(b_online, host.get("load1"), host.get("mem_pct"),
+                         _rel(last_ts, now))
+        walnut = _device(walnut_online, walnut_load, walnut_mem)
     return {
         "generated_at": int(now),
         "generated_text": datetime.fromtimestamp(now).strftime("%Y-%m-%d %H:%M"),
-        "4b": _device(b_online, host.get("load1"), host.get("mem_pct"), _rel(last_ts, now)),
-        "walnut": _device(walnut_online, walnut_load, walnut_mem),
+        "4b": four_b,
+        "walnut": walnut,
         "windows": _device(True),
         "queue_len": orch.get("queue_len"),
         "active_tasks": orch.get("active_tasks"),
         "last_task": orch.get("last_task"),
         "last_sync_text": _rel(orch.get("last_sync"), now),
         "next": nexts,
+        "upcoming_personal": (
+            upcoming_personal(schedule.get("personal") or [],
+                              datetime.fromtimestamp(now))
+            if schedule else []),
         "recent_tasks": [{"slug": t.get("slug"), "status": t.get("status"),
                           "time_text": _rel(t.get("ts"), now)}
                          for t in orch.get("recent_tasks", [])[:8]],

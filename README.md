@@ -1,7 +1,7 @@
 # Research Orchestra 项目全景记录（第三方审查版）
 
 > 生成：2026-08-19 ｜ 范围：本项目（Research Orchestra，科研-实验-论文框架）从最初讨论至今的完整过程记录
-> **更新：2026-08-20 ｜ 本次覆盖：mission 028-033（GitHub 上传 / 模型路由 / 并发两档实战 / SOL 协作者重构合并与深审 / 修复包落地 / skill 打包与兼容度分析）、教训库机制、阶段定位（工程收尾转道）——状态快照至 mission 033**
+> **更新：2026-08-20 ｜ 本次覆盖：mission 028-034（GitHub 上传 / 模型路由 / 并发两档实战 / SOL 协作者重构合并与深审 / 修复包落地 / skill 打包 / GUI 控制台）——控制台 v2 主入口 3100，待 SOL 复审精修**
 > 用途：供第三方审查项目决策链、执行质量与当前状态
 > 所有事实均可在文末「原始记录索引」中溯源验证
 > 说明：本文档已合并总架构 spec（v7）的前提与背景信息（见 §1.4）；**总 spec 全文本身亦是审查对象**（见 §8 索引），本文档不替代 spec 正文
@@ -271,6 +271,8 @@
 - **验收**：日历 vs Pi timer 逐条核对 / 留言往返 ≤5s / 断网降级演练 / 四页截图（D:\Temp\console-acceptance\）全 PASS
 - **过程收获**（8 任务 subagent-driven，15 轮审查+修复循环）：终审抓出 mock 夹具契约错位（4B 永远离线的隐形雷，读 monitor 真源码才暴露）；计划示例代码 4 处内在矛盾全部收敛修复；ICS 双 CR（Windows write_text 换行翻译）字节级实证并防回归；教训入库 L27-L31
 
+**v2（同日续作，Grok，待 SOL 复审）**：主入口改为自研浅色 SPA `http://127.0.0.1:3100/`（Homepage 3000 仅回退）。个人日程可写、月历只标个人事项、雷达可切往期、任务页按排队/运行中/完成/挂起分栏、14 天内个人事项进 `upcoming_personal` 给 agent 口头提醒。console 测试 86 绿。使用说明 `orchestra/console/README.md`；SOL 接手说明 `docs/superpowers/specs/2026-08-20-console-v2-beautify.md` §0。
+
 ---
 
 ## 4. 关键议题与用户决策记录
@@ -309,7 +311,7 @@
 | 告警链 | 服务失败 OnFailure 告警 → 磁盘/备份邮件告警（Pi 直发 QQ 邮件） |
 | 降级链 | 微信（Windows 在线）→ QQ 邮件（Pi 24/7）→ 墨水屏（Pi） |
 | usage-monitor | 核桃派在役（本项目只增量扩展：已新增 POST /api/orchestra，三端点语义不变） |
-| GUI 控制台 | Homepage 127.0.0.1:3000 四页 tab（今天/雷达/任务实验/系统）+ glue serve 127.0.0.1:3100（stdlib）；refresh 每 10 分钟（schtasks）+ 自启走启动文件夹；只读消费 GET /api/dashboard + 本地 results 快照，Pi 零改动；使用说明 `orchestra/console/README.md` |
+| GUI 控制台 | **v2 主入口** `http://127.0.0.1:3100/` 自研浅色四页 SPA；Homepage `:3000` 仅回退；glue stdlib serve + refresh 每 10 分钟；个人日程可编、临近提醒、雷达往期；Pi 零改动；说明 `orchestra/console/README.md` |
 
 **夜间雷达**：2026-08-19 23:30 首次真实定时注入已验证通过（60 篇 → 去重 57 → 评分 → 选 5 → 邮件成功），此后每夜自动运行。
 
@@ -318,7 +320,7 @@
 ## 6. 遗留与待办清单
 
 ### 进行中
-- 034-v2 控制台美化：接力顺序 Grok（本地全权限，先做）→ owner push → SOL（复审+精修+验收）。任务书 `docs/superpowers/specs/2026-08-20-console-v2-beautify.md`（owner 授权不局限于 Homepage、红线五条、owner REJECT 四点意见为验收必答项）
+- 034-v2 控制台：Grok 浅色 SPA + 个人日程/临近提醒/任务四态已交付待 push；**SOL 复审+精修+§6 验收自评**（任务书 §0 为最新接手说明，勿从 Homepage 重做）
 
 ### 已归档
 - mission 028-034 均已归档

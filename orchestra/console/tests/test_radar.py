@@ -6,6 +6,7 @@ from pathlib import Path
 from feed_radar import (
     build_digest_html,
     find_radar,
+    list_radar_dates,
     scan_attempts,
     scan_experiments,
 )
@@ -116,6 +117,33 @@ class FindRadarTest(unittest.TestCase):
             self.assertIsNone(radar["validation"])
             self.assertEqual(radar["stages"][2]["status"], "missing")
             self.assertEqual(radar["stages"][3]["status"], "missing")
+
+    def test_history_and_lookup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            make_legacy(root)
+            d = root / "T-20260818-nightly-radar" / "attempt-1"
+            _write(d, "state.json", _state("done"))
+            _write(d, "digest.txt", "文献日报 20260818\n")
+            _write(d, "top5.json", [])
+            dates = list_radar_dates(root)
+            self.assertEqual([x["date"] for x in dates], ["2026-08-19", "2026-08-18"])
+            latest = find_radar(root)
+            self.assertEqual(latest["date"], "2026-08-19")
+            self.assertEqual(len(latest["history"]), 2)
+            old = find_radar(root, "2026-08-18")
+            self.assertTrue(old["available"])
+            self.assertIn("20260818", old["digest_txt"])
+            missing = find_radar(root, "2026-08-01")
+            self.assertFalse(missing["available"])
+            self.assertEqual(missing["error"], "not_found")
+
+    def test_top5_arxiv_urls(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            make_legacy(Path(tmp))
+            radar = find_radar(Path(tmp))
+            self.assertTrue(radar["top5"][0]["abs_url"].endswith("2608.16798"))
+            self.assertIn("/pdf/", radar["top5"][0]["pdf_url"])
 
 class BuildDigestHtmlTest(unittest.TestCase):
     def test_escaping(self):

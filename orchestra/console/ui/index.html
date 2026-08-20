@@ -11,12 +11,13 @@
 </head>
 <body>
   <div class="shell">
+    <div class="livebar" id="livebar" aria-label="三端状态"></div>
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true"></span>
         <div>
           <div class="brand-name">Research Orchestra</div>
-          <div class="brand-sub">控制台 · 只读汇合面</div>
+          <div class="brand-sub">控制台 · 个人日程可编</div>
         </div>
       </div>
       <nav class="tabs" role="tablist" aria-label="页面">
@@ -32,22 +33,46 @@
     </header>
 
     <div id="banner" class="banner hidden" role="status"></div>
+    <div id="soon" class="soon hidden" aria-label="临近日程"></div>
 
     <main>
       <section id="page-today" class="page is-active" role="tabpanel">
-        <div class="pulse" id="pulse"></div>
+        <div class="pulse pulse-ops" id="pulse"></div>
         <div class="grid-today">
           <section class="panel">
             <header class="panel-head">
               <h2 class="panel-title">日程</h2>
               <span class="legend">
-                <i class="dot system"></i>系统
-                <i class="dot personal"></i>个人
+                <i class="dot system"></i>系统（每日定时）
+                <i class="dot personal"></i>个人（越近越红）
               </span>
             </header>
+            <form id="personal-form" class="personal-form">
+              <input type="hidden" id="pf-id" />
+              <input type="date" id="pf-date" required />
+              <input type="time" id="pf-time" required />
+              <input type="text" id="pf-title" placeholder="标题（个人）" required maxlength="80" />
+              <input type="text" id="pf-note" placeholder="备注（可选）" maxlength="200" />
+              <label class="check"><input type="checkbox" id="pf-weekly" /> 每周重复</label>
+              <button type="submit" id="pf-submit" class="btn-ghost">添加</button>
+              <button type="button" id="pf-cancel" class="btn-ghost hidden">取消</button>
+              <span id="pf-status" class="hint">越近越红；点时间可改点</span>
+            </form>
             <div id="agenda" class="agenda"></div>
           </section>
           <div class="stack">
+            <section class="panel">
+              <header class="panel-head">
+                <h2 class="panel-title">月历</h2>
+                <span class="month-nav">
+                  <button type="button" id="month-prev" class="btn-tiny" aria-label="上月">‹</button>
+                  <span id="month-label" class="mono time">—</span>
+                  <button type="button" id="month-next" class="btn-tiny" aria-label="下月">›</button>
+                </span>
+              </header>
+              <div id="cal-month" class="month"></div>
+              <p class="hint month-hint">只标个人事项：绿=未到期，橙=两天内，红=今天。系统定时每天都有，改看左侧日程和「下一触发」。</p>
+            </section>
             <section class="panel">
               <header class="panel-head">
                 <h2 class="panel-title">下一触发</h2>
@@ -82,16 +107,25 @@
       <section id="page-radar" class="page" role="tabpanel" hidden>
         <div class="radar-meta" id="radar-meta"></div>
         <div class="grid-radar">
-          <section class="panel">
-            <header class="panel-head">
-              <h2 class="panel-title">阶段时间线</h2>
-            </header>
-            <div id="radar-stages" class="stages"></div>
-          </section>
+          <div class="radar-left">
+            <section class="panel">
+              <header class="panel-head">
+                <h2 class="panel-title">阶段时间线</h2>
+              </header>
+              <div id="radar-stages" class="stages"></div>
+            </section>
+            <section class="panel">
+              <header class="panel-head">
+                <h2 class="panel-title">往期日报</h2>
+                <span class="hint">点击切换</span>
+              </header>
+              <div id="radar-history" class="history"></div>
+            </section>
+          </div>
           <section class="panel">
             <header class="panel-head">
               <h2 class="panel-title">Top5</h2>
-              <span class="hint">五维总分</span>
+              <span class="hint">五维总分 · 点标题/PDF 打开正文</span>
             </header>
             <div id="radar-top5" class="top5"></div>
           </section>
@@ -100,32 +134,48 @@
           <header class="panel-head">
             <h2 class="panel-title">日报全文</h2>
           </header>
-          <pre id="radar-digest" class="digest"></pre>
+          <div id="radar-digest" class="digest"></div>
         </section>
       </section>
 
       <section id="page-tasks" class="page" role="tabpanel" hidden>
-        <div class="pulse" id="tasks-pulse"></div>
+        <div class="pulse pulse-ops" id="tasks-pulse"></div>
         <div class="grid-tasks">
           <section class="panel">
             <header class="panel-head">
-              <h2 class="panel-title">最近任务</h2>
+              <h2 class="panel-title">排队</h2>
+              <span id="queued-count" class="chip muted">0</span>
             </header>
-            <div id="recent-tasks" class="table"></div>
+            <div id="tasks-queued" class="table"></div>
           </section>
           <section class="panel">
             <header class="panel-head">
-              <h2 class="panel-title">最近 attempt</h2>
+              <h2 class="panel-title">运行中</h2>
+              <span id="running-count" class="chip muted">0</span>
             </header>
-            <div id="attempts" class="table"></div>
+            <div id="tasks-running" class="table"></div>
           </section>
           <section class="panel">
             <header class="panel-head">
-              <h2 class="panel-title">实验卡</h2>
+              <h2 class="panel-title">完成</h2>
+              <span id="done-count" class="chip muted">0</span>
             </header>
-            <div id="experiments" class="table"></div>
+            <div id="tasks-done" class="table"></div>
+          </section>
+          <section class="panel">
+            <header class="panel-head">
+              <h2 class="panel-title">挂起</h2>
+              <span id="hung-count" class="chip alert">0</span>
+            </header>
+            <div id="tasks-hung" class="table"></div>
           </section>
         </div>
+        <section class="panel experiments-panel">
+          <header class="panel-head">
+            <h2 class="panel-title">实验卡</h2>
+          </header>
+          <div id="experiments" class="table"></div>
+        </section>
       </section>
 
       <section id="page-system" class="page" role="tabpanel" hidden>

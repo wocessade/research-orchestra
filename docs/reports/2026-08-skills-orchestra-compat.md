@@ -73,12 +73,12 @@
 
 | 优先级 | 事项 | 动作 |
 |---|---|---|
-| P0（立即） | digest 锁定 | 活副本已就绪，直接 `python orchestra/scripts/check_skills.py --lock-current --strict`，解除 ingest HARD 阻断 |
-| P0（立即） | 快照同步纪律 | 每次更新活副本后同步 orchestra/skills/ 快照并 re-lock（可挂 housekeeping 检查） |
-| P1（9.8） | 雷达→Zotero | 复用 pipeline `references/zotero-integration.md` 协议；Pi 侧无 MCP，改走 `academic-shared/skills-embedded/pyzotero.md` 的 pyzotero 直连，或 CC 侧以 pipeline 归档 digest top5（二选一，建议前者——数据在 Pi） |
-| P1 | 精读衔接 | 雷达 top5 → nature-reader 精读（CC 侧），回填 weekly-review 讨论，闭环 |
-| P1 | 重叠裁决固化 | 评分以雷达五维为唯一权威，pipeline 六维（含声望）仅作归档元数据；邮件以雷达 notify 为准，pipeline 的 mcp email 弃用 |
-| P2 | 编排边界 | 引擎 radar-routing 维持"编排不重造"；交互型 skill（weekly-review）不设计进 dsh 模板 |
+| P0（立即） | digest 锁定 | ✅ 已落地（2026-08-20：用户审查三脚本后 `--lock-current --strict`，两 skill status=ok，ingest 放行） |
+| P0（立即） | 快照同步纪律 | ✅ 已落地（orchestra/skills/README.md 重新锁定流程：改动→drifted 阻断→审查→re-lock→同步快照） |
+| P1（9.8） | 雷达→Zotero | ⏳ 维持 9.8（用户定调推迟）：复用 pipeline `references/zotero-integration.md` 协议；Pi 侧无 MCP，改走 `academic-shared/skills-embedded/pyzotero.md` 的 pyzotero 直连（建议） |
+| P1 | 精读衔接 | ✅ 已落地（2026-08-20）：orchestra/README.md 雷达节固化「日报 top5 → nature-reader 精读 → Obsidian 笔记 → nature-weekly-review 周报」闭环约定 |
+| P1 | 重叠裁决固化 | ✅ 已落地（2026-08-20）：orchestra/README.md 雷达节 + CLAUDE.md 锚固化"评分五维为唯一权威、pipeline 六维弃用仅保留精读/归档增量、pipeline 雷达/邮件功能在 orchestra 语境弃用" |
+| P2 | 编排边界 | 维持现状（引擎 radar-routing 不重造；交互型 skill 不进 dsh 模板） |
 
 ## 7. 结论
 

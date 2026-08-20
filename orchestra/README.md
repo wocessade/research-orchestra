@@ -56,6 +56,8 @@
 - `notify` 是纯 shell 阶段，只在 `validation.status=passed` 后发送邮件；持久 `sending/sent/not_sent/unknown` 状态与锁文件提供 at-most-once 语义，发送器明确报告 `not_sent` 时允许任务重试，结果不明确时仍拒绝自动重发
 - 阶段间通过 `depends_on` 串联：上游失败时下游等待且不消耗 attempt，各阶段可独立重试
 - 周日 04:00 housekeeping：清理 14 天前 dsh 会话、磁盘余量告警（邮件）；日志 logrotate 7 天
+- **权威裁决（2026-08-20 固化）**：评分以雷达五维（topic/method/applied/archival，novelty 控探索槽位）为**唯一权威**，声望/引用/来源不进总分；`nature-literature-pipeline` 的六维评分（含 Source Quality 声望维度）在 orchestra 语境**弃用**，仅保留其 PDF 精读与 Zotero/Obsidian 归档增量；其雷达/邮件功能不重复实现（兼容度分析 `docs/reports/2026-08-skills-orchestra-compat.md`）
+- **日报→精读→周报闭环（2026-08-20 固化）**：晨间日报 top5 → 按需 `nature-reader` 精读（CC 侧中英对照 reader，产物入 Obsidian 笔记）→ `nature-weekly-review` 周报聚合组会材料；交互型 skill 不进 dsh（headless 无交互 UI）
 
 ## 实验管线闭环（mission 025 / 总 spec §6.2）
 

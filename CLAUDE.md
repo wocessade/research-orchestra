@@ -29,7 +29,7 @@
 
 - 派任务：T-*.md 任务卡 → `orchestra/scripts/sync_push.sh` → 4B broker 队列执行 → attempt-N 落盘
 - 状态：4B reporter 每 30s POST 核桃派 usage-monitor（X-Monitor-Token 鉴权）→ 墨水屏融合面板
-- 雷达：每晚 23:30 注入四阶段任务（`templates/nightly-radar-{fetch,rank,render,notify}.md` → 10/20/30/40，depends_on 串联），晨间 QQ 邮箱日报
+- 雷达：每晚 23:30 注入四阶段任务（`templates/nightly-radar-{fetch,rank,render,notify}.md` → 10/20/30/40，depends_on 串联），晨间 QQ 邮箱日报；评分五维为唯一权威（pipeline 六维弃用，仅精读/归档场景调用）；日报 top5 精读走 nature-reader
 - 定时：03:00 冷备到核桃派 / 04:17 NAS 盘内备份 / 周日 04:00 housekeeping
 - 双 agent：`orchestra/scripts/codex_exec.py` + `codex_modes.py`（互审/双实现/claim 核验）；本机 codex 冷启动 ~2min，互审建议 --timeout ≥900
 - 模型路由：任务卡 `model: flash|pro` 字段（dsh --patch）；codex 三档由 CC 查 `orchestra/config/model-routing.json` 透传

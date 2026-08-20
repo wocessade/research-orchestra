@@ -1,0 +1,4 @@
+issue_id,section,claim_id,contribution_id,evidence_status,artifact_path,notes,done
+ISS-001,3.1,CLM-001,C1,planned,,method claim scaffold,false
+ISS-002,4.1,CLM-010,C1,placeholder,results/exp1.csv,awaiting run,false
+ISS-003,4.2,CLM-011,C2,verified,results/ablation.csv,ok for strong claim,false

@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "academic-shared/evidence-ledger/ledger-schema.json",
+  "title": "Evidence Ledger Entry",
+  "description": "A single claim entry in the evidence ledger, mapping a claim to its source reference",
+  "type": "object",
+  "required": [
+    "claim_id",
+    "section",
+    "paragraph_index",
+    "claim_text",
+    "source_ref",
+    "confidence",
+    "claim_type",
+    "audit_status"
+  ],
+  "properties": {
+    "claim_id": {
+      "type": "string",
+      "pattern": "^CLM-\\d{3,6}$",
+      "description": "Unique claim identifier, e.g. CLM-001"
+    },
+    "section": {
+      "type": "string",
+      "description": "Section number, e.g. '2.3'",
+      "examples": ["1", "2.1", "3.4.2"]
+    },
+    "subsection": {
+      "type": "string",
+      "description": "Optional subsection identifier",
+      "examples": ["2.3.1", "3.1"]
+    },
+    "paragraph_index": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "0-based paragraph index within the section"
+    },
+    "claim_text": {
+      "type": "string",
+      "minLength": 10,
+      "description": "Full sentence containing the claim"
+    },
+    "source_ref": {
+      "type": "string",
+      "description": "In-text citation reference, e.g. [Author, Year]",
+      "examples": ["[McMahan et al., 2017]", "[Smith, 2020; Jones, 2021]"]
+    },
+    "source_excerpt": {
+      "type": ["string", "null"],
+      "description": "Direct quote or close paraphrase from the source. null when source is not accessible."
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["high", "medium", "low"],
+      "description": "How confident the writer is that the claim accurately represents the source. high=direct source access, low=memory-based"
+    },
+    "claim_type": {
+      "type": "string",
+      "enum": ["factual", "attribution", "method", "result", "interpretation"],
+      "description": "Type of the claim:\n- factual: statements of fact\n- attribution: attributing a position to an author\n- method: describing a methodology\n- result: reporting results\n- interpretation: interpreting findings"
+    },
+    "audit_status": {
+      "type": "string",
+      "enum": ["pending", "verified", "orphan", "mismatch"],
+      "description": "Audit status: pending=not yet audited, verified=passes audit, orphan=no source traceable, mismatch=claim misrepresents source"
+    }
+  },
+  "additionalProperties": false
+}

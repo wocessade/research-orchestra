@@ -1,0 +1,30 @@
+name: nature-weekly-review
+description: "从 Obsidian 每日文献笔记生成周报 HTML，用于组会汇报。自动扫描、聚合、跨论文分析、生成带图表的自包含 HTML。"
+version: "1.0.0"
+author: "claude-code"
+
+triggers:
+  - "周报"
+  - "文献周报"
+  - "组会"
+  - "每周总结"
+  - "weekly review"
+  - "生成周报"
+  - "文献总结"
+  - "本周文献"
+  - "周文献"
+  - "weekly report"
+
+inputs:
+  date_range:
+    description: "目标周，默认当前 ISO 周"
+    required: false
+    default: "current ISO week"
+    examples:
+      - "上周"
+      - "06/23-06/29"
+      - "第26周"
+  output_dir:
+    description: "HTML 输出目录"
+    required: false
+    default: "D:/MD ideas/20-机器学习/文献/每周总结/{YYYY-WW}/"

@@ -1,0 +1,183 @@
+tier: stem_bachelor
+label: "理工科本科毕业论文"
+version: 2.0
+# @agent-count: 10 (8 scored + 2 scoreless: ai_tone, factual_accuracy)
+
+dimensions:
+  - id: method_rigor
+    name: "方法严谨性"
+    weight: 0.12
+    agents: [methodology_reviewer_stem]
+  - id: data_analysis
+    name: "数据分析质量"
+    weight: 0.10
+    agents: [data_analysis_reviewer]
+  - id: argumentation_quality
+    name: "论证质量"
+    weight: 0.10
+    agents: [content_reviewer_stem]
+  - id: logic
+    name: "逻辑一致性"
+    weight: 0.18
+    agents: [logic_consistency_stem]
+  - id: ai_tone
+    name: "AI痕迹"
+    weight: 0.12
+    scoreless: true
+    agents: [ai_tone_detector_stem]
+  - id: format
+    name: "格式规范"
+    weight: 0.12
+    agents: [format_compliance_stem]
+  - id: structure
+    name: "结构逻辑"
+    weight: 0.10
+    agents: [structure_reviewer_stem]
+  - id: innovation
+    name: "创新性"
+    weight: 0.08
+    agents: [innovation_reviewer_stem]
+    score_mapping:
+      type: power_scale
+      floor: 40
+      threshold: 25
+      exponent: 0.5
+  - id: reference_quality
+    name: "参考文献质量"
+    weight: 0.08
+    agents: [reference_quality_stem]
+  - id: factual_accuracy
+    name: "事实准确性"
+    weight: 0
+    scoreless: true
+    agents: [factual_accuracy]
+
+grade_thresholds:
+  优: 85
+  良: 70
+  中: 60
+  及格: 55
+  不及格: 0
+
+gate_blockers:
+  # Existing (from bachelor)
+  - logic_contradiction
+  - plagiarism_risk_high
+  - pervasive_ai_tone
+  - missing_core_section
+  - insufficient_references
+  # New STEM-specific
+  - methodology_fatal
+  - data_integrity_risk
+  - missing_data_analysis
+  - no_research_question
+  - factual_error
+
+coupling_rules:
+  # Rule 1: AI tone caps argumentation, logic, and method rigor
+  - source: ai_tone
+    targets: [argumentation_quality, logic, method_rigor]
+    type: clamp_max
+    base_cap: 40
+    release_rate: 0.020
+
+  # Rule 2: Method rigor caps data analysis (broken method = broken analysis)
+  - source: method_rigor
+    targets: [data_analysis]
+    type: clamp_max
+    base_cap: 30
+    release_rate: 0.025
+
+  # Rule 3: AI + innovation dynamic weight
+  - sources: [ai_tone, innovation]
+    target: innovation
+    type: dynamic_weight
+    default_weight: 0.08
+    mapping:
+      - condition: "ai_tone >= 70 && innovation >= 70"
+        weight: 0.16
+        borrow_from:
+          format: -0.04
+          structure: -0.04
+      - condition: "ai_tone >= 50 && innovation >= 70"
+        weight: 0.12
+        borrow_from:
+          format: -0.02
+          structure: -0.02
+      - condition: "ai_tone <= 50"
+        weight: 0.04
+        give_to:
+          format: 0.02
+          reference_quality: 0.02
+
+ai_tone_curves:
+  # ── 8 existing curves (retained, STEM-calibrated) ──
+  # Positive signals: HIGH density → AI (sigmoid)
+  benwen:       {weight: 25, curve: sigmoid, inflection: 13, steepness: 0.3}
+  gaix:         {weight: 10, curve: sigmoid, inflection: 12, steepness: 0.25, stem: {inflection: 18}}
+  danshi:       {weight: 8,  curve: sigmoid, inflection: 10, steepness: 0.3}
+  suizhe:       {weight: 8,  curve: sigmoid, inflection: 4,  steepness: 0.5}
+  ba:           {weight: 10, curve: sigmoid, inflection: 6,  steepness: 0.3}
+  jinxing:      {weight: 15, curve: sigmoid, inflection: 15, steepness: 0.25, stem: {inflection: 25}}
+  # Negative signals: ZERO/LOW density → AI (inverted sigmoid)
+  yinci:        {weight: 8,  curve: inverted_sigmoid, inflection: 3,  steepness: 0.5}
+  tongguo:      {weight: 8,  curve: inverted_sigmoid, inflection: 5,  steepness: 0.3}
+
+  # ── 3 cross-applicable from humanities ──
+  kongdong:     {weight: 8,  curve: sigmoid, inflection: 15, steepness: 0.25}
+  meirong:      {weight: 5,  curve: sigmoid, inflection: 6,  steepness: 0.3}
+  shenghua:     {weight: 5,  curve: sigmoid, inflection: 4,  steepness: 0.3}
+
+  # ── 5 new STEM-specific curves ──
+  formulaic_conclusion:    {weight: 7,  curve: sigmoid, inflection: 2,  steepness: 0.5}
+  data_display_stencil:    {weight: 7,  curve: sigmoid, inflection: 6,  steepness: 0.25}
+  benyanjiu:               {weight: 10, curve: sigmoid, inflection: 12, steepness: 0.3}
+  sequential_citations:    {weight: 5,  curve: sigmoid, inflection: 4,  steepness: 0.3}
+  experimental_template:   {weight: 6,  curve: sigmoid, inflection: 3,  steepness: 0.35}
+
+ai_fusion:
+  agreement_threshold: 0.5
+  disagree_shrink: 0.3
+  low_signal_shrink: 0.4
+  script_keys:
+    # Existing
+    - bei_density
+    - zai_construction_density
+    - tongguo_density
+    - bujin_density
+    - cong_perspective_density
+    - juyou_density
+    - conger_density
+    - chengwei_density
+    # New
+    - kongdong_density
+    - meirong_density
+    - shenghua_density
+    - formulaic_conclusion_density
+    - data_display_stencil_density
+    - benyanjiu_density
+    - sequential_citations_density
+    - experimental_template_density
+  thresholds:
+    bei_density: 7.3
+    zai_construction_density: 49.9
+    tongguo_density: 27.7
+    bujin_density: 14.1
+    cong_perspective_density: 4.3
+    juyou_density: 7.2
+    conger_density: 2.6
+    chengwei_density: 3.6
+    kongdong_density: 18.0
+    meirong_density: 8.0
+    shenghua_density: 6.0
+    formulaic_conclusion_density: 2.0
+    data_display_stencil_density: 7.0
+    benyanjiu_density: 10.0
+    sequential_citations_density: 5.0
+    experimental_template_density: 3.0
+
+length_limits:
+  min: 15000
+  max: 50000
+  too_short_penalty: 0.006
+  too_long_penalty: 0.001

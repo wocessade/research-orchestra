@@ -1,0 +1,14 @@
+# Academic Skills — minimum Python dependencies
+# Install: pip install -r requirements.txt
+
+# YAML manifest parsing (validate_pipeline.py, sync-to-modules.py)
+PyYAML>=6.0
+
+# .docx reading/writing (coursework C3/C5, thesis T4/T6, journal outputs)
+python-docx>=1.0
+
+# PDF reading, metadata cleaning (literature verify, thesis T6.5 blind review)
+PyMuPDF>=1.23
+
+# Chinese OCR fallback (literature search, PDF text extraction)
+# paddleocr>=2.7   # uncomment if OCR is needed — heavy install

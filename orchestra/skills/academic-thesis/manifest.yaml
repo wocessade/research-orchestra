@@ -1,0 +1,439 @@
+# Academic Thesis — declarative loading manifest (SELF-CONTAINED)
+# Standalone thesis writing module. All external skill dependencies have been
+# extracted and frozen under skills-embedded/. Stage files reference local files,
+# NOT Skill tool calls.
+
+name: academic-thesis
+version: "1.0"
+description: Standalone thesis writing module — bachelor/master thesis with full evaluate review, padding, style learning
+
+# ── Session Variables ──────────────────────────────
+session_variables:
+  output_dir:
+    description: "Directory path for writing intermediate and final output files. Set before any stage executes. Resolves to {output_dir_base}/{paper_slug}/ after directory resolution. Default base: ./paper_output_thesis"
+    default: "./paper_output_thesis"
+  paper_slug:
+    description: "Per-paper unique identifier in format {YYYYMMDD_HHMMSS}_{english_slug}. Generated at pipeline start from current timestamp + paper topic."
+    default: null
+  paper_dir:
+    description: "Full per-paper output path = {output_dir_base}/{paper_slug}/. This is what {output_dir} resolves to after directory resolution."
+    default: null
+  pipeline_root:
+    description: "Root directory of the thesis skill. Auto-detected at session start as the directory containing manifest.yaml."
+    default: "."
+
+# ── Axes ───────────────────────────────────────────
+axes:
+  entry_point:
+    description: "How does the thesis start?"
+    values: [thesis, existing-manuscript]
+    detect:
+      thesis: "User mentions 毕业论文, 学位论文, 本科论文, 硕士论文, 开题报告, 答辩, defense, thesis, or dissertation"
+      existing-manuscript: "User has a complete draft of the thesis manuscript"
+
+  paperType:
+    description: "Type of thesis paper"
+    values: [thesis]
+    default: thesis
+
+  degree:
+    description: "Thesis degree level"
+    values: [bachelor, master]
+    default: bachelor
+    detect:
+      bachelor: "User mentions 本科, 学士, bachelor, or default for thesis without specific degree level"
+      master: "User mentions 硕士, 研究生, master, 专硕, 学硕, MSc, MA"
+
+  hasData:
+    description: "Whether the user has provided data files for the thesis"
+    values: [true, false]
+    default: false
+    detect:
+      true: "User has attached or referenced data files (CSV, Excel, SPSS, questionnaire data, experimental results, etc.)"
+      false: "User has not provided data files — thesis is theoretical, engineering, or data not yet collected"
+
+  stage:
+    description: "Current active pipeline stage"
+    values: [T1, T1.5, T2, T3, T4, T5, T6, T6.5, T6.7, T7]
+
+  language:
+    description: "User's working language"
+    values: [en, zh]
+    default: zh
+    note: "Default 'zh' for Chinese thesis. Override to 'en' for English thesis."
+
+  discipline:
+    description: "Academic discipline for domain-specific conventions"
+    values: [general, stem]
+    default: general
+    detect:
+      stem: "User mentions CS, 计算机, CCF, CCF conference, ACM, IEEE, or the paper is a software/system/benchmark/algorithm paper"
+
+  urgency:
+    description: "Time pressure"
+    values: [normal, emergency]
+    default: normal
+
+  writingFormat:
+    description: "Target output format for the thesis"
+    values: [latex, word, markdown, typst, auto-detect]
+    default: auto-detect
+    detect:
+      latex: "User mentions LaTeX, Overleaf, .tex files, or CS/math/physics discipline"
+      word: "User says Word, .docx, or is in humanities/social sciences"
+      typst: "User mentions Typst, .typ files"
+      markdown: "User mentions Markdown, .md, or R Markdown"
+
+# ── Embedded References ────────────────────────────
+embedded_references:
+  critical:
+    - file: skills-embedded/paper-lookup.md
+      stages: [T2]
+      purpose: Multi-database literature search (fallback when literature/literature_search.py unavailable)
+  important:
+    - file: skills-embedded/scientific-brainstorming.md
+      stages: [T1]
+      purpose: Idea generation
+      fallback: skills-embedded/hypothesis-generation.md
+    - file: skills-embedded/scientific-visualization.md
+      stages: [T1.5]
+      purpose: Data visualization for data exploration
+      fallback: skills-embedded/nature-figure.md
+    - file: skills-embedded/nature-figure.md
+      stages: [T1.5]
+      purpose: Publication-grade figures for data exploration
+      fallback: skills-embedded/scientific-visualization.md
+    - file: skills-embedded/scientific-schematics.md
+      stages: [T2, T3]
+      purpose: Technical diagrams
+      fallback: skills-embedded/generate-image.md
+  optional:
+    - file: skills-embedded/latex-thesis-zh.md
+      stages: [T4]
+      purpose: Chinese LaTeX thesis layout / GB/T class
+    - file: skills-embedded/latex-paper-en.md
+      stages: [T4, T7]
+      purpose: Router to academic-latex claim-evidence + verify_paper (with --allow-cjk for zh)
+    - file: ../academic-latex/SKILL.md
+      stages: [T4, T7]
+      purpose: Canonical LaTeX protocol (module-root relative)
+    - file: ../academic-plotting/SKILL.md
+      stages: [T1.5, T2, T4]
+      purpose: Canonical figure protocol (module-root relative)
+    - file: skills-embedded/latex-document-skill.md
+      stages: [T7]
+      purpose: LaTeX compilation (writingFormat=latex)
+    - file: skills-embedded/scientific-slides.md
+      stages: [T7]
+      purpose: Presentation slides
+      fallback: skills-embedded/nature-paper2ppt.md
+    - file: skills-embedded/nature-paper2ppt.md
+      stages: [T7]
+      purpose: Paper-to-PPT (thesis defense)
+      fallback: skills-embedded/scientific-slides.md
+    - file: skills-embedded/docx.md
+      stages: [T4]
+      purpose: python-docx reference (.docx generation)
+    - file: skills-embedded/pptx.md
+      stages: [T7]
+      purpose: PowerPoint slide generation (thesis defense)
+    - file: skills-embedded/pdf.md
+      stages: [T6.5]
+      purpose: PDF metadata cleaning (blind review)
+
+# ── Always Load ─────────────────────────────────────
+always_load:
+  - static/core/convergence-loop.md
+  - static/core/incremental-update.md
+  - static/core/attention-defense.md
+  - static/core/pipeline-rules.md
+  - static/core/gate-chain.md
+  - static/core/dispatch-points.md
+  - static/core/context-budget.md
+  - static/core/parallel-groups.md
+  - static/core/result-collection.md
+  - static/core/stop-and-ask.md
+  - static/core/fallback.md
+  - static/core/input-validation.md
+  - static/core/exit-protocol.md
+  - static/core/web-search-policy.md
+  - static/core/paper-types.md
+  - static/core/prerequisites.md
+  - static/core/do-dont.md
+  - static/core/session-persistence.md
+  - static/core/stage-output-format.md
+  - static/core/session-variables.md
+  - references/quick-routing.md
+  - static/core/multi-agent-patterns.md
+  - static/core/material-passport.md
+
+# ── On Demand: Strategists ──────────────────────────
+strategists:
+  T1:
+    file: strategists/T1-strategist.md
+    entry_point: thesis
+    route:
+      - condition: {axis: hasData, value: true}
+        next: T1.5
+      - default: T2
+  T1.5:
+    file: strategists/T1.5-strategist.md
+    next: T2
+    condition:
+      axis: hasData
+      value: true
+  T2:
+    file: strategists/T2-strategist.md
+    next: T3
+  T3:
+    file: strategists/T3-strategist.md
+    next: T4
+  T4:
+    file: strategists/T4-strategist.md
+    next: T5
+  T5:
+    file: strategists/T5-strategist.md
+    entry_point: existing-manuscript
+    next: T6
+  T6:
+    file: strategists/T6-strategist.md
+    route:
+      - condition: {axis: degree, value: master}
+        next: T6.5
+      - default: T7
+  T6.5:
+    file: strategists/T6.5-strategist.md
+    next: T7
+    condition:
+      axis: degree
+      value: master
+  T6.7:
+    file: strategists/T6.7-strategist.md
+    next: null
+    note: "Hidden branch (v7) — conditionally loaded by T6.md trigger only when user mentions keywords such as padding/de-AI/plagiarism-check after T6 convergence. Not in the standard Thesis workflow. Padding executes after evaluate."
+  T7:
+    file: strategists/T7-strategist.md
+    next: null  # terminal — defense preparation complete. Loaded when dependency_graph path includes T7 (e.g., existing-manuscript-defense, thesis)
+
+# ── On Demand: Composers ──────────────────────────
+composers:
+  - path: ../academic-shared/composers/citation-anchor-format.md
+  - path: ../academic-shared/composers/evidence-ledger-gen.md
+  - path: ../academic-shared/composers/claim-to-paragraph.md
+  - path: ../academic-shared/composers/paper-audit-orchestration.md
+  - path: ../academic-shared/composers/factual-accuracy-check.md
+  - path: ../academic-shared/composers/de-ai-detect.md
+  - path: ../academic-shared/composers/polish-protocols.md
+  - path: ../academic-shared/composers/docx-assembly.md
+  - path: ../academic-shared/composers/literature-precheck.md
+
+# ── Dependency Graph ──────────────────────────────
+dependency_graph:
+  thesis: [T1, T2, T3, T4, T5, T6, T7]
+  thesis-inflated: [T1, T2, T3, T4, T5, T6, T6.7, T7]
+  thesis-master: [T1, T2, T3, T4, T5, T6, T6.5, T7]
+  thesis-master-inflated: [T1, T2, T3, T4, T5, T6, T6.5, T6.7, T7]
+  thesis-with-data: [T1, T1.5, T2, T3, T4, T5, T6, T7]
+  thesis-with-data-inflated: [T1, T1.5, T2, T3, T4, T5, T6, T6.7, T7]
+  thesis-master-with-data: [T1, T1.5, T2, T3, T4, T5, T6, T6.5, T7]
+  thesis-master-with-data-inflated: [T1, T1.5, T2, T3, T4, T5, T6, T6.5, T6.7, T7]
+  existing-manuscript: [T5, T6]
+  existing-manuscript-defense: [T5, T6, T7]
+  existing-manuscript-inflated: [T5, T6, T6.7]
+  existing-manuscript-master: [T5, T6, T6.5]
+  existing-manuscript-master-defense: [T5, T6, T6.5, T7]
+  existing-manuscript-master-inflated: [T5, T6, T6.5, T6.7]
+
+# ── On Demand: References ───────────────────────────
+references:
+  chinese-de-ai-guide:
+    file: references/chinese-de-ai-guide.md
+    condition:
+      axis: language
+      value: zh
+      stage: [T5]
+    on_demand: true
+
+  chinese-de-ai-quick-ref:
+    file: references/chinese-de-ai-quick-ref.md
+    condition:
+      axis: language
+      value: zh
+      stage: [T5]
+
+  common-mistakes:
+    file: references/common-mistakes.md
+    on_demand: true
+
+  emergency-path:
+    file: references/emergency-path.md
+    condition:
+      axis: urgency
+      value: emergency
+
+  english-academic-lexicon:
+    file: references/english-academic-lexicon.md
+    condition:
+      axis: language
+      value: en
+      stage: [T4, T5]
+
+  english-academic-writing-guide:
+    file: references/english-academic-writing-guide.md
+    condition:
+      axis: language
+      value: en
+      stage: [T4, T5]
+
+  english-de-ai-guide:
+    file: references/english-de-ai-guide.md
+    condition:
+      axis: language
+      value: en
+      stage: [T5]
+    on_demand: true
+
+  english-de-ai-quick-ref:
+    file: references/english-de-ai-quick-ref.md
+    condition:
+      axis: language
+      value: en
+      stage: [T5]
+
+  english-paper-template:
+    file: references/english-paper-template.md
+    condition:
+      axis: language
+      value: en
+      stage: [T4]
+
+  evaluate-module:
+    file: evaluate/stage_agents.md
+    condition:
+      stage: [T5, T6]
+    on_demand: true
+
+  literature-search-tool:
+    file: ../academic-shared/literature/literature_search.py
+    condition:
+      stage: [T2]
+    on_demand: true
+
+  literature-verify:
+    file: references/literature-verify.md
+    condition:
+      stage: [T2, T5, T6]
+
+  nnes-chinese-english-writing:
+    file: references/nnes-chinese-english-writing.md
+    condition:
+      axis: language
+      value: en
+      stage: [T4, T5]
+
+  paraphrasing-patterns:
+    file: references/paraphrasing-patterns.md
+    condition:
+      stage: [T6.7]
+    on_demand: true
+
+  plagiarism-check:
+    file: references/T6-plagiarism-check.md
+    condition:
+      stage: [T6]
+    on_demand: true
+
+  playwright-browser-automation:
+    file: references/playwright-browser-automation.md
+    condition:
+      stage: [T2]
+    on_demand: true
+
+  quick-routing:
+    file: references/quick-routing.md
+
+  tavily-search:
+    file: references/tavily-search.md
+    on_demand: true
+
+  verify-citations-tool:
+    file: ../academic-shared/literature/verify_citations.py
+    condition:
+      stage: [T2]
+    on_demand: true
+
+  # ── ROADMAP P2-3: commands ─────────────────────────────
+  command-check-refs:
+    file: ../academic-shared/commands/check-refs.md
+    condition:
+      stage: [T2]
+    on_demand: true
+
+  command-de-ai:
+    file: ../academic-shared/commands/de-ai.md
+    condition:
+      stage: [T5, T6]
+    on_demand: true
+
+  command-latex-cleanup:
+    file: ../academic-shared/commands/latex-cleanup.md
+    condition:
+      stage: [T4]
+    on_demand: true
+
+  command-verify-math:
+    file: ../academic-shared/commands/verify-math.md
+    condition:
+      stage: [T3, T4]
+    on_demand: true
+
+  # ── ROADMAP P2-5: checkpoint ───────────────────────────
+  checkpoint-state-manager:
+    file: checkpoint/state_manager.py
+    condition:
+      stage: [T4]
+    on_demand: true
+    note: "Manual intra-T4 paragraph-level checkpoint. NOT automatic."
+
+  contribution-gate:
+    file: ../academic-shared/contribution/contribution-gate.md
+    condition:
+      stage: [T1, T4]
+    on_demand: true
+  contribution-check-script:
+    file: ../academic-shared/contribution/contribution_check.py
+    condition:
+      stage: [T1, T4]
+    on_demand: true
+
+  issues-contract:
+    file: ../academic-shared/issues/issues-contract.md
+    condition:
+      stage: [T4]
+    on_demand: true
+  results-backfill:
+    file: ../academic-shared/issues/results-backfill.md
+    condition:
+      stage: [T4]
+    on_demand: true
+  rewrite-matrix:
+    file: ../academic-shared/rewrite/rewrite-matrix.md
+    condition:
+      stage: [T6]
+    on_demand: true
+  citation-support-bank:
+    file: ../academic-shared/citation/citation-support-bank.md
+    condition:
+      stage: [T2, T4]
+    on_demand: true
+
+  research-engine-handoff:
+    file: ../academic-research-engine/references/handoff-to-writing.md
+    condition:
+      stage: [T1]
+    on_demand: true
+  research-schemas:
+    file: ../academic-shared/research/schemas.md
+    condition:
+      stage: [T1]
+    on_demand: true

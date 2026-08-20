@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "academic-shared/research/metrics.schema.json",
+  "title": "ExperimentRunMetrics",
+  "type": "object",
+  "required": ["run_id", "exp_id", "status", "metrics"],
+  "additionalProperties": true,
+  "properties": {
+    "run_id": { "type": "string", "minLength": 1 },
+    "exp_id": { "type": "string", "pattern": "^EXP-[0-9]{3,}$" },
+    "hypothesis_ids": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^H-[0-9]{3,}$" }
+    },
+    "contribution_id": { "type": ["string", "null"], "pattern": "^C[0-9]+$" },
+    "status": {
+      "type": "string",
+      "enum": ["completed", "aborted", "failed", "partial"]
+    },
+    "git_commit": { "type": ["string", "null"] },
+    "seed": { "type": ["integer", "string", "null"] },
+    "started_at": { "type": ["string", "null"] },
+    "finished_at": { "type": ["string", "null"] },
+    "metrics": {
+      "type": "object",
+      "description": "Named numeric or string metrics; values must come from the run artifact.",
+      "additionalProperties": {
+        "type": ["number", "string", "boolean", "null", "object", "array"]
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "kind"],
+        "properties": {
+          "path": { "type": "string" },
+          "kind": {
+            "type": "string",
+            "enum": ["log", "csv", "figure", "checkpoint", "other"]
+          },
+          "notes": { "type": "string" }
+        }
+      }
+    },
+    "meets_success_criteria": { "type": ["boolean", "null"] },
+    "notes": { "type": "string" }
+  }
+}

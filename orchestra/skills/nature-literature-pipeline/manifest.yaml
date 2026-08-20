@@ -1,0 +1,32 @@
+name: nature-literature-pipeline
+version: 1.0.0
+description: >
+  Declarative manifest for the literature pipeline. The main axis is the mode
+  (config vs daily-run). Always load scoring system and push format.
+
+always_load:
+  - references/scoring-system.md
+  - references/push-format.md
+  - references/note-template.md
+  - references/dedup-rules.md
+  - references/zotero-integration.md
+
+axes:
+  mode:
+    detect: |
+      Determine the user's intent. config mode when they want to set up
+      keywords/weights/targets for the first time or update them.
+      daily-run mode for the actual pipeline execution (manual or cron).
+      review mode when they want to compile a focused literature review.
+    values:
+      config:    templates/config-template.yaml
+      daily-run: references/scoring-system.md
+      review:    references/review-compilation.md
+    default: daily-run
+
+references:
+  on_demand:
+    - condition: setting up or debugging cron
+      path: references/cron-setup.md
+    - condition: compiling a focused literature review from accumulated papers
+      path: references/review-compilation.md

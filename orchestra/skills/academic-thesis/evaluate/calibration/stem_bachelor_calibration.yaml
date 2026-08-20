@@ -1,0 +1,16 @@
+# STEM Bachelor Thesis Calibration
+# Seed calibration: no papers scored yet, start with zero offset
+# Run calibrate.py --feedback-log feedback_log.yaml --calibration-file stem_bachelor_calibration.yaml
+# to populate after scoring 3-5 STEM bachelor theses with known human scores.
+adjustment:
+  type: additive
+  value: 0.0
+confidence: 0.0
+samples: 0
+last_updated: "2026-06-23"
+source: "seed"
+note: >
+  Seed calibration. Collect 3-5 STEM bachelor theses with known human
+  scores to calibrate. Ideal initial samples: diversify across CS/EE/
+  ME/chemistry disciplines. STEM theses use the 10-agent tier (differs
+  from humanities 9-agent). Expected initial delta range: -5 to +5.

@@ -60,3 +60,5 @@
 30. **subagent 停滞/报错 ≠ 没干活**：两个"失败"的修复代理实际已完成实现并 commit（一个 stall 在报告阶段、一个报 prompt too long 前已落地）。规则：恢复先查 git log + 工作区 diff，账本（.superpowers/sdd/progress.md）是恢复地图；已 commit 的工作绝不重跑。
 
 31. **Windows 计划任务 onlogon 触发器非提权被拒**：schtasks /sc minute 可注册、/sc onlogon 拒绝访问。规则：用户级开机自启落地到用户启动文件夹（%APPDATA%\...\Startup），bat 用 start /min 最小化，无凭据内容可入库。
+
+32. **schtasks 只继承登录时的用户环境快照**：用户环境变量（setx）改后，已在运行的计划任务仍看不到新值，需登出重登才继承——手动 refresh 验证通过但下个 10 分钟 tick 又回到降级。规则：改用户环境变量后验证分两步：①手动跑验证值正确 ②提醒用户重登并等一个 tick 再确认计划任务路径。

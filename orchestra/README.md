@@ -73,6 +73,12 @@
 - 面板刷新纪律：内容变化才全刷；last_report 时间戳与负载抖动只走局刷（D10/D14）
 - 验收：`reports/2026-08-dashboard-acceptance.md`（reviewed: ok，含 D15 运行中帧）
 
+## GUI 控制台（mission 034 / 总 spec 汇合面）
+
+- Homepage（127.0.0.1:3000，四页 tab：今天/雷达/任务实验/系统）+ glue `console/console_feed.py`（refresh 每 10 分钟 + serve 127.0.0.1:3100，stdlib only）
+- 数据流（零改动）：usage-monitor `GET /api/dashboard`（只读）→ status.json；sync_pull 本地快照 → radar.json/attempts；console-schedule.toml → 双 ICS 双层日历（system 定时器镜像 + personal 手录）；messages.md（CC 留言/待决/告警，入库审计轨迹）→ messages.json
+- 详见 `console/README.md`；设计 `docs/superpowers/specs/2026-08-20-console-design.md`
+
 ## 双 agent（CC × Codex）（mission 027 / 总 spec §6.3）
 
 - 直调封装：`scripts/codex_exec.py run <prompt文件|-> [--model X] [--timeout N] [--out DIR] [--json-out PATH] [--skip-git-check]`——`codex exec --json` 直调：NDJSON 事件解析、超时树杀（Windows taskkill /T）、7 类错误分类（authentication / rate_limit / network / trust / sandbox / not_installed / unknown）、git 信任检查（非 git 目录自动加 `--skip-git-repo-check`）。exit code：0=ok 1=失败 2=未装 3=超时 4=认证失败

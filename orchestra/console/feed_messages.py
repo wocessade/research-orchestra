@@ -27,11 +27,15 @@ def parse_messages(text: str) -> dict:
             except ValueError:
                 current = None
                 continue
-            current = {"title": m.group(2).strip(), "time": ts, "text": ""}
+            current = {"title": m.group(2).strip(), "time": ts, "text": "",
+                       "pending": [], "alerts": []}
             if not current["title"]:
                 current = None
                 continue
             entries.append(current)
+            continue
+        if line.startswith("## "):
+            current = None
             continue
         if current is None:
             continue
@@ -41,18 +45,18 @@ def parse_messages(text: str) -> dict:
         current["text"] = (current["text"] + "\n" + stripped).strip()
         d = _DECISION.match(stripped)
         if d:
-            current["pending"] = d.group(1).strip()
+            current["pending"].append(d.group(1).strip())
         a = _ALERT.match(stripped)
         if a:
-            current["alerts"] = a.group(1).strip()
+            current["alerts"].append(a.group(1).strip())
     entries.sort(key=lambda e: e["time"], reverse=True)
     latest = [{"title": e["title"], "time": e["time"].strftime("%Y-%m-%d %H:%M"),
                "time_text": e["time"].strftime("%m-%d %H:%M"), "text": e["text"]}
               for e in entries[:5]]
     pending = [{"title": e["title"], "time_text": e["time"].strftime("%m-%d %H:%M"),
-                "text": e["pending"]} for e in entries if e.get("pending")]
+                "text": text} for e in entries for text in e["pending"]]
     alerts = [{"title": e["title"], "time_text": e["time"].strftime("%m-%d %H:%M"),
-               "text": e["alerts"]} for e in entries if e.get("alerts")]
+               "text": text} for e in entries for text in e["alerts"]]
     return {"latest": latest, "pending": pending, "alerts": alerts}
 
 
@@ -75,7 +79,13 @@ def build_messages_html(msgs: dict) -> str:
 def append_alert(messages_path: Path, text: str) -> bool:
     """追加自动告警留言；与最后一条重复则跳过。返回是否追加。"""
     existing = messages_path.read_text(encoding="utf-8") if messages_path.exists() else ""
-    if f"- 告警：{text}" in existing.split("\n\n")[-1]:
+    parsed = parse_messages(existing)
+    if parsed["latest"] and any(
+        alert["text"] == text
+        for alert in parsed["alerts"]
+        if alert["title"] == parsed["latest"][0]["title"]
+        and alert["time_text"] == parsed["latest"][0]["time_text"]
+    ):
         return False
     stamp = datetime.now().strftime("%Y-%m-%d %H:%M")
     with messages_path.open("a", encoding="utf-8") as f:

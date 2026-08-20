@@ -34,6 +34,27 @@ class ParseMessagesTest(unittest.TestCase):
         msgs = parse_messages("## 不是时间 — 标题\n正文\n## 2026-08-21 09:00 — 好\nok")
         self.assertEqual([m["title"] for m in msgs["latest"]], ["好"])
 
+    def test_malformed_section_after_valid_is_skipped_without_absorbing_text(self):
+        text = """## 2026-08-21 09:00 — 好
+有效正文
+## 不是时间 — 坏
+不应并入有效正文
+"""
+        msgs = parse_messages(text)
+        self.assertEqual([m["title"] for m in msgs["latest"]], ["好"])
+        self.assertEqual(msgs["latest"][0]["text"], "有效正文")
+
+    def test_multiple_pending_and_alerts_preserve_line_order(self):
+        text = """## 2026-08-21 09:00 — 批量事件
+- 待决：先决定 A
+- 告警：先告警 B
+- 待决：再决定 C
+- 告警：再告警 D
+"""
+        msgs = parse_messages(text)
+        self.assertEqual([p["text"] for p in msgs["pending"]], ["先决定 A", "再决定 C"])
+        self.assertEqual([a["text"] for a in msgs["alerts"]], ["先告警 B", "再告警 D"])
+
     def test_empty_input(self):
         msgs = parse_messages("")
         self.assertEqual(msgs, {"latest": [], "pending": [], "alerts": []})
@@ -45,6 +66,8 @@ class BuildMessagesHtmlTest(unittest.TestCase):
         html = build_messages_html(msgs)
         self.assertIn("&lt;script&gt;", html)
         self.assertNotIn("<script>", html)
+        self.assertIn("<meta charset='utf-8'>", html)
+        self.assertIn("white-space:pre-wrap", html)
 
 
 class AppendAlertTest(unittest.TestCase):
@@ -55,6 +78,27 @@ class AppendAlertTest(unittest.TestCase):
             self.assertTrue(append_alert(p, "usage-monitor 不可达"))
             self.assertFalse(append_alert(p, "usage-monitor 不可达"))
             self.assertEqual(p.read_text(encoding="utf-8").count("usage-monitor"), 1)
+    def test_body_prose_does_not_trigger_dedup(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "messages.md"
+            p.write_text(
+                "## 2026-08-21 09:00 — 说明\n"
+                "正文提到 - 告警：usage-monitor 不可达 但不是告警行\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(append_alert(p, "usage-monitor 不可达"))
+
+    def test_existing_alert_line_triggers_dedup(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "messages.md"
+            p.write_text(
+                "## 2026-08-21 09:00 — 自动告警\n"
+                "- 告警：usage-monitor 不可达\n",
+                encoding="utf-8",
+            )
+            self.assertFalse(append_alert(p, "usage-monitor 不可达"))
 
 
 if __name__ == "__main__":

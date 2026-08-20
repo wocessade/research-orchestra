@@ -117,8 +117,9 @@ def cmd_refresh(args) -> int:
 def cmd_serve(args) -> int:
     from feed_serve import make_server
     server = make_server(Path(args.out_dir), args.bind, args.port)
-    print(f"console feed serving {args.out_dir} "
-          f"at http://{args.bind}:{args.port} (Ctrl+C 退出)", flush=True)
+    if sys.stdout is not None:  # pythonw 无 stdout，print 会崩
+        print(f"console feed serving {args.out_dir} "
+              f"at http://{args.bind}:{args.port} (Ctrl+C 退出)", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

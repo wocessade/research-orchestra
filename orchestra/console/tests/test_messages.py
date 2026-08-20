@@ -89,6 +89,55 @@ class AppendAlertTest(unittest.TestCase):
             )
             self.assertTrue(append_alert(p, "usage-monitor 不可达"))
 
+    def test_append_not_suppressed_by_older_year(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "messages.md"
+            p.write_text(
+                "## 2025-08-20 21:00 — 自动告警\n"
+                "- 告警：usage-monitor 不可达\n\n"
+                "## 2026-08-20 22:00 — 正常留言\n"
+                "系统运行正常\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(append_alert(p, "usage-monitor 不可达"))
+            content = p.read_text(encoding="utf-8")
+            self.assertEqual(content.count("- 告警：usage-monitor 不可达"), 2)
+            self.assertIn("— 自动告警\n- 告警：usage-monitor 不可达\n", content)
+
+    def test_final_raw_section_controls_dedup(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "messages.md"
+            p.write_text(
+                "## 2025-08-20 21:00 — 自动告警\n"
+                "- 告警：usage-monitor 不可达\n\n"
+                "## 2026-08-20 21:00 — 自动告警\n"
+                "- 告警：usage-monitor 不可达\n\n"
+                "## 2026-08-20 22:00 — 正常留言\n"
+                "系统运行正常\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(append_alert(p, "usage-monitor 不可达"))
+
+    def test_append_prose_in_final_section_not_matching(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "messages.md"
+            p.write_text(
+                "## 2026-08-21 09:00 — 说明\n"
+                "正文提到 usage-monitor 不可达，但不是告警行\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(append_alert(p, "usage-monitor 不可达"))
+
+            p.write_text(
+                "## 2026-08-21 09:00 — 自动告警\n"
+                "- 告警：usage-monitor 不可达\n",
+                encoding="utf-8",
+            )
+            self.assertFalse(append_alert(p, "usage-monitor 不可达"))
+
     def test_existing_alert_line_triggers_dedup(self):
         import tempfile
         with tempfile.TemporaryDirectory() as tmp:

@@ -318,7 +318,7 @@
 ## 6. 遗留与待办清单
 
 ### 进行中
-- 034-v2 控制台美化：已移交 SOL（任务书 `docs/superpowers/specs/2026-08-20-console-v2-beautify.md`，owner 授权不局限于 Homepage、红线五条、过度谨慎提示已写）
+- 034-v2 控制台美化：接力顺序 Grok（本地全权限，先做）→ owner push → SOL（复审+精修+验收）。任务书 `docs/superpowers/specs/2026-08-20-console-v2-beautify.md`（owner 授权不局限于 Homepage、红线五条、owner REJECT 四点意见为验收必答项）
 
 ### 已归档
 - mission 028-034 均已归档

@@ -42,3 +42,9 @@
 
 - 030/031/032 的并发纪律（A1-A10）已固化进 `docs/superpowers/specs/2026-08-20-concurrent-work-modes.md` 与 memory `high_concurrency_modes`。
 - codex GBK（B12）已入 memory `codex_windows_console_encoding`。
+
+## F. 033 追加（2026-08-20）
+
+24. **Claude Code `!` 前缀无 TTY**：交互式命令（passwd 等）在 `!` 里跑不了；远程改密的非交互链 = 密钥认证 SSH + `printf '旧密\n' | sudo -S -v` 缓存凭据 + `chpasswd`/`smbpasswd -s`，改完用 `sudo -k && sudo -S -v` 反验新密。
+25. **功能重叠裁决模式**：本地交互 skill 与已上线自动化实现重叠时，以"已上线+有验证闭环"的为准（雷达 validator/SHA/at-most-once vs pipeline 交互版），对方独有增量并入计划而非另起炉灶（033 兼容度分析）。
+26. **快照型交付物必须带漂移声明**：skill 快照入仓库时 README 写明快照日期+活副本路径+刷新方式（L18 的文档化落地）。

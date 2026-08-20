@@ -39,9 +39,9 @@
 ## 当前挂账（更新日期 2026-08-20）
 
 - **阶段定位（用户定调）**：整体工程进入收尾复核；【术】已足够，转入【道】——新任务优先产出论文/研究实体，纯基建项只记挂账不急着做
-- SOL 重构 + 030 修复已合并入库（a2d31b8）：四阶段雷达、artifact 校验、taskkill 树杀等需一次 Pi 部署窗口；skills.json expected_digest=null → 真实 ingest 被 HARD 阻断，需用户提供 Skill 后 `--lock-current --strict`
+- SOL 重构 + 030 修复已合并入库（a2d31b8）：四阶段雷达、artifact 校验、taskkill 树杀等需一次 Pi 部署窗口；skills.json expected_digest=null → 真实 ingest 被 HARD 阻断，skill 快照已入仓库（orchestra/skills/，兼容度分析见 docs/reports/2026-08-skills-orchestra-compat.md），待用户审查后 `--lock-current --strict`
 - 031 树状档首跑产出 SOL 终审报告（docs/reports/2026-08-sol-refactor-review.md）：**小包 A 已修复入库（739fdfd，1 HIGH+12 MED 全落地，broker 116/scripts 161 绿）**；挂账 B（Pi 部署验证）并入部署窗口
-- 入学前（2026-09）：弱密码整改（见 `orchestra/docs/school-network-switch.md`）、宿舍-实验室互通实测、Tailscale 切换
+- 入学前（2026-09）：宿舍-实验室互通实测、Tailscale 切换；弱密码整改 4B 已完成（2026-08-20），核桃派 pi 密码待上线后同步
 - 雷达→Zotero 直连**推迟到 9.8 开学后再设计**（方向已记 `docs/superpowers/plans/2026-08-20-radar-digest-reading-note.md`）
 - 双 agent 想法池剩余项（resume 脚本化 / usage 统计）待选（模型路由表已落地，spec `docs/superpowers/specs/2026-08-20-model-routing-design.md`）
 - 待用户拍板：SD 旧副本删除、512G SSD 用途、宿舍 NAS、QQ bot

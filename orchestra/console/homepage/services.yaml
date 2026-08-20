@@ -36,11 +36,17 @@
               label: 活动任务
             - field: next.0.label
               label: 下一触发
+            - field: next.0.at
+              label: 下一触发时间
             - field: next.0.in_text
               label: 倒计时
             - field: next.1.label
               label: 再下一
             - field: next.1.in_text
+              label: 倒计时
+            - field: next.2.label
+              label: 再再下一
+            - field: next.2.in_text
               label: 倒计时
     - 留言:
         widget:
@@ -152,6 +158,26 @@
           refreshInterval: 60000
           display: block
           mappings:
+            - field: "4b"
+              label: 4B
+            - field: walnut
+              label: 核桃派
+            - field: windows
+              label: Windows
+            - field: next.0.label
+              label: 下一触发
+            - field: next.0.at
+              label: 下一触发时间
+            - field: next.0.in_text
+              label: 倒计时
+            - field: next.1.label
+              label: 再下一
+            - field: next.1.in_text
+              label: 倒计时
+            - field: next.2.label
+              label: 再再下一
+            - field: next.2.in_text
+              label: 倒计时
             - field: generated_text
               label: 数据生成
             - field: last_task

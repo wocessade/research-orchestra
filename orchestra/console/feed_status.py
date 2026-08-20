@@ -4,6 +4,7 @@
 """
 from __future__ import annotations
 
+import http.client
 import json
 import time
 import urllib.error
@@ -36,11 +37,13 @@ def fetch_dashboard(api_url: str, token: str | None,
             if not isinstance(payload, dict):
                 return None, "invalid_dashboard"
             return payload, None
-    except (urllib.error.URLError, OSError, ValueError) as exc:
+    except (urllib.error.URLError, http.client.HTTPException, OSError, ValueError) as exc:
         return None, str(exc)
 
 
 def _rel(ts, now: float) -> str:
+    if not isinstance(ts, (int, float)):
+        return "—"
     if not ts:
         return "—"
     s = int(now - ts)
@@ -82,10 +85,13 @@ def aggregate(dashboard: dict | None, fetch_error: str | None,
     now = time.time() if now is None else now
     orch = (dashboard or {}).get("orchestra", {}) or {}
     lr = (dashboard or {}).get("orchestra_last_report", {}) or {}
-    last_ts = lr.get("ts")
+    last_ts = lr.get("broker") or lr.get("ts")
     b_online = last_ts is not None and (now - last_ts) <= FRESH_S
     host = orch.get("host", {}) or {}
+    self_status = (dashboard or {}).get("self_status", {}) or {}
     walnut_online = dashboard is not None
+    walnut_load = self_status.get("load1")
+    walnut_mem = self_status.get("mem_pct")
     nexts = []
     if schedule and schedule.get("system"):
         for n in next_system_events(schedule["system"], datetime.fromtimestamp(now)):
@@ -95,7 +101,7 @@ def aggregate(dashboard: dict | None, fetch_error: str | None,
         "generated_at": int(now),
         "generated_text": datetime.fromtimestamp(now).strftime("%Y-%m-%d %H:%M"),
         "4b": _device(b_online, host.get("load1"), host.get("mem_pct"), _rel(last_ts, now)),
-        "walnut": _device(walnut_online),
+        "walnut": _device(walnut_online, walnut_load, walnut_mem),
         "windows": _device(True),
         "queue_len": orch.get("queue_len"),
         "active_tasks": orch.get("active_tasks"),

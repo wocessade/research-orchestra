@@ -17,7 +17,7 @@ DASH = {
                          for i in range(12)],
         "host": {"load1": 0.3, "mem_pct": 38},
     },
-    "orchestra_last_report": {"ts": 1755700000},
+    "orchestra_last_report": {"broker": 1755700000},
 }
 NOW = 1755700030.0  # 最后上报 30s 前
 

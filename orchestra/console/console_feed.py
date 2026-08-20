@@ -86,7 +86,7 @@ def cmd_refresh(args) -> int:
             try:
                 proc = subprocess.run(
                     [bash, str(script)], cwd=str(script.parent),
-                    capture_output=True, text=True, timeout=300)
+                    capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
                 notes.append(f"sync_pull exit={proc.returncode}")
             except subprocess.TimeoutExpired:
                 notes.append("sync_pull timeout")

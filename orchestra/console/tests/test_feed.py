@@ -11,12 +11,12 @@ from unittest import mock
 from console_feed import cmd_refresh
 
 MONITOR = {"orchestra": {"queue_len": 1, "recent_tasks": [], "host": {"load1": 0.1, "mem_pct": 20}},
-           "orchestra_last_report": {"ts": 1755700000}}
+           "orchestra_last_report": {"broker": 1755700000}}
 
 
 def _fresh_monitor(*args, **kwargs):
     m = copy.deepcopy(MONITOR)
-    m["orchestra_last_report"]["ts"] = int(time.time()) - 30
+    m["orchestra_last_report"]["broker"] = int(time.time()) - 30
     return m, None
 
 

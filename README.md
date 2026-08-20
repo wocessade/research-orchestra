@@ -311,14 +311,17 @@
 | usage-monitor | 核桃派在役（本项目只增量扩展：已新增 POST /api/orchestra，三端点语义不变） |
 | GUI 控制台 | Homepage 127.0.0.1:3000 四页 tab（今天/雷达/任务实验/系统）+ glue serve 127.0.0.1:3100（stdlib）；refresh 每 10 分钟（schtasks）+ 自启走启动文件夹；只读消费 GET /api/dashboard + 本地 results 快照，Pi 零改动；使用说明 `orchestra/console/README.md` |
 
-**夜间雷达**：2026-08-19 23:30 首次真实定时注入已启动（dry-run 全链路已验证：60 篇 → 去重 57 → 六维评分 → 选 5 → 邮件成功）；明早用户 QQ 邮箱应收到第一封真实日报。
+**夜间雷达**：2026-08-19 23:30 首次真实定时注入已验证通过（60 篇 → 去重 57 → 评分 → 选 5 → 邮件成功），此后每夜自动运行。
 
 ---
 
 ## 6. 遗留与待办清单
 
 ### 进行中
-- 无（mission 028-034 均已归档）
+- 034-v2 控制台美化：已移交 SOL（任务书 `docs/superpowers/specs/2026-08-20-console-v2-beautify.md`，owner 授权不局限于 Homepage、红线五条、过度谨慎提示已写）
+
+### 已归档
+- mission 028-034 均已归档
 
 ### 已承诺后续
 - **Pi 部署窗口（合并为一）**：SOL 重构（四阶段雷达/artifact 校验/taskkill 树杀）+ 小包 A 修复（notify 锁接管/send_email 拒信分类/inject 死循环防护/deploy stop 时序等 12 条）真机部署验证；notify 崩溃残留演练、inject 真实 /proc 首跑

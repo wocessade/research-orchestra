@@ -3,6 +3,8 @@
 以双层日历为核心的只读控制台：Homepage（127.0.0.1:3000）+ glue（127.0.0.1:3100）。
 设计 spec：`docs/superpowers/specs/2026-08-20-console-design.md`；实施计划：`docs/superpowers/plans/2026-08-20-console-v1.md`。
 
+> **v2 美化已移交 SOL**（2026-08-20）：任务书 `docs/superpowers/specs/2026-08-20-console-v2-beautify.md`——纯前端展示层美化，数据契约（out/ 八产物）为接口不可破坏，红线与验收见任务书。
+
 ## 组件
 
 | 路径 | 职责 |

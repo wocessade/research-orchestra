@@ -1,2 +1,13 @@
 *.pyc
 __pycache__/
+
+# 红线：以下目录/文件不入库（见 CLAUDE.md 硬约束）
+orchestra/logs/
+orchestra/results/
+.tasks/
+01thesis/
+ml-notes/
+pm3-mcp-server/
+.proxmark3/
+FCC_IDE_v2.bat
+fcc_inner.cmd

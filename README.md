@@ -70,7 +70,7 @@ Windows CC / 3100 / 微信桥
 
 ## 挂账（状态以仓库+真机为准，不在此手抄 SHA）
 
-- Skill digest：2026-08-22 ingest fail-closed + `academic-shared` 入契约后 **须重新审查锁定**
+- Skill digest：**owner 暂不锁**（ingest / `--strict` 会 HARD，直到明确开口 `--lock-current`）
 - Pi / 核桃派部署窗口：四阶段雷达与相关 broker 修复的真机验证
 - 入学前：宿舍–实验室 Tailscale 实测；核桃派 pi 密码
 - 雷达→Zotero：9.8 后再设计

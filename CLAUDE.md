@@ -2,14 +2,14 @@
 
 ## 这是什么
 
-方向无关的科研生产力系统：CC（编排大脑）+ 树莓派 4B Broker（7×24 任务代理，dsh/shell 执行）+ 核桃派（墨水屏展示/异地冷备）+ Codex 副脑（交叉验证）+ Tailscale 三端组网 + 4B 兼职 NAS + 夜间文献雷达（23:30 自动）。
+科研**任务调度器**（不是自主科研体）：CC 编排 + 树莓派 4B Broker（7×24 队列，dsh/shell）+ 核桃派墨水屏/冷备 + Codex 副脑 + Tailscale + 4B 兼职 NAS + 夜间文献雷达（23:30）。对外叙事与锐评回复见根 `README.md`、`docs/reports/2026-08-22-critique-replies.md`。
 
 ## 新会话接手规则（重要）
 
 接到本项目任何任务前，先读：
 1. `orchestra/README.md` — 系统运行手册（命令/链路/运维）
 2. `docs/superpowers/specs/2026-08-18-research-orchestra-design.md` §13 — 总 spec 检查清单与各子系统状态
-3. `README.md` — 项目全景记录（第三方审查版：决策链、时间线、索引）
+3. `README.md` — 现状页（拓扑/挂账/Hermes 硬件倒推；**不再**维护 mission 流水和测试计数）
 4. `docs/lessons-learned.md` — 系统运行教训库（**每个 mission 归档时必须把新教训追加进去**）
 
 按任务范围再读对应 mission 档案：`.tasks/completed/NNN_*`（MISSION/STATE/DECISIONS/BRIEF/AUDIT，编号见目录）。
@@ -24,6 +24,7 @@
 - 未跟踪目录（01thesis/、ml-notes/、FCC 脚本、.tasks/、pm3-mcp-server/、.proxmark3/、orchestra/results、logs）一律不入库
 - GitHub 仓库 wocessade/research-orchestra 为 private；push 走已配置的 git 代理
 - 凭据走环境变量/systemd env，绝不入库
+- **不要擅自 `check_skills.py --lock-current`**（digest 锁定须 owner 明确开口）
 
 ## 关键链路速查
 
@@ -32,9 +33,11 @@
 - 雷达：每晚 23:30 注入四阶段任务（`templates/nightly-radar-{fetch,rank,render,notify}.md` → 10/20/30/40，depends_on 串联），晨间 QQ 邮箱日报；评分五维为唯一权威（pipeline 六维弃用，仅精读/归档场景调用）；日报 top5 精读走 nature-reader
 - 定时：03:00 冷备到核桃派 / 04:17 NAS 盘内备份 / 周日 04:00 housekeeping
 - 双 agent：`orchestra/scripts/codex_exec.py` + `codex_modes.py`（互审/双实现/claim 核验）；本机 codex 冷启动 ~2min，互审建议 --timeout ≥900
-- 模型路由：任务卡 `model: flash|pro` 字段（dsh --patch）；codex 三档由 CC 查 `orchestra/config/model-routing.json` 透传
+- 模型路由：任务卡 `model: flash|pro` 字段（dsh --patch）；codex 三档由 CC 查 `orchestra/config/model-routing.json` 透传。改路由表不会自动改已注入的卡
+- `orchestra/config/rules.yaml`：**Broker 不读**；改了不会改调度
 - 并发两档：标准档（4-8 路扁平，030 已实战）/ 树状档（2 层×≤3 子树×≤12 叶子，031 首跑）；opus 只接口+统一 commit，agent 不 commit；约定 `docs/superpowers/specs/2026-08-20-concurrent-work-modes.md`
-- 测试：`unittest discover` 分别在 `orchestra/broker` 与 `orchestra/scripts` 跑；不要把个数手抄进文档
+- 测试：`unittest discover` 分别在 `orchestra/broker` 与 `orchestra/scripts`（以及改到的 `console/`）跑；不要把个数手抄进文档
+- ingest：`jsonschema` + `academic-shared/research/metrics.schema.json` fail-closed；schema 在 `skills.json` 契约中
 - 控制台：`http://127.0.0.1:3100/`（`python orchestra/console/console_feed.py serve`）；数据刷新 `python orchestra/console/console_feed.py refresh`
   - **留言协议**（写 `orchestra/console/messages.md`，serve 约 5s 热重）：
     ```
@@ -47,13 +50,14 @@
   - 个人日程：控制台首页可增删改，或改 `orchestra/console/console-schedule.toml` 的 `[[personal]]`；系统层（雷达/备份）只读。用法见 `orchestra/console/README.md`
   - **日程将近提醒**：读 `console-schedule.toml` 或 `status.json` 的 `upcoming_personal`（未来 14 天未完成个人事项）。会话开头或收束时：48 小时内必须口头提醒，7 天内顺带一句，8–14 天轻提一次。不要每 10 分钟往 `messages.md` 刷提醒。
 
-## 当前挂账（更新日期 2026-08-20）
+## 当前挂账（更新日期 2026-08-22）
 
-- **阶段定位（用户定调）**：整体工程进入收尾复核；【术】已足够，转入【道】——新任务优先产出论文/研究实体，纯基建项只记挂账不急着做
-- SOL 重构 + 030 修复已合并入库：四阶段雷达等需一次 Pi 部署窗口；**2026-08-22 ingest fail-closed 后 skills.json digest 须重新审查锁定**（`academic-shared` 为 required，`expected_digest` 未锁则 ingest HARD），流程见 orchestra/skills/README.md
-- 031 树状档首跑产出 SOL 终审报告（docs/reports/2026-08-sol-refactor-review.md）：**小包 A 已修复入库（739fdfd，1 HIGH+12 MED 全落地，broker 116/scripts 161 绿）**；挂账 B（Pi 部署验证）并入部署窗口
-- 入学前（2026-09）：宿舍-实验室互通实测、Tailscale 切换；弱密码整改 4B 已完成（2026-08-20），核桃派 pi 密码待上线后同步
-- 雷达→Zotero 直连**推迟到 9.8 开学后再设计**（方向已记 `docs/superpowers/plans/2026-08-20-radar-digest-reading-note.md`）
-- 双 agent 想法池剩余项（resume 脚本化 / usage 统计）待选（模型路由表已落地，spec `docs/superpowers/specs/2026-08-20-model-routing-design.md`）
-- **GUI 控制台 v2 主入口已换到 3100**（mission 034 的 v1 Homepage 仍作回退）：自研浅色 SPA `http://127.0.0.1:3100/` + glue `orchestra/console/`（86 测试绿，Pi 零改动）；个人日程可编、月历只标个人、任务四态、临近提醒（`upcoming_personal`）；留言=写 `orchestra/console/messages.md`；**ORCHESTRA_MONITOR_TOKEN 已配用户环境变量（值绝不入库/入对话）**——schtasks 需用户重登一次后继承。SOL 复审见 `docs/superpowers/specs/2026-08-20-console-v2-beautify.md` §0；v1.5（tailnet 手机访问）仍挂账
+- **阶段定位（用户定调）**：【术】已足够，转入【道】——新任务优先论文/研究实体，纯基建只记挂账
+- **Skill digest：owner 暂不锁**（2026-08-22 起）。`academic-shared` 为 required 且 `expected_digest` 未写；engine 契约已改过。`check_skills --strict` / 真实 `run_card.py ingest` 会 HARD。需要入账时再开口锁定，agent 不得自行 `--lock-current`
+- Pi / 核桃派部署窗口：四阶段雷达、artifact 校验、taskkill 树杀等真机验证仍挂
+- 入学前（2026-09-08）：宿舍–实验室 Tailscale 实测；4B 弱密码已改（2026-08-20），核桃派 pi 密码待上线后同步
+- 雷达→Zotero 直连推迟到开学后再设计（`docs/superpowers/plans/2026-08-20-radar-digest-reading-note.md`）
+- **GUI 控制台 v2 主入口 3100**（Homepage v1 仅回退）；留言=`orchestra/console/messages.md`；`ORCHESTRA_MONITOR_TOKEN` 已配用户环境变量（值绝不入库/入对话）。v1.5 tailnet 手机访问仍挂账
+- Hermes：不进 2GB 4B；若做 IM 值班需独立常驻盒（≥8GB、API-only）。不替代 Broker。微信桥仍在 Windows。详见根 README
+- 锐评有意不做：`orchestra_check.py`、原子 `releases/<sha>` 发布、Task 未知字段全拒绝
 - 待用户拍板：SD 旧副本删除、512G SSD 用途、宿舍 NAS、QQ bot

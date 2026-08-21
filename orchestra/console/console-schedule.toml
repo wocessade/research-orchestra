@@ -2,13 +2,19 @@
 # deploy/运维改动 timer 时同步改本文件）；personal 段 = 手录日程。
 
 [system]
-radar = "23:30"                       # 每日夜间雷达注入（orchestra-timer）
-cold_backup = "03:00"                 # 每日冷备到核桃派（orchestra-backup）
-nas_backup = "04:17"                  # 每日 NAS 盘内备份（nas-backup）
+radar = "23:30"             # 每日夜间雷达注入（orchestra-timer）
+cold_backup = "03:00"       # 每日冷备到核桃派（orchestra-backup）
+nas_backup = "04:17"        # 每日 NAS 盘内备份（nas-backup）
 housekeeping = { time = "04:00", dow = "sun" }   # 周日 housekeeping
 
 [[personal]]
-date = "2026-09-01"
+date = "2026-09-08"
 time = "09:00"
 title = "开学报到"
 note = "宿舍-实验室互通实测待办"
+
+[[personal]]
+date = "2026-08-22"
+time = "14:00"
+title = "论文修改"
+note = "自考本科初稿修改"

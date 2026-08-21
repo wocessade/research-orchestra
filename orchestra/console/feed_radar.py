@@ -10,7 +10,10 @@ import json
 import re
 from pathlib import Path
 
-_DIR = re.compile(r"^T-(\d{8})-(10-fetch|20-rank|30-render|40-notify|nightly-radar)$")
+_DIR = re.compile(
+    r"^T-(\d{8})-(?:nightly-radar-(10-fetch|20-rank|30-render|40-notify)"
+    r"|(10-fetch|20-rank|30-render|40-notify)|nightly-radar)$"
+)
 _STAGES = (("10-fetch", "fetch"), ("20-rank", "rank"),
            ("30-render", "render"), ("40-notify", "notify"))
 _FRONT = re.compile(r"^(\w+):\s*(.+)$")
@@ -76,7 +79,8 @@ def _index_radar(root: Path) -> dict:
     for p in root.iterdir():
         m = _DIR.match(p.name)
         if p.is_dir() and m:
-            by_date.setdefault(m.group(1), {})[m.group(2)] = p
+            slug = m.group(2) or m.group(3) or "nightly-radar"
+            by_date.setdefault(m.group(1), {})[slug] = p
     return by_date
 
 
@@ -165,19 +169,22 @@ def _radar_from_day(compact: str, day: dict) -> dict:
 
 def find_radar(root: Path, date: str | None = None) -> dict:
     by_date = _index_radar(root)
+    history = list_radar_dates(root)
     if not by_date:
-        return {"available": False}
+        return {"available": False, "history": history}
     compact = _compact_date(date)
     if date and not compact:
-        return {"available": False, "date": date, "error": "bad_date"}
+        return {"available": False, "date": date, "error": "bad_date",
+                "history": history}
     if compact:
         if compact not in by_date:
-            return {"available": False, "date": _iso_date(compact), "error": "not_found"}
+            return {"available": False, "date": _iso_date(compact),
+                    "error": "not_found", "history": history}
         payload = _radar_from_day(compact, by_date[compact])
     else:
         latest = max(by_date)
         payload = _radar_from_day(latest, by_date[latest])
-    payload["history"] = list_radar_dates(root)
+    payload["history"] = history
     return payload
 
 

@@ -192,14 +192,48 @@
       .join("");
   }
 
+  function upcomingFromEvents(events) {
+    const now = new Date();
+    const horizon = new Date(now);
+    horizon.setHours(23, 59, 59, 999);
+    horizon.setDate(horizon.getDate() + 14);
+    const today = new Date(now);
+    today.setHours(0, 0, 0, 0);
+    const rows = [];
+    for (const ev of events || []) {
+      if (ev.layer !== "personal" || ev.done) continue;
+      if (ev.start < now || ev.start > horizon) continue;
+      const day = new Date(ev.start);
+      day.setHours(0, 0, 0, 0);
+      const daysLeft = Math.round((day - today) / 86400000);
+      const urg = personalUrgency(ev.start);
+      let urgency = "due-14";
+      if (urg === "due-0" || urg === "due-2" || urg === "due-7") urgency = urg;
+      let inText = `${daysLeft} 天后`;
+      if (daysLeft === 0) inText = `今天 ${formatHM(ev.start)}`;
+      else if (daysLeft === 1) inText = "明天";
+      rows.push({
+        title: ev.title,
+        at: `${dayKey(ev.start)} ${formatHM(ev.start)}`,
+        in_text: inText,
+        note: ev.note || "",
+        days_left: daysLeft,
+        urgency,
+        start: ev.start,
+      });
+    }
+    rows.sort((a, b) => a.start - b.start || String(a.title).localeCompare(b.title));
+    return rows;
+  }
+
   function renderPulse(targetId, status) {
     const el = $(targetId);
     if (!el || !status) {
       if (el) el.innerHTML = `<div class="empty">无状态数据</div>`;
       return;
     }
-    const upcoming = (status && status.upcoming_personal) || [];
-    const soon = upcoming[0];
+    const upcoming = upcomingFromEvents(state.events);
+    const soon = upcoming[0] || ((status && status.upcoming_personal) || [])[0];
     const cards = [
       {
         label: "队列",
@@ -235,71 +269,92 @@
       .join("");
   }
 
+  function addDaysISO(iso, n) {
+    const d = new Date(`${iso}T00:00:00`);
+    d.setDate(d.getDate() + n);
+    return dayKey(d);
+  }
+
+  function daysBetween(a, b) {
+    const da = new Date(`${a}T00:00:00`);
+    const db = new Date(`${b}T00:00:00`);
+    return Math.round((db - da) / 86400000);
+  }
+
+  function agendaDayKeys(events) {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const today = dayKey(now);
+    const keys = new Set();
+    for (let i = 0; i < 7; i += 1) {
+      const d = new Date(now);
+      d.setDate(d.getDate() + i);
+      keys.add(dayKey(d));
+    }
+    for (const ev of events) {
+      if (ev.layer !== "personal") continue;
+      const day = new Date(ev.start);
+      day.setHours(0, 0, 0, 0);
+      if (day >= now) keys.add(dayKey(day));
+    }
+    const focus = state.focusDay;
+    if (focus && focus >= today) keys.add(focus);
+    const sorted = [...keys].sort();
+    return sorted.length ? sorted : [today];
+  }
+
   function renderAgenda(events) {
     const el = $("agenda");
     if (!el) return;
-    const now = new Date();
-    const today = dayKey(now);
-    const start = new Date(now);
-    start.setHours(0, 0, 0, 0);
-    start.setDate(start.getDate() - 3);
-    const sysEnd = new Date(now);
-    sysEnd.setHours(23, 59, 59, 999);
-    sysEnd.setDate(sysEnd.getDate() + 7);
-    const perEnd = new Date(now);
-    perEnd.setHours(23, 59, 59, 999);
-    perEnd.setDate(perEnd.getDate() + 60);
-
-    const filtered = events
-      .filter((e) => {
-        if (e.start < start) return false;
-        return e.layer === "personal" ? e.start <= perEnd : e.start <= sysEnd;
-      })
+    const today = dayKey(new Date());
+    const personal = (events || [])
+      .filter((e) => e.layer === "personal")
       .sort((a, b) => a.start - b.start);
-
-    if (!filtered.length) {
-      el.innerHTML = `<div class="empty">窗口内无日程（系统：昨3天→未7天；个人：未60天）</div>`;
-      return;
+    const byDay = new Map();
+    for (const ev of personal) {
+      const key = dayKey(ev.start);
+      if (!byDay.has(key)) byDay.set(key, []);
+      byDay.get(key).push(ev);
     }
-
-    const groups = new Map();
-    for (const ev of filtered) {
-      const meta = formatDayLabel(ev.start, today);
-      if (!groups.has(meta.key)) groups.set(meta.key, { meta, items: [] });
-      groups.get(meta.key).items.push(ev);
-    }
-
-    el.innerHTML = [...groups.values()]
-      .map(({ meta, items }) => {
+    el.innerHTML = agendaDayKeys(personal)
+      .map((key) => {
+        const dummy = new Date(`${key}T00:00:00`);
+        const meta = formatDayLabel(dummy, today);
+        const items = byDay.get(key) || [];
         const rows = items
           .map((ev) => {
             const series = ev.seriesId || ev.uid;
-            const day = dayKey(ev.start);
-            const side = ev.layer === "personal"
-              ? `<div class="event-side">
-                  <span class="event-layer">${ev.repeat === "weekly" ? "每周" : "个人"}</span>
-                  <button type="button" class="btn-tiny" data-done="${esc(series)}" data-day="${esc(day)}">${ev.done ? "撤销" : "完成"}</button>
-                  <button type="button" class="btn-tiny" data-edit="${esc(series)}">改</button>
-                  <button type="button" class="btn-tiny danger" data-del="${esc(series)}">${ev.repeat === "weekly" ? "删系列" : "删"}</button>
-                </div>`
-              : `<div class="event-layer">系统</div>`;
-            const urg = ev.layer === "personal" && !ev.done ? personalUrgency(ev.start) : "";
-            const timeCls = ev.layer === "personal" ? "event-time editish" : "event-time";
-            const extra = ev.done ? "done" : "";
-            return `<div class="event ${urg} ${extra}">
-            <div class="${timeCls}" ${ev.layer === "personal" ? `data-edit="${esc(series)}" title="改时间"` : ""}>${esc(formatHM(ev.start))}</div>
-            <div class="event-rail ${esc(ev.layer)}"></div>
-            <div>
-              <div class="event-title">${esc(ev.title)}</div>
-              ${ev.note ? `<div class="event-note">${esc(ev.note)}</div>` : ""}
-            </div>
-            ${side}
-          </div>`;
+            const hm = formatHM(ev.start);
+            const urg = !ev.done ? personalUrgency(ev.start) : "";
+            const weekly = ev.repeat === "weekly" ? " · 每周" : "";
+            return `<div class="task-card ${urg} ${ev.done ? "is-done" : ""}" draggable="true" data-id="${esc(series)}" data-day="${esc(key)}">
+              <div class="task-when">
+                <input type="date" class="task-date" value="${esc(key)}" data-date-id="${esc(series)}" data-from-day="${esc(key)}" />
+                <input type="time" class="task-time" value="${esc(hm)}" data-time-id="${esc(series)}" />
+              </div>
+              <div class="task-main">
+                <input type="text" class="task-title" maxlength="80" value="${esc(ev.title)}" data-title-id="${esc(series)}" />
+                ${ev.note ? `<div class="task-note">${esc(ev.note)}${weekly}</div>` : (weekly ? `<div class="task-note">${weekly.trim()}</div>` : "")}
+              </div>
+              <div class="task-actions">
+                <button type="button" class="task-btn done-btn ${ev.done ? "is-on" : ""}" data-done="${esc(series)}" data-day="${esc(key)}" title="${ev.done ? "撤销完成" : "完成"}">${ev.done ? "✓" : ""}</button>
+                <button type="button" class="task-btn del-btn" data-del="${esc(series)}" title="删除">×</button>
+              </div>
+            </div>`;
           })
           .join("");
-        return `<div class="day-group" data-day="${esc(meta.key)}">
+        const composer = (items.length || key === today || key === state.focusDay)
+          ? `<form class="task-composer" data-day="${esc(key)}">
+            <input type="time" name="time" value="09:00" class="task-time" />
+            <input type="text" name="title" maxlength="80" placeholder="写点什么…（回车或失焦保存）" />
+            <label class="check"><input type="checkbox" name="weekly" /> 每周</label>
+            <button type="submit" class="btn-tiny">添加</button>
+          </form>`
+          : `<div class="day-drop-hint">拖到这一天</div>`;
+        return `<div class="day-group ${items.length ? "" : "is-empty"}" data-day="${esc(key)}">
           <div class="day-label ${meta.isToday ? "is-today" : ""}">${esc(meta.label)}${meta.isToday ? " · 今天" : ""}</div>
           ${rows}
+          ${composer}
         </div>`;
       })
       .join("");
@@ -441,25 +496,56 @@
     return out;
   }
 
+  function radarHistory(radar) {
+    const incoming = radar && Array.isArray(radar.history) ? radar.history : [];
+    if (incoming.length) return incoming;
+    const prev = state.radar && Array.isArray(state.radar.history) ? state.radar.history : [];
+    return prev;
+  }
+
+  function renderRadarHistory(hist, activeDate) {
+    const history = $("radar-history");
+    if (!history) return;
+    if (!hist.length) {
+      history.innerHTML = `<div class="empty">仅当前一期</div>`;
+      return;
+    }
+    history.innerHTML = hist
+      .slice(0, TASK_CAP)
+      .map((h) => {
+        const on = h.date === activeDate ? "is-active" : "";
+        const miss = h.has_digest ? "" : "no-digest";
+        return `<button type="button" class="history-chip ${on} ${miss}" data-radar-date="${esc(h.date)}">${esc(h.date)}${h.has_digest ? "" : " · 无正文"}</button>`;
+      })
+      .join("");
+  }
+
   function renderRadar(radar) {
     const meta = $("radar-meta");
     const stages = $("radar-stages");
     const top5 = $("radar-top5");
     const digest = $("radar-digest");
-    const history = $("radar-history");
+    const hist = radarHistory(radar);
+    if (radar && hist.length) radar.history = hist;
     if (!radar || !radar.available) {
       if (meta) meta.innerHTML = `<div class="meta-pill">雷达数据不可用</div>`;
       if (stages) stages.innerHTML = `<div class="empty">无阶段数据</div>`;
       if (top5) top5.innerHTML = `<div class="empty">无 Top5</div>`;
       if (digest) digest.textContent = "无日报";
-      if (history) history.innerHTML = `<div class="empty">暂无往期</div>`;
+      renderRadarHistory(hist, radar && radar.date);
       return;
     }
 
+    const val = radar.validation;
+    const valText = val == null
+      ? "—"
+      : (typeof val === "object"
+        ? (val.status || val.result || "有报告")
+        : String(val));
     meta.innerHTML = [
       ["日期", radar.date || "—"],
       ["模式", radar.mode || "—"],
-      ["校验", radar.validation == null ? "—" : String(radar.validation)],
+      ["校验", valText],
     ]
       .map(
         ([k, v]) =>
@@ -467,18 +553,7 @@
       )
       .join("");
 
-    const hist = Array.isArray(radar.history) ? radar.history : [];
-    if (history) {
-      history.innerHTML = hist.length
-        ? hist
-            .map((h) => {
-              const on = h.date === radar.date ? "is-active" : "";
-              const miss = h.has_digest ? "" : "no-digest";
-              return `<button type="button" class="history-chip ${on} ${miss}" data-radar-date="${esc(h.date)}">${esc(h.date)}${h.has_digest ? "" : " · 无正文"}</button>`;
-            })
-            .join("")
-        : `<div class="empty">仅当前一期</div>`;
-    }
+    renderRadarHistory(hist, radar.date);
 
     const st = Array.isArray(radar.stages) ? radar.stages : [];
     stages.innerHTML = st.length
@@ -565,6 +640,7 @@
     for (const t of (status && status.recent_tasks) || []) take(t);
     for (const a of (status && status.attempts) || []) take(a);
     const rows = [...map.values()];
+    rows.sort((a, b) => String(b.time || "").localeCompare(String(a.time || "")));
     const has = (bucket) => rows.some((r) => r.bucket === bucket);
     const queueLen = Number(status && status.queue_len) || 0;
     const active = Number(status && status.active_tasks) || 0;
@@ -587,25 +663,35 @@
     return rows;
   }
 
+  const TASK_CAP = 10;
+
   function renderTaskBucket(targetId, countId, items, emptyText) {
     const labelOf = (row) => BUCKET_LABEL[row.bucket] || row.status || "—";
-    renderRows(targetId, items, (row) => {
+    const shown = items.slice(0, TASK_CAP);
+    renderRows(targetId, shown, (row) => {
       const extra = [
         row.attempt != null ? `attempt ${row.attempt}` : "",
         row.time || "",
         row.error || "",
       ].filter(Boolean).join(" · ");
       return `<div class="row">
-        <div class="row-main">${esc(row.name)}</div>
+        <div class="row-main" title="${esc(row.name)}">${esc(row.name)}</div>
         <span class="badge ${badgeClass(row.bucket)}">${esc(labelOf(row))}</span>
         ${extra ? `<div class="row-sub">${esc(extra)}</div>` : ""}
       </div>`;
     });
     const countEl = $(countId);
     if (countEl) countEl.textContent = String(items.length);
+    const el = $(targetId);
     if (!items.length) {
-      const el = $(targetId);
       if (el) el.innerHTML = `<div class="empty">${esc(emptyText)}</div>`;
+      return;
+    }
+    if (el && items.length > TASK_CAP) {
+      el.insertAdjacentHTML(
+        "beforeend",
+        `<div class="empty">只列最近 ${TASK_CAP} 条，另有 ${items.length - TASK_CAP} 条</div>`,
+      );
     }
   }
 
@@ -625,13 +711,20 @@
     if (!expAvailable) {
       expEl.innerHTML = `<div class="empty">实验卡目录未初始化</div>`;
     } else {
-      renderRows("experiments", experiments, (c) => {
+      const cards = experiments.slice(0, TASK_CAP);
+      renderRows("experiments", cards, (c) => {
         const st = c.status || "—";
         return `<div class="row">
-          <div class="row-main">${esc(c.id || "—")}</div>
+          <div class="row-main" title="${esc(c.id || "")}">${esc(c.id || "—")}</div>
           <span class="badge ${badgeClass(st)}">${esc(st)}</span>
         </div>`;
       });
+      if (experiments.length > TASK_CAP) {
+        expEl.insertAdjacentHTML(
+          "beforeend",
+          `<div class="empty">只列 ${TASK_CAP} 张，另有 ${experiments.length - TASK_CAP} 张</div>`,
+        );
+      }
     }
   }
 
@@ -695,14 +788,16 @@
   function renderSoon(status) {
     const el = $("soon");
     if (!el) return;
-    const list = (status && status.upcoming_personal) || [];
-    if (!list.length) {
+    const list = upcomingFromEvents(state.events);
+    const fallback = (status && status.upcoming_personal) || [];
+    const rows = list.length ? list : fallback;
+    if (!rows.length) {
       el.classList.add("hidden");
       el.innerHTML = "";
       return;
     }
     el.classList.remove("hidden");
-    el.innerHTML = list
+    el.innerHTML = rows
       .slice(0, 4)
       .map((u) => {
         const note = u.note ? ` · ${esc(u.note)}` : "";
@@ -720,7 +815,6 @@
     renderPulse("tasks-pulse", status);
     renderAgenda(events);
     renderMonth(events);
-    renderNext("next-list", (status && status.next) || []);
     renderMessages((messages && messages.latest) || [], "messages-latest", "");
     renderMessages((messages && messages.pending) || [], "messages-pending", "pending");
     renderMessages((messages && messages.alerts) || [], "messages-alerts", "alert");
@@ -787,74 +881,95 @@
   }
 
   function setFormStatus(text) {
-    $("pf-status").textContent = text || "";
+    const el = $("agenda-status");
+    if (el) el.textContent = text || "点月历某天添加 · 卡片可改日期";
   }
 
-  function resetPersonalForm() {
-    state.editingId = "";
-    $("pf-id").value = "";
-    const now = new Date();
-    $("pf-date").value = dayKey(now);
-    $("pf-time").value = `${String((now.getHours() + 1) % 24).padStart(2, "0")}:00`;
-    $("pf-title").value = "";
-    $("pf-note").value = "";
-    $("pf-weekly").checked = false;
-    $("pf-submit").textContent = "添加";
-    $("pf-cancel").classList.add("hidden");
-  }
-
-  function fillPersonalForm(item) {
-    state.editingId = item.id;
-    $("pf-id").value = item.id;
-    $("pf-date").value = item.date;
-    $("pf-time").value = item.time;
-    $("pf-title").value = item.title;
-    $("pf-note").value = item.note || "";
-    $("pf-weekly").checked = item.repeat === "weekly";
-    $("pf-submit").textContent = "保存";
-    $("pf-cancel").classList.remove("hidden");
-  }
-
-  function formPayload() {
+  function itemPayload(item, patch) {
     return {
-      date: $("pf-date").value,
-      time: $("pf-time").value,
-      title: $("pf-title").value.trim(),
-      note: $("pf-note").value.trim(),
-      repeat: $("pf-weekly").checked ? "weekly" : "",
+      id: item.id,
+      date: item.date,
+      time: item.time,
+      title: item.title,
+      note: item.note || "",
+      repeat: item.repeat || "",
+      ...(patch || {}),
     };
   }
 
-  async function savePersonal(ev) {
-    ev.preventDefault();
-    const payload = formPayload();
-    if (!payload.title) {
+  async function putPersonal(payload) {
+    const res = await fetch("/api/personal", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `失败 ${res.status}`);
+    await loadCore();
+  }
+
+  async function addPersonal(payload) {
+    const res = await fetch("/api/personal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `失败 ${res.status}`);
+    await loadCore();
+  }
+
+  async function saveQuickAdd(form) {
+    const title = (form.title.value || "").trim();
+    if (!title) {
       setFormStatus("标题必填");
       return;
     }
+    if (form.dataset.busy === "1") return;
+    form.dataset.busy = "1";
     setFormStatus("保存中…");
-    const editing = state.editingId;
-    const res = await fetch("/api/personal", {
-      method: editing ? "PUT" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(editing ? { ...payload, id: editing } : payload),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      setFormStatus(data.error || `失败 ${res.status}`);
-      return;
+    try {
+      state.focusDay = form.dataset.day;
+      await addPersonal({
+        date: form.dataset.day,
+        time: form.time.value || "09:00",
+        title,
+        note: "",
+        repeat: form.weekly.checked ? "weekly" : "",
+      });
+      setFormStatus("已保存");
+    } finally {
+      delete form.dataset.busy;
     }
-    resetPersonalForm();
+  }
+
+  async function patchField(id, patch) {
+    const item = state.personal.find((p) => p.id === id);
+    if (!item) return;
+    setFormStatus("保存中…");
+    await putPersonal(itemPayload(item, patch));
     setFormStatus("已保存");
-    await loadCore();
+  }
+
+  async function moveCard(id, fromDay, toDay) {
+    if (!id || !toDay || fromDay === toDay) return;
+    const item = state.personal.find((p) => p.id === id);
+    if (!item) return;
+    const date = item.repeat === "weekly"
+      ? addDaysISO(item.date, daysBetween(fromDay, toDay))
+      : toDay;
+    setFormStatus("保存中…");
+    state.focusDay = toDay;
+    await putPersonal(itemPayload(item, { date }));
+    setFormStatus("已改日期");
   }
 
   async function deletePersonal(id) {
     if (!id) return;
     const item = state.personal.find((p) => p.id === id);
     const msg = item && item.repeat === "weekly"
-      ? "删除整个每周系列？（系统层事件不会被删）"
-      : "删除这条个人日程？系统层事件不会被删。";
+      ? "删除整个每周系列？"
+      : "删除这条个人日程？";
     if (!window.confirm(msg)) return;
     const res = await fetch(`/api/personal?id=${encodeURIComponent(id)}`, {
       method: "DELETE",
@@ -864,7 +979,6 @@
       setFormStatus(data.error || `删除失败 ${res.status}`);
       return;
     }
-    if (state.editingId === id) resetPersonalForm();
     setFormStatus("已删除");
     await loadCore();
   }
@@ -894,29 +1008,82 @@
         $("banner").textContent = `刷新失败：${err.message}`;
       });
     });
-    $("personal-form").addEventListener("submit", (e) => {
-      savePersonal(e).catch((err) => setFormStatus(err.message));
-    });
-    $("pf-cancel").addEventListener("click", () => {
-      resetPersonalForm();
-      setFormStatus("");
-    });
     $("agenda").addEventListener("click", (e) => {
-      const edit = e.target.closest("[data-edit]");
       const del = e.target.closest("[data-del]");
       const done = e.target.closest("[data-done]");
       if (done) {
         toggleDone(done.dataset.done, done.dataset.day).catch((err) => setFormStatus(err.message));
-      } else if (edit) {
-        const item = state.personal.find((p) => p.id === edit.dataset.edit);
-        if (item) {
-          fillPersonalForm(item);
-          if (edit.classList.contains("event-time")) $("pf-time").focus();
-          else $("pf-title").focus();
-        }
       } else if (del) {
         deletePersonal(del.dataset.del).catch((err) => setFormStatus(err.message));
       }
+    });
+    $("agenda").addEventListener("change", (e) => {
+      const timeEl = e.target.closest("[data-time-id]");
+      const dateEl = e.target.closest("[data-date-id]");
+      if (dateEl) {
+        moveCard(dateEl.dataset.dateId, dateEl.dataset.fromDay, dateEl.value)
+          .catch((err) => setFormStatus(err.message));
+      } else if (timeEl) {
+        patchField(timeEl.dataset.timeId, { time: timeEl.value }).catch((err) => setFormStatus(err.message));
+      }
+    });
+    $("agenda").addEventListener("focusout", (e) => {
+      const composer = e.target.closest(".task-composer");
+      if (composer && e.target.name === "title") {
+        const next = (e.relatedTarget && composer.contains(e.relatedTarget));
+        if (next) return;
+        if ((composer.title.value || "").trim()) {
+          saveQuickAdd(composer).catch((err) => setFormStatus(err.message));
+        }
+        return;
+      }
+      const titleEl = e.target.closest("[data-title-id]");
+      if (!titleEl) return;
+      const item = state.personal.find((p) => p.id === titleEl.dataset.titleId);
+      const next = titleEl.value.trim();
+      if (!item || !next || next === item.title) return;
+      patchField(item.id, { title: next }).catch((err) => setFormStatus(err.message));
+    });
+    $("agenda").addEventListener("submit", (e) => {
+      const form = e.target.closest(".task-composer");
+      if (!form) return;
+      e.preventDefault();
+      saveQuickAdd(form).catch((err) => setFormStatus(err.message));
+    });
+    $("agenda").addEventListener("dragstart", (e) => {
+      const card = e.target.closest(".task-card");
+      if (!card || e.target.closest("input,button")) {
+        e.preventDefault();
+        return;
+      }
+      e.dataTransfer.setData("text/plain", JSON.stringify({
+        id: card.dataset.id,
+        day: card.dataset.day,
+      }));
+      e.dataTransfer.effectAllowed = "move";
+    });
+    $("agenda").addEventListener("dragover", (e) => {
+      const group = e.target.closest(".day-group");
+      if (!group) return;
+      e.preventDefault();
+      group.classList.add("is-over");
+    });
+    $("agenda").addEventListener("dragleave", (e) => {
+      const group = e.target.closest(".day-group");
+      if (group && !group.contains(e.relatedTarget)) group.classList.remove("is-over");
+    });
+    $("agenda").addEventListener("drop", (e) => {
+      const group = e.target.closest(".day-group");
+      if (!group) return;
+      e.preventDefault();
+      group.classList.remove("is-over");
+      let payload;
+      try {
+        payload = JSON.parse(e.dataTransfer.getData("text/plain") || "{}");
+      } catch (err) {
+        return;
+      }
+      moveCard(payload.id, payload.day, group.dataset.day).catch((err) => setFormStatus(err.message));
     });
     $("month-prev").addEventListener("click", () => {
       const cur = monthCursor();
@@ -931,9 +1098,15 @@
     $("cal-month").addEventListener("click", (e) => {
       const cell = e.target.closest("[data-jump]");
       if (!cell) return;
-      state.focusDay = cell.dataset.jump;
+      const jump = cell.dataset.jump;
+      const today = dayKey(new Date());
+      state.focusDay = jump;
+      if (jump >= today) {
+        renderAgenda(state.events);
+        setFormStatus(`添加：${jump} · 或改卡片上的日期`);
+      }
       renderMonth(state.events);
-      const group = document.querySelector(`.day-group[data-day="${cell.dataset.jump}"]`);
+      const group = document.querySelector(`.day-group[data-day="${jump}"]`);
       if (group) group.scrollIntoView({ block: "start", behavior: "smooth" });
     });
     $("radar-history").addEventListener("click", (e) => {
@@ -941,6 +1114,9 @@
       if (!chip) return;
       fetchJson(`/api/radar?date=${encodeURIComponent(chip.dataset.radarDate)}`)
         .then((radar) => {
+          if (!radar.history || !radar.history.length) {
+            radar.history = (state.radar && state.radar.history) || [];
+          }
           state.radar = radar;
           renderRadar(radar);
         })
@@ -955,7 +1131,6 @@
     });
     const hash = (location.hash || "").replace(/^#/, "");
     if (["today", "radar", "tasks", "system"].includes(hash)) setTab(hash);
-    resetPersonalForm();
   }
 
   bind();

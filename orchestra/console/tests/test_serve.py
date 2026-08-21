@@ -186,6 +186,7 @@ class ServeTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertTrue(data["available"])
         self.assertIn("lookup", data["digest_txt"])
+        self.assertTrue(any(h.get("date") == "2026-08-19" for h in data.get("history") or []))
 
     def test_unknown_404(self):
         status, _ = self._get("/nope.json")
@@ -221,6 +222,19 @@ class ServeTest(unittest.TestCase):
             "date": "2026-09-03", "time": "99:00", "title": "坏",
         })
         self.assertEqual(status, 400)
+
+    def test_personal_post_updates_status_upcoming(self):
+        from datetime import date, timedelta
+        (self.out / "status.json").write_text(
+            json.dumps({"upcoming_personal": []}), encoding="utf-8")
+        soon = date.today() + timedelta(days=2)
+        status, _ = self._json("POST", "/api/personal", {
+            "date": soon.isoformat(), "time": "14:00", "title": "临近测",
+        })
+        self.assertEqual(status, 200)
+        st = json.loads((self.out / "status.json").read_text(encoding="utf-8"))
+        titles = [u["title"] for u in st["upcoming_personal"]]
+        self.assertIn("临近测", titles)
 
     def test_personal_post_does_not_touch_system(self):
         self._json("POST", "/api/personal", {

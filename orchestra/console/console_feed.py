@@ -32,11 +32,72 @@ from feed_status import DEFAULT_MONITOR_API, aggregate, fetch_dashboard
 
 _WINDOW_BEFORE = timedelta(days=30)
 _WINDOW_AFTER = timedelta(days=60)
+DEFAULT_SSH_HOST = "192.168.0.250"
+DEFAULT_SSH_USER = "liuxfs"
+DEFAULT_REMOTE_ROOT = "/mnt/broker"
 
 
 def _write_raw(path: Path, text: str) -> None:
     with open(path, "w", encoding="utf-8", newline="") as f:
         f.write(text)
+
+
+def _ssh_target() -> tuple[str, str, str]:
+    host = os.environ.get("ORCHESTRA_SSH_HOST") or DEFAULT_SSH_HOST
+    user = os.environ.get("ORCHESTRA_SSH_USER") or DEFAULT_SSH_USER
+    remote = (os.environ.get("ORCHESTRA_REMOTE_ROOT") or DEFAULT_REMOTE_ROOT).rstrip("/")
+    return host, user, remote
+
+
+def sync_pull(results_root: Path) -> str:
+    """拉回 4B results/logs。Windows 优先 OpenSSH scp；否则 bash+sync_pull.sh。"""
+    host, user, remote = _ssh_target()
+    env = os.environ.copy()
+    env["ORCHESTRA_SSH_HOST"] = host
+    env["ORCHESTRA_SSH_USER"] = user
+    env["ORCHESTRA_REMOTE_ROOT"] = remote
+    scp = shutil.which("scp")
+    bash = shutil.which("bash")
+    prefer_scp = sys.platform == "win32" and scp
+    if prefer_scp or (scp and not bash):
+        dest_results = Path(results_root)
+        dest_logs = dest_results.parent / "logs"
+        dest_results.mkdir(parents=True, exist_ok=True)
+        dest_logs.mkdir(parents=True, exist_ok=True)
+        try:
+            r1 = subprocess.run(
+                [scp, "-rq", f"{user}@{host}:{remote}/results/.", str(dest_results)],
+                capture_output=True, text=True, encoding="utf-8",
+                errors="replace", timeout=300)
+            r2 = subprocess.run(
+                [scp, "-rq", f"{user}@{host}:{remote}/logs/.", str(dest_logs)],
+                capture_output=True, text=True, encoding="utf-8",
+                errors="replace", timeout=300)
+            err = " ".join(
+                t.strip() for t in (r1.stderr, r2.stderr)
+                if isinstance(t, str) and t.strip())
+            note = (f"sync_pull scp results={r1.returncode} logs={r2.returncode} "
+                    f"host={host}")
+            if err:
+                note += f" ({err[:180]})"
+            return note
+        except subprocess.TimeoutExpired:
+            return "sync_pull scp timeout"
+    if bash:
+        script = Path(__file__).resolve().parent.parent / "scripts" / "sync_pull.sh"
+        try:
+            proc = subprocess.run(
+                [bash, str(script)], cwd=str(script.parent),
+                capture_output=True, text=True, encoding="utf-8",
+                errors="replace", timeout=300, env=env)
+            err = proc.stderr.strip() if isinstance(proc.stderr, str) else ""
+            note = f"sync_pull exit={proc.returncode} host={host}"
+            if err:
+                note += f" ({err[:180]})"
+            return note
+        except subprocess.TimeoutExpired:
+            return "sync_pull timeout"
+    return "sync_pull skipped（缺 bash 与 scp）"
 
 
 def cmd_refresh(args) -> int:
@@ -80,18 +141,7 @@ def cmd_refresh(args) -> int:
         json.dumps(status, ensure_ascii=False, indent=2), encoding="utf-8")
 
     if not args.no_sync:
-        script = console.parent / "scripts" / "sync_pull.sh"
-        bash = shutil.which("bash")
-        if bash and os.environ.get("ORCHESTRA_SSH_HOST"):
-            try:
-                proc = subprocess.run(
-                    [bash, str(script)], cwd=str(script.parent),
-                    capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
-                notes.append(f"sync_pull exit={proc.returncode}")
-            except subprocess.TimeoutExpired:
-                notes.append("sync_pull timeout")
-        else:
-            notes.append("sync_pull skipped（缺 bash 或 ORCHESTRA_SSH_HOST）")
+        notes.append(sync_pull(results_root))
 
     radar = find_radar(results_root)
     (out / "radar.json").write_text(

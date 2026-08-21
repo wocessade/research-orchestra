@@ -1,6 +1,7 @@
 import argparse
 import copy
 import json
+import os
 import tempfile
 import time
 import unittest
@@ -105,6 +106,56 @@ class RefreshTest(unittest.TestCase):
             raw = (self.out / name).read_bytes()
             self.assertNotIn(b"\r\r", raw)
             self.assertIn(b"BEGIN:VCALENDAR\r\n", raw)
+
+
+    def test_refresh_sync_skip_without_bash_or_scp(self):
+        with mock.patch("console_feed.fetch_dashboard", side_effect=_fresh_monitor), \
+             mock.patch("console_feed.shutil.which", return_value=None), \
+             mock.patch("console_feed.subprocess.run") as run:
+            rc = cmd_refresh(self._args(no_sync=False))
+        self.assertEqual(rc, 0)
+        run.assert_not_called()
+        log = (self.out / "feed.log").read_text(encoding="utf-8")
+        self.assertIn("缺 bash 与 scp", log)
+
+    def test_refresh_sync_scp_defaults_host(self):
+        def which(name):
+            return r"C:\Windows\System32\OpenSSH\scp.exe" if name == "scp" else None
+
+        fake = mock.Mock(returncode=0)
+        with mock.patch("console_feed.fetch_dashboard", side_effect=_fresh_monitor), \
+             mock.patch("console_feed.shutil.which", side_effect=which), \
+             mock.patch("console_feed.subprocess.run", return_value=fake) as run, \
+             mock.patch.dict(os.environ, {"ORCHESTRA_SSH_HOST": ""}, clear=False):
+            rc = cmd_refresh(self._args(no_sync=False))
+        self.assertEqual(rc, 0)
+        self.assertEqual(run.call_count, 2)
+        first = run.call_args_list[0].args[0]
+        self.assertEqual(first[0], r"C:\Windows\System32\OpenSSH\scp.exe")
+        self.assertEqual(first[1], "-rq")
+        self.assertIn("liuxfs@192.168.0.250:/mnt/broker/results/.", first[2])
+        log = (self.out / "feed.log").read_text(encoding="utf-8")
+        self.assertIn("sync_pull scp", log)
+        self.assertIn("host=192.168.0.250", log)
+
+    def test_refresh_sync_windows_prefers_scp_over_bash(self):
+        def which(name):
+            if name == "scp":
+                return r"C:\Windows\System32\OpenSSH\scp.exe"
+            if name == "bash":
+                return r"C:\Git\bin\bash.exe"
+            return None
+
+        fake = mock.Mock(returncode=0)
+        with mock.patch("console_feed.fetch_dashboard", side_effect=_fresh_monitor), \
+             mock.patch("console_feed.shutil.which", side_effect=which), \
+             mock.patch("console_feed.sys.platform", "win32"), \
+             mock.patch("console_feed.subprocess.run", return_value=fake) as run:
+            rc = cmd_refresh(self._args(no_sync=False))
+        self.assertEqual(rc, 0)
+        self.assertEqual(run.call_count, 2)
+        self.assertEqual(run.call_args_list[0].args[0][0],
+                         r"C:\Windows\System32\OpenSSH\scp.exe")
 
 
 if __name__ == "__main__":

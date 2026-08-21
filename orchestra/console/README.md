@@ -18,7 +18,7 @@
 | `feed_radar.py` | results/.research 扫描 |
 | `feed_serve.py` | out/ + ui/ 同端口服务；messages.json mtime 热重 |
 | `homepage/` | v1 Homepage 配置（保留，不删除） |
-| `startup_serve.bat` / `startup_homepage.bat` | 开机自启 |
+| `startup_serve.pyw` / `startup_homepage.pyw` | 开机自启（.pyw 无窗口；Startup 里不要放 .bat，会闪 cmd 黑框） |
 | `out/` | 产物（不入库） |
 | `tests/` | unittest |
 
@@ -28,8 +28,29 @@
 2. 起服务：`python console_feed.py serve` → **打开 http://127.0.0.1:3100/**
 3. 四页：今天 / 雷达 / 任务实验 / 系统（顶栏切换；URL hash `#today|#radar|#tasks|#system`）
 4. 留言：写 `messages.md` → 页内约 5s 热重可见。协议见下方「Agent / CC 协议」
-5. **个人日程**：首页可增删改、勾完成、勾「每周重复」、右侧月历跳转；写入 `console-schedule.toml` 的 `[[personal]]`，系统层只读
-6. 环境变量（绝不入库）：`ORCHESTRA_MONITOR_TOKEN`、`ORCHESTRA_MONITOR_API`、`ORCHESTRA_SSH_HOST`
+5. **个人日程**：首页只列今天起的个人卡片。点月历某天打开添加栏（写完回车 / 失焦 /「添加」）；卡片上可改日期和时间；完成圈与红X删除；可拖到另一天。写入 `console-schedule.toml` 的 `[[personal]]`。系统定时只在「系统」页。
+6. 环境变量（绝不入库）：`ORCHESTRA_MONITOR_TOKEN`、`ORCHESTRA_MONITOR_API`；`ORCHESTRA_SSH_HOST` 缺省 `192.168.0.250`
+7. **雷达往期**：点日期 chips 切换；`GET /api/radar?date=YYYY-MM-DD` 必须带 `history`，chips 不能随切换被清空。
+8. **任务实验**：排队/运行中/完成/挂起/实验卡每种最多展示 10 条。
+
+## 近期维护（2026-08-21）
+
+首页日程与雷达同步的实装记录，给后续会话接手用。
+
+| 项 | 说明 |
+|---|---|
+| 个人日程 UI | `ui/app.js` `renderAgenda`：个人卡片 + `PUT /api/personal`；系统 ICS 仍生成，首页不展示 |
+| 添加入口 | 今天组自带「写点什么」；其它天要点右侧月历；提交=回车/失焦/添加按钮 |
+| Windows sync_pull | `console_feed.sync_pull`：Win32 **优先 OpenSSH scp**，缺省 host `192.168.0.250`。Git Bash `sync_pull.sh` 在计划任务里常 exit 1，不要当唯一路径 |
+| 四阶段目录名 | 真机是 `T-YYYYMMDD-nightly-radar-{10-fetch,20-rank,30-render,40-notify}`；测试夹具还有短名 `T-YYYYMMDD-10-fetch`。`feed_radar._DIR` 两种都认 |
+| 昨晚补跑 | Pi：`ORCHESTRA_DATE=20260820 bash /home/liuxfs/broker/inject_daily.sh`。邮件走 40-notify，控制台要等 scp + `find_radar` 认目录 |
+| CRLF | Windows scp 脚本会带 CR。`deploy_broker.sh` 传完 `sed -i 's/\r$//'`；`inject_daily.sh` 遇 `pipefail\r` 会 exit 2、当晚无雷达 |
+| glue 热更 | `ui/` 静态文件随请求更新（Ctrl+F5）；`feed_radar.py` 被 serve **import 缓存**，改扫描逻辑必须重启 3100（pythonw / `startup_serve.pyw`） |
+| 往期 chips | 查不到该日时 API 仍返回 `history`；前端用上一份 history 兜底，避免按钮消失 |
+
+补数据：`py -3 orchestra/console/console_feed.py refresh`（会 scp results）。只重建 JSON：`refresh --no-sync`。
+
+## Agent / CC 协议
 
 ## Agent / CC 协议
 
@@ -46,7 +67,7 @@ top5 中 2 篇与方向相关
 ```
 
 同一条里可以有多条 `- 待决：` / `- 告警：`，都会进对应栏（待决最多展示 24 条）。标题时间用 `YYYY-MM-DD HH:MM`，破折号是 `—`。删行即撤卡。CLAUDE.md 挂账是权威待办，这里只记增量。
-- **个人日程**：走 UI，或编辑 `console-schedule.toml` 的 `[[personal]]` 后 `python console_feed.py refresh`。不要改 `[system]`，那是 4B timer 镜像。
+- **个人日程**：走首页任务卡片，或编辑 `console-schedule.toml` 的 `[[personal]]` 后 `python console_feed.py refresh`。不要改 `[system]`，那是 4B timer 镜像。
 - **临近提醒**：`status.json` 的 `upcoming_personal` 是未来 14 天未完成个人事项。Agent 会话开头/收束口头提醒（48h 内必提）；控制台顶栏绿/橙/红条同步展示。不要用 refresh 往 messages.md 刷提醒。
 - **雷达往期**：点「往期日报」chips，或 `GET /api/radar?date=YYYY-MM-DD`。
 - 不要往 `out/` 手写 JSON；refresh / serve 热重才是权威生成路径。

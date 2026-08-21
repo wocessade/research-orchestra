@@ -56,7 +56,7 @@ def make_legacy(root: Path) -> None:
 class FindRadarTest(unittest.TestCase):
     def test_empty_root(self):
         with tempfile.TemporaryDirectory() as tmp:
-            self.assertEqual(find_radar(Path(tmp)), {"available": False})
+            self.assertEqual(find_radar(Path(tmp)), {"available": False, "history": []})
 
     def test_four_stage(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -69,6 +69,22 @@ class FindRadarTest(unittest.TestCase):
                              ["fetch", "rank", "render", "notify"])
             self.assertTrue(all(s["status"] == "done" for s in radar["stages"]))
             self.assertEqual(radar["top5"][0]["title"], "ClawGym II")
+
+    def test_four_stage_prefixed_dir_names(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for slug in ("10-fetch", "20-rank", "30-render", "40-notify"):
+                d = root / f"T-20260820-nightly-radar-{slug}" / "attempt-1"
+                _write(d, "state.json", _state("done"))
+            rd = root / "T-20260820-nightly-radar-30-render" / "attempt-1"
+            _write(rd, "digest.json", PAPERS)
+            _write(rd, "top5.json", [{"arxiv_id": "2608.16798", "title": "ClawGym II",
+                                      "total": 76}])
+            _write(rd, "digest.txt", "文献日报 2026-08-20\n")
+            radar = find_radar(root)
+            self.assertEqual(radar["date"], "2026-08-20")
+            self.assertEqual(radar["mode"], "four-stage")
+            self.assertIn("文献日报 2026-08-20", radar["digest_txt"])
 
     def test_legacy(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -137,6 +153,7 @@ class FindRadarTest(unittest.TestCase):
             missing = find_radar(root, "2026-08-01")
             self.assertFalse(missing["available"])
             self.assertEqual(missing["error"], "not_found")
+            self.assertEqual(len(missing["history"]), 2)
 
     def test_top5_arxiv_urls(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -50,6 +50,8 @@ scp -q "$ROOT"/broker/{db.py,taskfile.py,executor.py,dispatcher.py,artifact_vali
 scp -q "$ROOT"/scripts/backup_to_nas.sh "$SSH_USER@$SSH_HOST:/home/liuxfs/broker/"  # 审计 CONCERN-1：备份脚本本体此前从未随 deploy 传载
 scp -q "$ROOT"/templates/nightly-radar-*.md "$SSH_USER@$SSH_HOST:/home/liuxfs/broker/templates/"
 scp -q "$ROOT"/broker/orchestra-broker.service "$ROOT"/broker/orchestra-timer.timer "$ROOT"/broker/orchestra-timer.service "$ROOT"/broker/orchestra-backup.service "$ROOT"/broker/orchestra-backup.timer "$ROOT"/broker/orchestra-backup-alert.service "$ROOT"/broker/orchestra-housekeeping.service "$ROOT"/broker/orchestra-housekeeping.timer "$ROOT"/broker/logrotate-orchestra.conf "$SSH_USER@$SSH_HOST:/tmp/"
+# Windows scp 可能带 CRLF；远端立刻剥 CR，避免 inject_daily 因 pipefail\r 退出
+ssh "$SSH_USER@$SSH_HOST" "sed -i 's/\r$//' /home/liuxfs/broker/*.sh /home/liuxfs/broker/templates/*.md"
 
 # 4) 远端：目录 + config.json（不存在时从 example 生成，路径按 REMOTE_ROOT 改写）
 ssh "$SSH_USER@$SSH_HOST" "REMOTE_ROOT='$REMOTE_ROOT' bash -s" << 'REMOTE'

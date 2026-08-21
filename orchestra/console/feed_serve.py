@@ -8,6 +8,7 @@ from __future__ import annotations
 import functools
 import json
 import mimetypes
+import sys
 import threading
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -88,6 +89,22 @@ class FeedHandler(SimpleHTTPRequestHandler):
         from feed_schedule import personal_public
         return [personal_public(p) for p in sched["personal"]]
 
+    def _patch_status_upcoming(self, sched: dict) -> None:
+        """加删改个人日程后立刻改 status.json，不等 10 分钟 refresh。"""
+        from datetime import datetime
+        from feed_schedule import upcoming_personal
+        path = Path(self.directory) / "status.json"
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return
+        if not isinstance(data, dict):
+            return
+        data["upcoming_personal"] = upcoming_personal(
+            sched.get("personal") or [], datetime.now())
+        path.write_text(json.dumps(data, ensure_ascii=False, indent=2),
+                        encoding="utf-8")
+
     def _handle_personal(self, method: str) -> None:
         from feed_schedule import (
             add_personal,
@@ -132,6 +149,7 @@ class FeedHandler(SimpleHTTPRequestHandler):
                     return
                 write_schedule(src, sched)
                 rebuild_personal_ics(Path(self.directory), sched)
+                self._patch_status_upcoming(sched)
             except KeyError:
                 self._send_json({"error": "事件不存在"}, 404)
                 return
@@ -159,6 +177,7 @@ class FeedHandler(SimpleHTTPRequestHandler):
                 sched = toggle_personal_done(sched, ident, body.get("date"))
                 write_schedule(src, sched)
                 rebuild_personal_ics(Path(self.directory), sched)
+                self._patch_status_upcoming(sched)
             except KeyError:
                 self._send_json({"error": "事件不存在"}, 404)
                 return
@@ -226,6 +245,9 @@ class FeedHandler(SimpleHTTPRequestHandler):
         self.send_error(404, "Not Found")
 
     def log_message(self, fmt: str, *args) -> None:  # noqa: A003
+        # pythonw 无 stderr；基类写 sys.stderr 会直接掐掉连接
+        if sys.stderr is None:
+            return
         super().log_message(fmt, *args)
 
 

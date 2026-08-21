@@ -42,22 +42,8 @@
           <section class="panel">
             <header class="panel-head">
               <h2 class="panel-title">日程</h2>
-              <span class="legend">
-                <i class="dot system"></i>系统（每日定时）
-                <i class="dot personal"></i>个人（越近越红）
-              </span>
+              <span id="agenda-status" class="hint">点月历某天添加 · 卡片可改日期</span>
             </header>
-            <form id="personal-form" class="personal-form">
-              <input type="hidden" id="pf-id" />
-              <input type="date" id="pf-date" required />
-              <input type="time" id="pf-time" required />
-              <input type="text" id="pf-title" placeholder="标题（个人）" required maxlength="80" />
-              <input type="text" id="pf-note" placeholder="备注（可选）" maxlength="200" />
-              <label class="check"><input type="checkbox" id="pf-weekly" /> 每周重复</label>
-              <button type="submit" id="pf-submit" class="btn-ghost">添加</button>
-              <button type="button" id="pf-cancel" class="btn-ghost hidden">取消</button>
-              <span id="pf-status" class="hint">越近越红；点时间可改点</span>
-            </form>
             <div id="agenda" class="agenda"></div>
           </section>
           <div class="stack">
@@ -71,13 +57,7 @@
                 </span>
               </header>
               <div id="cal-month" class="month"></div>
-              <p class="hint month-hint">只标个人事项：绿=未到期，橙=两天内，红=今天。系统定时每天都有，改看左侧日程和「下一触发」。</p>
-            </section>
-            <section class="panel">
-              <header class="panel-head">
-                <h2 class="panel-title">下一触发</h2>
-              </header>
-              <div id="next-list" class="next-list"></div>
+              <p class="hint month-hint">点某一天：左侧打开那天，可写新事项或把卡片拖过去。卡片上也能改日期。绿/橙/红只标未完成个人事项。</p>
             </section>
             <section class="panel">
               <header class="panel-head">

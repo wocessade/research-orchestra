@@ -66,3 +66,15 @@
 ## H. 控制台收束（2026-08-20）
 
 33. **Agent 看日程靠结构化字段，不靠刷留言**：个人临近事项进 `status.json.upcoming_personal` + CLAUDE.md 口头提醒协议；refresh 每 10 分钟跑一次，往 `messages.md` 自动追加会刷屏。卡片栏只放需要人拍板的待决/告警。
+
+## I. 控制台/雷达（2026-08-21）
+
+34. **Windows 有 Git Bash ≠ sync_pull 能用**：计划任务找到 bash 后跑 `sync_pull.sh` 常 exit 1，控制台雷达停在旧日。规则：Win32 优先本机 OpenSSH `scp -rq`，`ORCHESTRA_SSH_HOST` 空则默认 `192.168.0.250`；bash 失败不要当作已经拉回。
+
+35. **四阶段任务目录带 `nightly-radar-` 前缀**：真机 `T-20260820-nightly-radar-10-fetch`，不是测试夹具的 `T-20260820-10-fetch`。只认短名时 results 已在本地、日报仍显示 8/19 legacy。规则：扫描正则两种都认；加夹具覆盖真机目录名。
+
+36. **Windows scp 部署脚本必剥 CR**：`inject_daily.sh` 带 CRLF 会 `pipefail\r` exit 2，timer 准点但当晚无雷达。规则：`deploy_broker.sh` 远端 `sed -i 's/\r$//'`；传完用 `file`/`od` 验 LF。
+
+37. **往期日期 API 失败不能拆掉 chips**：`GET /api/radar?date=` 找不到时若返回无 `history`，前端 `renderRadar` 会把 19/20 按钮换成「暂无往期」。规则：`find_radar` 任何分支都带 history；前端用上一份 history 兜底。
+
+38. **serve 进程缓存 glue 模块**：`ui/*.js` 可 Ctrl+F5；`feed_radar.py` 改完必须重启 3100，否则 chips 来自 refresh 的新 JSON、点击走旧 API。

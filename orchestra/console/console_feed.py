@@ -49,6 +49,13 @@ def _ssh_target() -> tuple[str, str, str]:
     return host, user, remote
 
 
+def _no_window_kwargs() -> dict:
+    """Windows：隐藏 scp/ssh 控制台窗口。"""
+    if sys.platform == "win32":
+        return {"creationflags": subprocess.CREATE_NO_WINDOW}
+    return {}
+
+
 def sync_pull(results_root: Path) -> str:
     """拉回 4B results/logs。Windows 优先 OpenSSH scp；否则 bash+sync_pull.sh。"""
     host, user, remote = _ssh_target()
@@ -59,6 +66,7 @@ def sync_pull(results_root: Path) -> str:
     scp = shutil.which("scp")
     bash = shutil.which("bash")
     prefer_scp = sys.platform == "win32" and scp
+    hide = _no_window_kwargs()
     if prefer_scp or (scp and not bash):
         dest_results = Path(results_root)
         dest_logs = dest_results.parent / "logs"
@@ -68,11 +76,11 @@ def sync_pull(results_root: Path) -> str:
             r1 = subprocess.run(
                 [scp, "-rq", f"{user}@{host}:{remote}/results/.", str(dest_results)],
                 capture_output=True, text=True, encoding="utf-8",
-                errors="replace", timeout=300)
+                errors="replace", timeout=300, **hide)
             r2 = subprocess.run(
                 [scp, "-rq", f"{user}@{host}:{remote}/logs/.", str(dest_logs)],
                 capture_output=True, text=True, encoding="utf-8",
-                errors="replace", timeout=300)
+                errors="replace", timeout=300, **hide)
             err = " ".join(
                 t.strip() for t in (r1.stderr, r2.stderr)
                 if isinstance(t, str) and t.strip())
@@ -89,7 +97,7 @@ def sync_pull(results_root: Path) -> str:
             proc = subprocess.run(
                 [bash, str(script)], cwd=str(script.parent),
                 capture_output=True, text=True, encoding="utf-8",
-                errors="replace", timeout=300, env=env)
+                errors="replace", timeout=300, env=env, **hide)
             err = proc.stderr.strip() if isinstance(proc.stderr, str) else ""
             note = f"sync_pull exit={proc.returncode} host={host}"
             if err:

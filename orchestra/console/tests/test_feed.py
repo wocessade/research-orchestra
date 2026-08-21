@@ -2,6 +2,8 @@ import argparse
 import copy
 import json
 import os
+import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -134,6 +136,11 @@ class RefreshTest(unittest.TestCase):
         self.assertEqual(first[0], r"C:\Windows\System32\OpenSSH\scp.exe")
         self.assertEqual(first[1], "-rq")
         self.assertIn("liuxfs@192.168.0.250:/mnt/broker/results/.", first[2])
+        if sys.platform == "win32":
+            for call in run.call_args_list:
+                self.assertEqual(
+                    call.kwargs.get("creationflags"),
+                    subprocess.CREATE_NO_WINDOW)
         log = (self.out / "feed.log").read_text(encoding="utf-8")
         self.assertIn("sync_pull scp", log)
         self.assertIn("host=192.168.0.250", log)
@@ -156,6 +163,10 @@ class RefreshTest(unittest.TestCase):
         self.assertEqual(run.call_count, 2)
         self.assertEqual(run.call_args_list[0].args[0][0],
                          r"C:\Windows\System32\OpenSSH\scp.exe")
+        for call in run.call_args_list:
+            self.assertEqual(
+                call.kwargs.get("creationflags"),
+                subprocess.CREATE_NO_WINDOW)
 
 
 if __name__ == "__main__":

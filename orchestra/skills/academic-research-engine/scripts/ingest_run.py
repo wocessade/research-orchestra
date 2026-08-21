@@ -11,7 +11,7 @@ from pathlib import Path
 
 try:
     import jsonschema
-except ImportError:  # optional
+except ImportError:
     jsonschema = None  # type: ignore
 
 SKILLS = Path(__file__).resolve().parents[2]
@@ -41,7 +41,11 @@ def validate_metrics(data: dict) -> list[str]:
         errs.append(f"bad exp_id {data.get('exp_id')!r}")
     if "status" in data and data["status"] not in {"completed", "aborted", "failed", "partial"}:
         errs.append(f"bad status {data.get('status')!r}")
-    if jsonschema is not None and SCHEMA_PATH.is_file():
+    if jsonschema is None:
+        errs.append("jsonschema is required (pip install jsonschema)")
+    elif not SCHEMA_PATH.is_file():
+        errs.append(f"schema file missing: {SCHEMA_PATH}")
+    else:
         try:
             jsonschema.validate(data, load_schema())
         except Exception as e:  # noqa: BLE001

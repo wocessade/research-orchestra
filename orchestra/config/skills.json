@@ -25,6 +25,24 @@
       "output_contract": ".research experiment run artifacts"
     },
     {
+      "id": "academic-shared",
+      "source": "external",
+      "path": "~/.claude/skills/academic-shared",
+      "required": true,
+      "used_by": [
+        "orchestra/scripts/run_card.py ingest"
+      ],
+      "entrypoints": [
+        "research/metrics.schema.json"
+      ],
+      "contract_files": [
+        "research/metrics.schema.json"
+      ],
+      "expected_digest": null,
+      "input_contract": "experiment run metrics.json",
+      "output_contract": "jsonschema for ingest_run.validate_metrics"
+    },
+    {
       "id": "nature-literature-pipeline",
       "source": "external",
       "path": "~/.claude/skills/nature-literature-pipeline",

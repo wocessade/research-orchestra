@@ -1,9 +1,0 @@
-{
-  "slug": "T-20260819-e2e-recover",
-  "executor": "shell",
-  "attempt": 2,
-  "status": "done",
-  "error": null,
-  "started_at": "2026-08-18T18:04:00+00:00",
-  "elapsed_s": 120.0
-}

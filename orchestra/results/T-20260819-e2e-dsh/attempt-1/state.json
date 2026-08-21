@@ -1,9 +1,0 @@
-{
-  "slug": "T-20260819-e2e-dsh",
-  "executor": "dsh",
-  "attempt": 1,
-  "status": "done",
-  "error": null,
-  "started_at": "2026-08-18T17:48:36+00:00",
-  "elapsed_s": 329.7
-}

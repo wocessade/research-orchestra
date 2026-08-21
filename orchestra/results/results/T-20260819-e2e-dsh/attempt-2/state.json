@@ -1,9 +1,0 @@
-{
-  "slug": "T-20260819-e2e-dsh",
-  "executor": "dsh",
-  "attempt": 2,
-  "status": "failed",
-  "error": "exit code 1",
-  "started_at": "2026-08-18T17:38:46+00:00",
-  "elapsed_s": 4.0
-}

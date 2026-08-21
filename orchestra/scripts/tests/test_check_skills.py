@@ -200,6 +200,15 @@ class CheckSkillsTest(unittest.TestCase):
         self.assertEqual(json.loads(output.getvalue())["status"], "invalid")
         self.assertNotIn("Traceback", err.getvalue())
 
+    def test_repo_manifest_includes_academic_shared_schema(self):
+        manifest = Path(__file__).resolve().parents[2] / "config" / "skills.json"
+        data = json.loads(manifest.read_text(encoding="utf-8"))
+        check_skills.validate_manifest(data)
+        shared = next(s for s in data["skills"] if s["id"] == "academic-shared")
+        self.assertTrue(shared["required"])
+        self.assertIn("research/metrics.schema.json", shared["contract_files"])
+        self.assertIsNone(shared["expected_digest"])
+
 
 if __name__ == "__main__":
     unittest.main()

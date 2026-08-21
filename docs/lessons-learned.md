@@ -78,3 +78,17 @@
 37. **往期日期 API 失败不能拆掉 chips**：`GET /api/radar?date=` 找不到时若返回无 `history`，前端 `renderRadar` 会把 19/20 按钮换成「暂无往期」。规则：`find_radar` 任何分支都带 history；前端用上一份 history 兜底。
 
 38. **serve 进程缓存 glue 模块**：`ui/*.js` 可 Ctrl+F5；`feed_radar.py` 改完必须重启 3100，否则 chips 来自 refresh 的新 JSON、点击走旧 API。
+
+## J. 038 SD 卡对换（2026-08-22）
+
+39. **Allwinner 系换卡捕获必须含首 4MB 引导区**：分区级捕获（sfdisk 存档 + 分区 dd）不含 MBR 与首分区之间的 U-Boot eGON 镜像（核桃派在扇区 16 / offset 8196，魔数 eGON.BT0）——16G 卡恢复后完全无法引导（无 ARP 应答）。树莓派引导固件在 FAT 分区内不受影响。规则：Allwinner 平台换卡 = sfdisk 存档 + 首 4MB 原盘 dd（保留源 MBR 扇区 0）+ 分区级镜像 + 恢复后魔数验证；保险转储首 4MB 到仓库外。
+
+40. **整盘扇区数以 sfdisk 报告为准，勿心算**：心算 62542315520B/512=122153350 扇区，实际 122152960，差 390 扇区——part2 超界被 sfdisk 原子拒绝（label-id/part1 均未写，卡零损伤）。规则：目标分区 size 由 `blockdev --getsz` 或 sfdisk 输出算出，重建后 `sfdisk --verify` + `blockdev --getsz` 双校验卡身份。
+
+41. **broker 209/STDOUT 循环重启 = 日志路径所在盘未挂载**：`StandardOutput=append:/mnt/broker/logs/broker.log`，U 盘物理不在时 systemd 报 `Failed to set up standard output: No such file or directory`（status=209），restart counter 无限累加。排查顺序：lsblk 设备枚举 → dmesg → 物理检查；修复 = mount 后 `systemctl restart`（nofail 的 fstab 挂载启动时被跳过，热插后 systemd 不自动重挂，需手动 mount）。
+
+42. **Persistent timer 补跑 ≠ 注入保证**：4B 换卡关机跨过 23:30 注入窗口，01:45 上电后 timer 补跑，但 broker 还在 209 循环崩溃，注入失败——22 日晨间雷达日报缺失一期。规则：跨关机窗口后验证 timer 补跑产物实际落盘（tasks/ 有任务卡、archive 有归档），不假设补跑成功；发现缺失可手动重跑 nightly-radar 四阶段。
+
+## K. 门禁诚实（2026-08-22）
+
+43. **软 schema / 未接线配置 / 仍被跟踪的 ignored 目录比缺文档更危险**：`jsonschema` 或 `metrics.schema.json` 缺失时若跳过校验，digest 仍显示锁定；`rules.yaml` 从未被 Broker 读取却写得像控制面；`orchestra/results/` 已 gitignore 但仍可能留在索引里（含嵌套 `results/results/`）。规则：结论层校验 fail-closed；配置文件要么有消费代码要么标明人工约定；红线目录 `git ls-files` 交叉检查后 `git rm --cached`。

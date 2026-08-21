@@ -1,4 +1,6 @@
 # 执行器分派规则（v1）
+# Broker 不加载本文件。default_executor / max_attempts / degradation_order
+# 以任务卡与 broker/config.json 为准；本文件仅供 CC 分派前人工阅读。
 default_executor: dsh          # 未显式指定时默认
 executors:
   dsh:                         # 4B 上的 dsh headless（主执行器）

@@ -4,7 +4,7 @@
 
 | 目录 | 用途 |
 |------|------|
-| config/rules.yaml | 执行器分派规则与降级顺序（CC 分派前读） |
+| config/rules.yaml | 人工约定（代码不读）；Broker 以任务卡与 broker/config.json 为准 |
 | config/model-routing.json | 模型路由表（用户维护、系统只读，见「模型路由表」节） |
 | config/skills.json | 外部 Skill 路径、入口、契约文件与锁定摘要 |
 | tasks/ | 任务文件总线：CC 写入，Broker 轮询 |
@@ -92,7 +92,7 @@
 
 ## 模型路由表（mission 029 / 总 spec §8）
 
-- 表：`config/model-routing.json`（用户维护、系统只读；值为抽象档位键，具体模型名在执行侧）
+- 表：`config/model-routing.json`（用户维护、系统只读；值为抽象档位键，具体模型名在执行侧）。改表不会自动改已经注入的任务卡。
 - dsh：任务卡头 `model: flash|pro` → executor 映射 `--patch /mnt/broker/dsh-patches/{model}.yml`（patch 缺失任务 failed）
 - codex：CC 查表传 `--model`（Luna 杂活 / Terra 默认 / Sol 关键场景；production-fix 归 CC）
 - 纪律：长实验任务卡 `timeout` 必填

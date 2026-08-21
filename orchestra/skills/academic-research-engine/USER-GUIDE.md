@@ -132,7 +132,7 @@ py -3 academic-research-engine/scripts/ingest_run.py path/to/metrics.json --rese
 py -3 academic-research-engine/scripts/handoff_sync.py --research-root .research --paper-dir {paper_dir} --module academic-journal
 ```
 
-可选 `pip install jsonschema`。
+必须 `pip install jsonschema`；schema 文件缺失或未安装时 ingest 失败。
 
 
 ## 10. metrics.json

@@ -6,6 +6,7 @@ import time
 import unittest
 from pathlib import Path
 from unittest import mock
+from urllib.parse import quote
 
 from feed_serve import make_server
 
@@ -252,6 +253,33 @@ class ServeTest(unittest.TestCase):
         self.assertTrue(data["personal"][0]["done"])
         toml = (self.console / "console-schedule.toml").read_text(encoding="utf-8")
         self.assertIn("done = true", toml)
+
+    def test_messages_merge_status_without_md_change(self):
+        (self.out / "status.json").write_text(
+            json.dumps({"4b": "离线", "walnut": "在线"}), encoding="utf-8")
+        status, body = self._get("/messages.json")
+        self.assertEqual(status, 200)
+        data = json.loads(body)
+        self.assertEqual(data["latest"][0]["title"], "早上好")
+        self.assertTrue(any(a["title"] == "4B 离线" for a in data["alerts"]))
+
+    def test_pending_api_roundtrip(self):
+        status, data = self._json("POST", "/api/pending", {"text": "拍板预算"})
+        self.assertEqual(status, 200)
+        self.assertEqual([p["text"] for p in data["pending"]], ["拍板预算"])
+        self.assertTrue(data["pending"][0]["dismissable"])
+        md = (self.console / "messages.md").read_text(encoding="utf-8")
+        self.assertIn("- 待决：拍板预算", md)
+        status, body = self._get("/messages.json")
+        self.assertIn("拍板预算", json.loads(body)["pending"][0]["text"])
+        encoded = "/api/pending?text=" + quote("拍板预算")
+        status, data = self._json("DELETE", encoded)
+        self.assertEqual(status, 200)
+        self.assertEqual(data["pending"], [])
+        status, data = self._json("DELETE", encoded)
+        self.assertEqual(status, 404)
+        status, data = self._json("POST", "/api/pending", {"text": "   "})
+        self.assertEqual(status, 400)
 
 
 if __name__ == "__main__":

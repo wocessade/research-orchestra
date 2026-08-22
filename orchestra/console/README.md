@@ -27,7 +27,7 @@
 1. 刷新数据：`python console_feed.py refresh`（计划任务 OrchestraConsoleRefresh 每 10 分钟）
 2. 起服务：`python console_feed.py serve` → **打开 http://127.0.0.1:3100/**
 3. 四页：今天 / 雷达 / 任务实验 / 系统（顶栏切换；URL hash `#today|#radar|#tasks|#system`）
-4. 留言：写 `messages.md` → 页内约 5s 热重可见。协议见下方「Agent / CC 协议」
+4. 待决：首页输入框回车写入（`POST /api/pending`），红叉删除。告警/最新由 refresh 派生，不必手写。协议见下方。
 5. **个人日程**：首页只列今天起的个人卡片。点月历某天打开添加栏（写完回车 / 失焦 /「添加」）；卡片上可改日期和时间；完成圈与红X删除；可拖到另一天。写入 `console-schedule.toml` 的 `[[personal]]`。系统定时只在「系统」页。
 6. 环境变量（绝不入库）：`ORCHESTRA_MONITOR_TOKEN`、`ORCHESTRA_MONITOR_API`；`ORCHESTRA_SSH_HOST` 缺省 `192.168.0.250`
 7. **雷达往期**：点日期 chips 切换；`GET /api/radar?date=YYYY-MM-DD` 必须带 `history`，chips 不能随切换被清空。
@@ -52,21 +52,12 @@
 
 ## Agent / CC 协议
 
-## Agent / CC 协议
-
 控制台不是 Homepage 配置玩具，agent 应直接用：
 
 - 打开 `http://127.0.0.1:3100/` 看四页；hash `#today|#radar|#tasks|#system`
-- **留言 / 待决 / 告警**：只写本目录 `messages.md`（入库）。格式必须是：
-
-```markdown
-## 2026-08-21 08:00 — 雷达日报已出
-top5 中 2 篇与方向相关
-- 待决：SD 旧副本是否删除？
-- 告警：usage-monitor 不可达
-```
-
-同一条里可以有多条 `- 待决：` / `- 告警：`，都会进对应栏（待决最多展示 24 条）。标题时间用 `YYYY-MM-DD HH:MM`，破折号是 `—`。删行即撤卡。CLAUDE.md 挂账是权威待办，这里只记增量。
+- **留言 / 待决 / 告警**：`GET /messages.json` = `messages.md` 人工条 + refresh 派生条。
+  - 告警/最新：glue 从 `status.json` / `radar.json` / `sync_note` 生成（离线、未鉴权、同步失败、雷达阶段失败、attempt failed、雷达摘要）。不要把这些再手抄进 md。
+  - 待决：首页输入框，或写 `- 待决：`。待决最多展示 24 条。标题时间用 `YYYY-MM-DD HH:MM`，破折号是 `—`。删行或红叉即撤卡。CLAUDE.md 挂账是权威待办，这里只记要 owner 拍板的增量。
 - **个人日程**：走首页任务卡片，或编辑 `console-schedule.toml` 的 `[[personal]]` 后 `python console_feed.py refresh`。不要改 `[system]`，那是 4B timer 镜像。
 - **临近提醒**：`status.json` 的 `upcoming_personal` 是未来 14 天未完成个人事项。Agent 会话开头/收束口头提醒（48h 内必提）；控制台顶栏绿/橙/红条同步展示。不要用 refresh 往 messages.md 刷提醒。
 - **雷达往期**：点「往期日报」chips，或 `GET /api/radar?date=YYYY-MM-DD`。

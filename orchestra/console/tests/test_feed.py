@@ -109,6 +109,13 @@ class RefreshTest(unittest.TestCase):
             self.assertNotIn(b"\r\r", raw)
             self.assertIn(b"BEGIN:VCALENDAR\r\n", raw)
 
+    def test_refresh_merges_ops_into_messages_json(self):
+        with mock.patch("console_feed.fetch_dashboard", return_value=(None, "down")):
+            rc = cmd_refresh(self._args())
+        self.assertEqual(rc, 0)
+        msgs = json.loads((self.out / "messages.json").read_text(encoding="utf-8"))
+        self.assertTrue(any(a["title"] in ("4B 离线", "核桃派离线") for a in msgs["alerts"]))
+        self.assertEqual(msgs["latest"][0]["title"], "早上好")
 
     def test_refresh_sync_skip_without_bash_or_scp(self):
         with mock.patch("console_feed.fetch_dashboard", side_effect=_fresh_monitor), \
@@ -128,7 +135,7 @@ class RefreshTest(unittest.TestCase):
         with mock.patch("console_feed.fetch_dashboard", side_effect=_fresh_monitor), \
              mock.patch("console_feed.shutil.which", side_effect=which), \
              mock.patch("console_feed.subprocess.run", return_value=fake) as run, \
-             mock.patch.dict(os.environ, {"ORCHESTRA_SSH_HOST": ""}, clear=False):
+             mock.patch.dict(os.environ, {"ORCHESTRA_SSH_HOST": "", "ORCHESTRA_REMOTE_ROOT": ""}, clear=False):
             rc = cmd_refresh(self._args(no_sync=False))
         self.assertEqual(rc, 0)
         self.assertEqual(run.call_count, 2)

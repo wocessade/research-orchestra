@@ -452,12 +452,47 @@
       .slice(0, cap)
       .map(
         (m) => `<article class="msg ${tone || ""}">
-        <div class="msg-title">${esc(m.title || "留言")}</div>
-        <div class="msg-meta">${esc(m.time_text || m.time || "")}</div>
-        ${m.text ? `<div class="msg-text">${esc(m.text)}</div>` : ""}
+        <div class="msg-body">
+          <div class="msg-title">${esc(m.title || "留言")}</div>
+          <div class="msg-meta">${esc(m.time_text || m.time || "")}</div>
+          ${m.text ? `<div class="msg-text">${esc(m.text)}</div>` : ""}
+        </div>
+        ${m.dismissable && tone === "pending"
+          ? `<button type="button" class="task-btn del-btn msg-dismiss" data-pending="${esc(m.text)}" aria-label="撤掉">×</button>`
+          : ""}
       </article>`,
       )
       .join("");
+  }
+
+  function applyMessages(messages) {
+    state.messages = messages;
+    renderMessages((messages && messages.latest) || [], "messages-latest", "");
+    renderMessages((messages && messages.pending) || [], "messages-pending", "pending");
+    renderMessages((messages && messages.alerts) || [], "messages-alerts", "alert");
+    $("msg-count").textContent = String(((messages && messages.latest) || []).length);
+    $("pending-count").textContent = String(((messages && messages.pending) || []).length);
+    $("alert-count").textContent = String(((messages && messages.alerts) || []).length);
+  }
+
+  async function addPending(text) {
+    const res = await fetch("/api/pending", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "待决写入失败");
+    applyMessages(data);
+  }
+
+  async function dismissPending(text) {
+    const res = await fetch(`/api/pending?text=${encodeURIComponent(text)}`, {
+      method: "DELETE",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "待决删除失败");
+    applyMessages(data);
   }
 
   function personalUrgency(start) {
@@ -815,12 +850,7 @@
     renderPulse("tasks-pulse", status);
     renderAgenda(events);
     renderMonth(events);
-    renderMessages((messages && messages.latest) || [], "messages-latest", "");
-    renderMessages((messages && messages.pending) || [], "messages-pending", "pending");
-    renderMessages((messages && messages.alerts) || [], "messages-alerts", "alert");
-    $("msg-count").textContent = String(((messages && messages.latest) || []).length);
-    $("pending-count").textContent = String(((messages && messages.pending) || []).length);
-    $("alert-count").textContent = String(((messages && messages.alerts) || []).length);
+    applyMessages(messages);
     renderRadar(radar);
     renderTasks(status);
     renderSystem(status);
@@ -850,13 +880,7 @@
   }
 
   async function loadMessagesOnly() {
-    state.messages = await fetchJson("/messages.json");
-    renderMessages((state.messages && state.messages.latest) || [], "messages-latest", "");
-    renderMessages((state.messages && state.messages.pending) || [], "messages-pending", "pending");
-    renderMessages((state.messages && state.messages.alerts) || [], "messages-alerts", "alert");
-    $("msg-count").textContent = String(((state.messages && state.messages.latest) || []).length);
-    $("pending-count").textContent = String(((state.messages && state.messages.pending) || []).length);
-    $("alert-count").textContent = String(((state.messages && state.messages.alerts) || []).length);
+    applyMessages(await fetchJson("/messages.json"));
   }
 
   function setTab(name) {
@@ -1008,6 +1032,26 @@
         $("banner").textContent = `刷新失败：${err.message}`;
       });
     });
+    const pendingForm = $("pending-composer");
+    if (pendingForm) {
+      pendingForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const input = pendingForm.querySelector('input[name="text"]');
+        const text = (input && input.value || "").trim();
+        if (!text) return;
+        addPending(text)
+          .then(() => { input.value = ""; })
+          .catch((err) => setFormStatus(err.message));
+      });
+    }
+    const pendingList = $("messages-pending");
+    if (pendingList) {
+      pendingList.addEventListener("click", (e) => {
+        const btn = e.target.closest("[data-pending]");
+        if (!btn) return;
+        dismissPending(btn.dataset.pending).catch((err) => setFormStatus(err.message));
+      });
+    }
     $("agenda").addEventListener("click", (e) => {
       const del = e.target.closest("[data-del]");
       const done = e.target.closest("[data-done]");

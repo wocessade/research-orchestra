@@ -1,7 +1,14 @@
 import unittest
 from pathlib import Path
 
-from feed_messages import append_alert, build_messages_html, parse_messages
+from feed_messages import (
+    append_alert,
+    append_pending,
+    build_messages_html,
+    merge_board,
+    parse_messages,
+    remove_pending,
+)
 
 SAMPLE = """## 2026-08-21 08:05 — deploy 窗口建议
 4B 已 14 天未部署，032 修复包待真机验证
@@ -161,6 +168,70 @@ class AppendAlertTest(unittest.TestCase):
                 encoding="utf-8",
             )
             self.assertFalse(append_alert(p, "usage-monitor 不可达"))
+
+
+class MergeBoardTest(unittest.TestCase):
+    def test_offline_and_radar_become_alerts_and_latest(self):
+        human = parse_messages(SAMPLE)
+        board = merge_board(
+            human,
+            status={"4b": "离线", "walnut": "在线 · load 0.1",
+                    "attempts": [{"task": "T-x", "status": "failed"}]},
+            radar={"available": True, "date": "2026-08-22",
+                   "top5": [{}, {}],
+                   "stages": [
+                       {"name": "fetch", "status": "done"},
+                       {"name": "notify", "status": "failed"},
+                   ]},
+        )
+        self.assertTrue(any(a["title"] == "4B 离线" for a in board["alerts"]))
+        self.assertTrue(any("notify" in (a["text"] or "") for a in board["alerts"]))
+        self.assertTrue(any(a["title"] == "任务失败" for a in board["alerts"]))
+        self.assertTrue(any(a["text"] == "usage-monitor 不可达" for a in board["alerts"]))
+        self.assertTrue(any(m["title"].startswith("雷达") for m in board["latest"]))
+        self.assertEqual(board["pending"][0]["text"], "SD 旧副本是否删除？")
+        self.assertTrue(board["pending"][0]["dismissable"])
+
+    def test_token_missing_is_alert_not_offline(self):
+        board = merge_board(
+            {"latest": [], "pending": [], "alerts": []},
+            status={"4b": "未配置 token", "walnut": "未配置 token"},
+            radar={"available": False},
+        )
+        titles = [a["title"] for a in board["alerts"]]
+        self.assertIn("监控未鉴权", titles)
+        self.assertNotIn("4B 离线", titles)
+
+    def test_sync_timeout_alerts(self):
+        board = merge_board(
+            {"latest": [], "pending": [], "alerts": []},
+            status={}, radar={}, sync_note="sync_pull scp timeout")
+        self.assertTrue(any(a["title"] == "同步失败" for a in board["alerts"]))
+
+
+class PendingFileTest(unittest.TestCase):
+    def test_append_and_remove_pending(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "messages.md"
+            p.write_text("## 2026-08-21 08:00 — 旧\nok\n", encoding="utf-8")
+            append_pending(p, "  买塔式主机  ")
+            self.assertEqual(
+                [x["text"] for x in parse_messages(p.read_text(encoding="utf-8"))["pending"]],
+                ["买塔式主机"])
+            append_pending(p, "买塔式主机")
+            self.assertEqual(
+                p.read_text(encoding="utf-8").count("- 待决：买塔式主机"), 1)
+            remove_pending(p, "买塔式主机")
+            self.assertEqual(
+                parse_messages(p.read_text(encoding="utf-8"))["pending"], [])
+
+    def test_append_pending_rejects_empty(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "messages.md"
+            with self.assertRaises(ValueError):
+                append_pending(p, "   ")
 
 
 if __name__ == "__main__":

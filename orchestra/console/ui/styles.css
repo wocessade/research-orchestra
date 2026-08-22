@@ -718,7 +718,13 @@ body {
   border-radius: 6px;
   background: var(--bg);
   border-left: 3px solid var(--line-strong);
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
 }
+.msg-body { flex: 1 1 0; min-width: 0; }
+.pending-composer { margin: 0 0 6px; }
+.pending-hint { margin: 0 0 8px; }
 .msg.pending { border-left-color: var(--danger); background: #fbf3f2; }
 .msg.alert { border-left-color: var(--warn); background: #fbf7ef; }
 .msg-title {

@@ -15,7 +15,12 @@ import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from feed_messages import append_alert, build_messages_html, parse_messages
+from feed_messages import (
+    append_alert,
+    build_messages_html,
+    merge_board,
+    parse_messages,
+)
 from feed_radar import (
     build_digest_html,
     find_radar,
@@ -143,13 +148,13 @@ def cmd_refresh(args) -> int:
     state, err = fetch_dashboard(api, token)
     status = aggregate(state, err, sched)
     results_root = Path(args.results_root)
+    if not args.no_sync:
+        notes.append(sync_pull(results_root))
+        status["sync_note"] = notes[-1]
     status["attempts"] = scan_attempts(results_root)
     status["experiments"] = scan_experiments(Path(args.research_root))
     (out / "status.json").write_text(
         json.dumps(status, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    if not args.no_sync:
-        notes.append(sync_pull(results_root))
 
     radar = find_radar(results_root)
     (out / "radar.json").write_text(
@@ -157,11 +162,12 @@ def cmd_refresh(args) -> int:
     (out / "digest.html").write_text(build_digest_html(radar), encoding="utf-8")
 
     try:
-        msgs = parse_messages(
+        human = parse_messages(
             (console / "messages.md").read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
-        msgs = {"latest": [], "pending": [], "alerts": []}
+        human = {"latest": [], "pending": [], "alerts": []}
         notes.append(f"messages 读取失败: {exc}")
+    msgs = merge_board(human, status, radar, status.get("sync_note"))
     (out / "messages.json").write_text(
         json.dumps(msgs, ensure_ascii=False, indent=2), encoding="utf-8")
     (out / "messages.html").write_text(build_messages_html(msgs), encoding="utf-8")

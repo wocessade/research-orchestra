@@ -39,14 +39,7 @@
 - 测试：`unittest discover` 分别在 `orchestra/broker` 与 `orchestra/scripts`（以及改到的 `console/`）跑；不要把个数手抄进文档
 - ingest：`jsonschema` + `academic-shared/research/metrics.schema.json` fail-closed；schema 在 `skills.json` 契约中
 - 控制台：`http://127.0.0.1:3100/`（`python orchestra/console/console_feed.py serve`）；数据刷新 `python orchestra/console/console_feed.py refresh`
-  - **留言协议**（写 `orchestra/console/messages.md`，serve 约 5s 热重）：
-    ```
-    ## YYYY-MM-DD HH:MM — 标题
-    正文（进「最新」）
-    - 待决：事项（可多行，进待决栏）
-    - 告警：事项（可多行，进告警栏）
-    ```
-    删掉对应 `- 待决：` / `- 告警：` 行，卡片即消失。挂账权威仍是本文件「当前挂账」，留言只放增量事件，不复制挂账全文。
+  - **留言三栏**：告警/最新由 `refresh` 从 status+radar 派生（离线、同步失败、雷达阶段失败、任务失败、雷达摘要），不要手写日常状态。**待决**用首页输入框（`POST /api/pending`）或仍可写 `messages.md` 的 `- 待决：`。agent 只有在需要 owner 拍板时才加待决；收束口头复述。挂账权威仍是本文件「当前挂账」。删 `- 待决：` 行或点红叉即撤卡。不要每 10 分钟往 `messages.md` 刷日程提醒。
   - 个人日程：控制台首页可增删改，或改 `orchestra/console/console-schedule.toml` 的 `[[personal]]`；系统层（雷达/备份）只读。用法见 `orchestra/console/README.md`
   - **日程将近提醒**：读 `console-schedule.toml` 或 `status.json` 的 `upcoming_personal`（未来 14 天未完成个人事项）。会话开头或收束时：48 小时内必须口头提醒，7 天内顺带一句，8–14 天轻提一次。不要每 10 分钟往 `messages.md` 刷提醒。
 

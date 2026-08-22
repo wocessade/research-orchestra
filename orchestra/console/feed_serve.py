@@ -2,6 +2,8 @@
 
 v2：同端口兼服 ui/（自研浅色控制台）；八产物路径不变。
 个人日程写入：POST/PUT/DELETE /api/personal（只改 [[personal]]，不碰 system）。
+待决写入：POST/DELETE /api/pending（改 messages.md 的 `- 待决：` 行）。
+`GET /messages.json` 合并 messages.md 与 status/radar 派生的告警、最新。
 """
 from __future__ import annotations
 
@@ -16,27 +18,48 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 
 class FeedHandler(SimpleHTTPRequestHandler):
+    def _read_out_json(self, name: str) -> dict:
+        path = Path(self.directory) / name
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return {}
+        return data if isinstance(data, dict) else {}
+
+    def _compose_board(self, human: dict) -> dict:
+        from feed_messages import merge_board
+        status = self._read_out_json("status.json")
+        radar = self._read_out_json("radar.json")
+        return merge_board(human, status, radar, status.get("sync_note"))
+
     def _refresh_messages(self) -> bytes:
         empty = {"latest": [], "pending": [], "alerts": []}
         src = self.server.console_dir / "messages.md"
         try:
             mtime = src.stat().st_mtime
         except OSError:
-            return json.dumps(empty, ensure_ascii=False, indent=2).encode("utf-8")
+            board = self._compose_board(empty)
+            return json.dumps(board, ensure_ascii=False, indent=2).encode("utf-8")
         with self.server._messages_lock:
             if (self.server._messages_cache is None
                     or mtime != self.server._messages_mtime):
                 try:
                     from feed_messages import parse_messages
-                    data = parse_messages(src.read_text(encoding="utf-8"))
-                    self.server._messages_cache = json.dumps(
-                        data, ensure_ascii=False, indent=2).encode("utf-8")
+                    human = parse_messages(src.read_text(encoding="utf-8"))
+                    self.server._messages_cache = human
                     self.server._messages_mtime = mtime
                 except (OSError, ValueError):
-                    self.server._messages_cache = json.dumps(
-                        empty, ensure_ascii=False, indent=2).encode("utf-8")
-                    self.server._messages_mtime = mtime  # 记录观测 mtime，坏文件不反复重解析
-            return self.server._messages_cache
+                    human = empty
+                    self.server._messages_cache = empty
+                    self.server._messages_mtime = mtime
+            else:
+                human = self.server._messages_cache
+            board = self._compose_board(human)
+            return json.dumps(board, ensure_ascii=False, indent=2).encode("utf-8")
+
+    def _invalidate_messages(self) -> None:
+        self.server._messages_cache = None
+        self.server._messages_mtime = 0.0
 
     def _send_bytes(self, body: bytes, content_type: str, status: int = 200) -> None:
         self.send_response(status)
@@ -189,6 +212,36 @@ class FeedHandler(SimpleHTTPRequestHandler):
                 return
         self._send_json({"ok": True, "personal": self._personal_list(sched)})
 
+    def _handle_pending(self, method: str) -> None:
+        from feed_messages import append_pending, parse_messages, remove_pending
+        src = self.server.console_dir / "messages.md"
+        with self.server._messages_lock:
+            try:
+                if method == "POST":
+                    append_pending(src, str(self._read_json().get("text") or ""))
+                elif method == "DELETE":
+                    text = unquote(
+                        (parse_qs(urlparse(self.path).query).get("text") or [""])[0])
+                    if not text.strip():
+                        self._send_json({"error": "缺 text"}, 400)
+                        return
+                    remove_pending(src, text)
+                else:
+                    self._send_json({"error": "method"}, 405)
+                    return
+                self._invalidate_messages()
+                try:
+                    human = parse_messages(src.read_text(encoding="utf-8"))
+                except (OSError, ValueError):
+                    human = {"latest": [], "pending": [], "alerts": []}
+            except KeyError:
+                self._send_json({"error": "待决不存在"}, 404)
+                return
+            except (ValueError, json.JSONDecodeError) as exc:
+                self._send_json({"error": str(exc)}, 400)
+                return
+        self._send_json({"ok": True, **self._compose_board(human)})
+
     def _handle_radar(self) -> None:
         from feed_radar import find_radar
         qs = parse_qs(urlparse(self.path).query)
@@ -228,6 +281,9 @@ class FeedHandler(SimpleHTTPRequestHandler):
         if path == "/api/personal/done":
             self._handle_personal_done()
             return
+        if path == "/api/pending":
+            self._handle_pending("POST")
+            return
         self.send_error(404, "Not Found")
 
     def do_PUT(self):  # noqa: N802
@@ -241,6 +297,9 @@ class FeedHandler(SimpleHTTPRequestHandler):
         path = unquote(urlparse(self.path).path)
         if path == "/api/personal":
             self._handle_personal("DELETE")
+            return
+        if path == "/api/pending":
+            self._handle_pending("DELETE")
             return
         self.send_error(404, "Not Found")
 

@@ -71,6 +71,11 @@
                 <h2 class="panel-title">待决</h2>
                 <span id="pending-count" class="chip pending">0</span>
               </header>
+              <form id="pending-composer" class="task-composer pending-composer">
+                <input type="text" name="text" maxlength="200" placeholder="要拍板的事…（回车写入）" />
+                <button type="submit" class="btn-tiny">添加</button>
+              </form>
+              <p class="hint pending-hint">只放需要你点头的事。红叉撤掉。告警和最新由系统刷新，不用手写。</p>
               <div id="messages-pending" class="msg-list"></div>
             </section>
             <section class="panel tone-alert">

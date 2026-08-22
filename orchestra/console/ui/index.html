@@ -39,26 +39,26 @@
       <section id="page-today" class="page is-active" role="tabpanel">
         <div class="pulse pulse-ops" id="pulse"></div>
         <div class="grid-today">
-          <section class="panel">
+          <section class="panel agenda-panel">
             <header class="panel-head">
               <h2 class="panel-title">日程</h2>
               <span id="agenda-status" class="hint">点月历某天添加 · 卡片可改日期</span>
             </header>
             <div id="agenda" class="agenda"></div>
           </section>
-          <div class="stack">
-            <section class="panel">
-              <header class="panel-head">
-                <h2 class="panel-title">月历</h2>
-                <span class="month-nav">
-                  <button type="button" id="month-prev" class="btn-tiny" aria-label="上月">‹</button>
-                  <span id="month-label" class="mono time">—</span>
-                  <button type="button" id="month-next" class="btn-tiny" aria-label="下月">›</button>
-                </span>
-              </header>
-              <div id="cal-month" class="month"></div>
-              <p class="hint month-hint">点某一天：左侧打开那天，可写新事项或把卡片拖过去。卡片上也能改日期。绿/橙/红只标未完成个人事项。</p>
-            </section>
+          <section class="panel month-panel">
+            <header class="panel-head">
+              <h2 class="panel-title">月历</h2>
+              <span class="month-nav">
+                <button type="button" id="month-prev" class="btn-tiny" aria-label="上月">‹</button>
+                <span id="month-label" class="mono time">—</span>
+                <button type="button" id="month-next" class="btn-tiny" aria-label="下月">›</button>
+              </span>
+            </header>
+            <div id="cal-month" class="month"></div>
+            <p class="hint month-hint">点某一天：左侧打开那天，可写新事项或把卡片拖过去。卡片上也能改日期。绿/橙/红只标未完成个人事项。</p>
+          </section>
+          <div class="board-msgs">
             <section class="panel">
               <header class="panel-head">
                 <h2 class="panel-title">留言</h2>
@@ -77,7 +77,7 @@
                   <input id="pending-input" type="text" name="text" maxlength="200" autocomplete="off" placeholder="例如：宿舍主机买不买" />
                   <button type="button" id="pending-add" class="pending-add">写入</button>
                 </div>
-                <p id="pending-status" class="hint pending-hint">写好后点「写入」。列表右侧「撤掉」会删这一条。</p>
+                <p id="pending-status" class="hint pending-hint">写好后点「写入」。只有待决能「撤掉」；留言和告警是系统刷的，刷新还会回来。</p>
               </form>
               <div id="messages-pending" class="msg-list"></div>
             </section>

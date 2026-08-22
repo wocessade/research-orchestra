@@ -368,6 +368,22 @@ body {
 .grid-today {
   display: grid;
   grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.9fr);
+  grid-template-rows: minmax(28rem, 1fr) auto;
+  gap: var(--gap);
+  align-items: stretch;
+}
+
+.agenda-panel,
+.month-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.board-msgs {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--gap);
   align-items: start;
 }
@@ -385,7 +401,10 @@ body {
 .month {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-rows: auto repeat(6, minmax(2.6rem, 1fr));
   gap: 2px;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 .month-dow, .month-cell {
   text-align: center;
@@ -404,10 +423,12 @@ body {
   color: var(--ink);
   border-radius: 6px;
   cursor: pointer;
-  min-height: 42px;
+  min-height: 2.6rem;
+  height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 3px;
 }
 .month-cell:hover { background: #e8eef4; }
@@ -441,7 +462,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: 720px;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
 }
 
@@ -712,7 +734,7 @@ body {
   white-space: nowrap;
 }
 
-.msg-list { display: grid; gap: 6px; max-height: 280px; overflow: auto; }
+.msg-list { display: grid; gap: 6px; max-height: min(36vh, 320px); overflow: auto; }
 .msg {
   padding: 7px 8px;
   border-radius: 6px;
@@ -1118,6 +1140,11 @@ a.top-title:hover { color: var(--system); text-decoration: underline; }
   .grid-system,
   .devices,
   .radar-left {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+  }
+  .board-msgs {
+    grid-column: auto;
     grid-template-columns: 1fr;
   }
   .radar-left { grid-template-rows: auto auto; }

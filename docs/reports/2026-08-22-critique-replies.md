@@ -61,3 +61,5 @@ P2 文档反噬：根 README 已砍成现状页。教训库继续只追加，不
 这不是 4B 升级，是**再买/再腾一台常驻盒**。倒推硬件见根 README「若要把调度重心转到 Hermes」：≥8GB、SSD、API-only、不与 2GB Broker 合住、微信仍在 Windows。Hermes **替代不了** Broker；它最多成为写卡/问进度的通道。未进组、方向未定，C 不采购。
 
 **明确不做的过程：** 换产品名、OpenClaw 切换、4B 上 Hermes、原子发布半成品、把两份锐评抄进 CLAUDE 当状态。
+
+**请评（2026-08-22 夜）：** 宿舍常驻 runner 与现网 Broker 怎么耦 → `docs/reports/2026-08-22-dorm-runner-rfc.md`。只要评论，不要实现。

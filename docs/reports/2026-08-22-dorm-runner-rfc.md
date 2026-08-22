@@ -20,9 +20,9 @@
 - **0 元**：大活等组里，小活回家插电跑 3060。
 - **~1.5–2.5k**：二手塔式（已带 32G DDR4）先无卡常驻，只解决离家。
 - **~4.5–6.5k**：同上 + 二手 16/24G（A4000 或 3090）。显存升级的上限。
-- **不要**：新迷你机 + Oculink + 新 5060 Ti 16G（8k–1.2 万且溢价）；不要 Mac；不要和 Hermes IM 盒合住。
+- **不要**：新迷你机 + Oculink + 新 5060 Ti 16G（8k–1.2 万且溢价）；不要 Mac。
 
-Hermes 若做是另一台 ≥8GB API 盒，**替代不了 Broker**，与本 RFC 无关。
+**Hermes / IM 值班盒已放弃**（owner 2026-08-22），与本 RFC 无关。
 
 ---
 
@@ -57,4 +57,4 @@ Runner 软件最小集：无桌面 Ubuntu、Docker（有卡后再加 NVIDIA tool
 
 ## 4. 明确不在本讨论范围
 
-换产品名；OpenClaw；4B 上 Hermes；把 `rules.yaml` 接进 dispatcher；Task 再收一圈无关字段；手机控制台 v1.5；雷达→Zotero。
+换产品名；OpenClaw；Hermes；把 `rules.yaml` 接进 dispatcher；手机控制台 v1.5；雷达→Zotero。

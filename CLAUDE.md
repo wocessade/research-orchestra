@@ -9,7 +9,7 @@
 接到本项目任何任务前，先读：
 1. `orchestra/README.md` — 系统运行手册（命令/链路/运维）
 2. `docs/superpowers/specs/2026-08-18-research-orchestra-design.md` §13 — 总 spec 检查清单与各子系统状态
-3. `README.md` — 现状页（拓扑/挂账/Hermes 硬件倒推；**不再**维护 mission 流水和测试计数）
+3. `README.md` — 现状页（拓扑/挂账；**不再**维护 mission 流水、测试计数、Hermes 倒推）
 4. `docs/lessons-learned.md` — 系统运行教训库（**每个 mission 归档时必须把新教训追加进去**）
 
 按任务范围再读对应 mission 档案：`.tasks/completed/NNN_*`（MISSION/STATE/DECISIONS/BRIEF/AUDIT，编号见目录）。
@@ -39,7 +39,7 @@
 - 测试：`unittest discover` 分别在 `orchestra/broker` 与 `orchestra/scripts`（以及改到的 `console/`）跑；不要把个数手抄进文档
 - ingest：`jsonschema` + `academic-shared/research/metrics.schema.json` fail-closed；schema 在 `skills.json` 契约中
 - 控制台：`http://127.0.0.1:3100/`（`python orchestra/console/console_feed.py serve`）；数据刷新 `python orchestra/console/console_feed.py refresh`
-  - **留言三栏**：告警/最新由 `refresh` 从 status+radar 派生（离线、同步失败、雷达阶段失败、任务失败、雷达摘要），不要手写日常状态。**待决**用首页输入框（`POST /api/pending`）或仍可写 `messages.md` 的 `- 待决：`。agent 只有在需要 owner 拍板时才加待决；收束口头复述。挂账权威仍是本文件「当前挂账」。删 `- 待决：` 行或点红叉即撤卡。不要每 10 分钟往 `messages.md` 刷日程提醒。
+  - **留言三栏**：告警/最新由 `refresh` 从 status+radar 派生（离线、同步失败、雷达阶段失败、任务失败、雷达摘要），不要手写日常状态。**待决**用首页输入框（`POST /api/pending`）或仍可写 `messages.md` 的 `- 待决：`。agent 只有在需要 owner 拍板时才加待决；收束口头复述。挂账权威仍是本文件「当前挂账」。删 `- 待决：` 行或点「撤掉」即撤卡。不要每 10 分钟往 `messages.md` 刷日程提醒。
   - 个人日程：控制台首页可增删改，或改 `orchestra/console/console-schedule.toml` 的 `[[personal]]`；系统层（雷达/备份）只读。用法见 `orchestra/console/README.md`
   - **日程将近提醒**：读 `console-schedule.toml` 或 `status.json` 的 `upcoming_personal`（未来 14 天未完成个人事项）。会话开头或收束时：48 小时内必须口头提醒，7 天内顺带一句，8–14 天轻提一次。不要每 10 分钟往 `messages.md` 刷提醒。
 
@@ -47,10 +47,9 @@
 
 - **阶段定位（用户定调）**：【术】已足够，转入【道】——新任务优先论文/研究实体，纯基建只记挂账
 - **Skill digest：owner 暂不锁**（2026-08-22 起）。`academic-shared` 为 required 且 `expected_digest` 未写；engine 契约已改过。`check_skills --strict` / 真实 `run_card.py ingest` 会 HARD。需要入账时再开口锁定，agent 不得自行 `--lock-current`
-- Pi / 核桃派部署窗口：四阶段雷达、artifact 校验、taskkill 树杀等真机验证仍挂
+- Pi / 核桃派部署窗口：taskfile 收紧、artifact 校验、taskkill 树杀等与仓库对齐仍挂
 - 入学前（2026-09-08）：宿舍–实验室 Tailscale 实测；4B 弱密码已改（2026-08-20），核桃派 pi 密码待上线后同步
 - 雷达→Zotero 直连推迟到开学后再设计（`docs/superpowers/plans/2026-08-20-radar-digest-reading-note.md`）
 - **GUI 控制台 v2 主入口 3100**（Homepage v1 仅回退）；留言=`orchestra/console/messages.md`；`ORCHESTRA_MONITOR_TOKEN` 已配用户环境变量（值绝不入库/入对话）。v1.5 tailnet 手机访问仍挂账
-- Hermes：不进 2GB 4B；若做 IM 值班需独立常驻盒（≥8GB、API-only）。不替代 Broker。微信桥仍在 Windows。详见根 README
-- 锐评有意不做：`orchestra_check.py`、原子 `releases/<sha>` 发布、Task 未知字段全拒绝
-- 待用户拍板：SD 旧副本删除、512G SSD 用途、宿舍 NAS、QQ bot
+- 锐评有意不做：全文证据扫描器、原子 `releases/<sha>` 发布、Hermes / OpenClaw
+- 待用户拍板：SD 旧副本删除、512G SSD 用途、宿舍 NAS、QQ bot、宿舍 runner 预算三档

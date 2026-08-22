@@ -23,9 +23,26 @@ class TaskSpec:
     validator: str | None = None
 
 _REQUIRED = ("executor", "net", "result")
+_ALLOWED_KEYS = {
+    "executor",
+    "net",
+    "result",
+    "timeout",
+    "model",
+    "depends_on",
+    "mode",
+    "detail",
+    "required_outputs",
+    "json_outputs",
+    "validation_output",
+    "validator",
+}
 _VALID_MODES = ("execute", "explore", "decide", "audit", "brief")
 _VALID_DETAILS = ("brief", "standard", "deep")
 _VALID_VALIDATORS = ("radar-fetch", "radar-rank", "radar-render")
+_VALID_MODELS = ("flash", "pro")
+_TIMEOUT_MIN = 1
+_TIMEOUT_MAX = 86400
 
 
 def _parse_csv(value: str) -> tuple[str, ...]:
@@ -55,7 +72,12 @@ def parse_taskfile(path: str | Path) -> TaskSpec:
         if ":" not in line:
             raise ValueError(f"{p}: 头部行不是 key: value 格式: {line!r}")
         k, _, v = line.partition(":")
-        fields[k.strip()] = v.strip()
+        k, v = k.strip(), v.strip()
+        if k in fields:
+            raise ValueError(f"{p}: 重复字段 {k}")
+        if k not in _ALLOWED_KEYS:
+            raise ValueError(f"{p}: 未知字段 {k}")
+        fields[k] = v
     missing = [k for k in _REQUIRED if k not in fields]
     if missing:
         raise ValueError(f"{p}: 缺少字段 {missing}")
@@ -97,14 +119,25 @@ def parse_taskfile(path: str | Path) -> TaskSpec:
         raise ValueError(f"{p}: json_outputs 必须同时出现在 required_outputs")
     if validation_output is not None and validation_output not in json_outputs:
         raise ValueError(f"{p}: validation_output 必须同时出现在 json_outputs")
+    try:
+        timeout = int(fields.get("timeout", "3600"))
+    except ValueError:
+        raise ValueError(f"{p}: timeout 必须为整数") from None
+    if timeout < _TIMEOUT_MIN or timeout > _TIMEOUT_MAX:
+        raise ValueError(
+            f"{p}: timeout 必须在 {_TIMEOUT_MIN}-{_TIMEOUT_MAX} 秒，实际 {timeout}"
+        )
+    model = fields.get("model")
+    if model is not None and model not in _VALID_MODELS:
+        raise ValueError(f"{p}: model 必须为 {'|'.join(_VALID_MODELS)}")
     return TaskSpec(
         slug=p.stem,
         executor=fields["executor"],
         net=fields["net"],
         result_dir=fields["result"],
-        timeout=int(fields.get("timeout", "3600")),
+        timeout=timeout,
         body=body,
-        model=fields.get("model"),
+        model=model,
         depends_on=depends_on,
         mode=mode,
         detail=detail,

@@ -2,6 +2,7 @@
 import os
 import tempfile
 import unittest
+from pathlib import Path
 
 import taskfile
 
@@ -280,11 +281,53 @@ class TestParseTaskfile(unittest.TestCase):
             f.write("# T-1\n" "executor: shell\n" "net: optional\n" "result: r\n" "model: pro\n" "---\necho hi\n")
         self.assertEqual(taskfile.parse_taskfile(self.path).model, "pro")
 
-    def test_model_field_not_validated(self):
-        # 档位校验责任在写卡的 CC；解析层透传不校验
+    def test_model_field_rejects_unknown_tier(self):
         with open(self.path, "w", encoding="utf-8") as f:
             f.write("# T-1\n" "executor: shell\n" "net: optional\n" "result: r\n" "model: weird-tier\n" "---\necho hi\n")
-        self.assertEqual(taskfile.parse_taskfile(self.path).model, "weird-tier")
+        with self.assertRaises(ValueError) as cm:
+            taskfile.parse_taskfile(self.path)
+        self.assertIn("model 必须为", str(cm.exception))
+
+    def test_duplicate_header_key_raises(self):
+        with open(self.path, "w", encoding="utf-8") as f:
+            f.write(
+                "# T-1\nexecutor: shell\nnet: optional\nresult: r\n"
+                "timeout: 10\ntimeout: 20\n---\necho hi\n"
+            )
+        with self.assertRaises(ValueError) as cm:
+            taskfile.parse_taskfile(self.path)
+        self.assertIn("重复字段", str(cm.exception))
+
+    def test_unknown_header_key_raises(self):
+        with open(self.path, "w", encoding="utf-8") as f:
+            f.write(
+                "# T-1\nexecutor: shell\nnet: optional\nresult: r\n"
+                "priority: high\n---\necho hi\n"
+            )
+        with self.assertRaises(ValueError) as cm:
+            taskfile.parse_taskfile(self.path)
+        self.assertIn("未知字段", str(cm.exception))
+
+    def test_timeout_out_of_range_raises(self):
+        with open(self.path, "w", encoding="utf-8") as f:
+            f.write("# T-1\nexecutor: shell\nnet: optional\nresult: r\ntimeout: 0\n---\necho hi\n")
+        with self.assertRaises(ValueError) as cm:
+            taskfile.parse_taskfile(self.path)
+        self.assertIn("timeout", str(cm.exception))
+
+    def test_repo_radar_templates_parse(self):
+        root = Path(__file__).resolve().parents[2] / "templates"
+        for path in sorted(root.glob("nightly-radar-*.md")):
+            text = path.read_text(encoding="utf-8")
+            text = text.replace("{{DATE}}", "20260822").replace(
+                "{{RESULTS_ROOT}}", "/home/liuxfs/broker-data/results"
+            )
+            tmp = Path(self.tmp.name) / path.name
+            tmp.write_text(text, encoding="utf-8")
+            spec = taskfile.parse_taskfile(tmp)
+            self.assertGreaterEqual(spec.timeout, 1)
+            self.assertLessEqual(spec.timeout, 86400)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -11,7 +11,7 @@
 | results/ | 执行器产出（attempt-N/ 目录：stdout/stderr/state.json） |
 | logs/ | broker.log 与执行日志 |
 | reports/ | CC 复查记录 |
-| scripts/ | sync_push.sh / sync_pull.sh / deploy_broker.sh / backup_to_nas.sh |
+| scripts/ | sync_push/pull、deploy_broker、backup_to_nas、`orchestra_check.py`（测试 + skill digest + tracked-ignored） |
 | broker/ | Broker 源码（stdlib only，scp 部署到 4B） |
 | templates/ | dsh 任务模板（nightly-radar 等，inject_daily 填充日期后注入） |
 
@@ -21,7 +21,7 @@
     executor: dsh | shell
     net: required | optional
     result: T-YYYYMMDD-<slug>
-    timeout: <秒，默认 3600>
+    timeout: <秒，1–86400，默认 3600>
     depends_on: T-...[, T-...]  # 可选；依赖完成前不执行、不消耗 attempt
     mode: execute | explore | decide | audit | brief  # 可选，默认 execute
     detail: brief | standard | deep                   # 可选，默认 standard
@@ -31,6 +31,8 @@
     model: flash | pro       # dsh 模型档位（可选，见「模型路由表」节）
     ---
     <执行体：dsh 任务的 prompt 全文，或 shell 任务的命令>
+
+本机解析（`broker/taskfile.py`）拒绝未知字段、重复 key、timeout 非 1–86400、`model` 非 `flash|pro`。**4B 在役副本须下次 `deploy_broker.sh` 才对齐。**
 
 快速流程：写 tasks/T-*.md → sync_push.sh → 等 Broker 执行 → sync_pull.sh → CC 复查写 reports/。任务终态后 broker 自动把任务文件移入 tasks/archive/（本地 tasks/ 经 sync_pull 同步该状态）。
 
@@ -77,8 +79,8 @@
 
 - **v2 默认入口**：自研浅色 SPA `http://127.0.0.1:3100/`（与 glue 八产物同端口）。Homepage `:3000` 配置保留回退，不再作为主路径。
 - glue `console/console_feed.py`：refresh 每 10 分钟 + serve 127.0.0.1:3100，stdlib only
-- 数据流：usage-monitor `GET /api/dashboard`（只读）→ status.json（含 `upcoming_personal`）；sync_pull 本地快照 → radar.json（可按日期回看）；console-schedule.toml → 双 ICS；个人层可在 UI 增删改（系统层只读）；messages.md → 待决/告警
-- Agent 协议与使用说明：`console/README.md`；设计 `docs/superpowers/specs/2026-08-20-console-design.md`；SOL 复审任务书 `docs/superpowers/specs/2026-08-20-console-v2-beautify.md`
+- 数据流：usage-monitor `GET /api/dashboard`（只读）→ status.json（含 `upcoming_personal`）；sync_pull 本地快照 → radar.json（可按日期回看）；console-schedule.toml → 双 ICS；个人层可在 UI 增删改（系统层只读）；messages.json = messages.md 待决 + refresh 派生的告警/最新
+- Agent 协议与使用说明：`console/README.md`。**控制台不派任务。** 新会话不会自动把 3100 当必经入口。
 
 ## 双 agent（CC × Codex）（mission 027 / 总 spec §6.3）
 
@@ -100,9 +102,9 @@
 ## 部署连接（当前家庭网络）
 
 - 4B：WiFi `liudfs`，静态 IP `192.168.0.250`（NetworkManager 连接名 liudfs；备用：有线 DHCP）
-- 用法：`ORCHESTRA_SSH_HOST=192.168.0.250 [ORCHESTRA_REMOTE_ROOT=/mnt/broker] bash scripts/deploy_broker.sh`
-- 部署脚本先只把 `migration_guard.py` 临时上传到远端 `/tmp` 并检查任务文件及 SQLite；预检通过后才覆盖 `artifact_validators.py`、`radar_render.py`、`radar_notify.py` 等在役代码、四阶段模板和 systemd unit。发现 queued/running/仍可重试 failed 的旧单体雷达任务时，部署在任何线上文件覆盖前退出，原运行文件保持不变
-- REMOTE_ROOT 默认 `/mnt/broker`（U 盘 ext4，fstab 按 UUID 挂载）；SD 过渡期传 `~/broker-data`
+- 用法：`ORCHESTRA_SSH_HOST=192.168.0.250 [ORCHESTRA_REMOTE_ROOT=/home/liuxfs/broker-data] bash scripts/deploy_broker.sh`
+- 部署脚本先只把 `migration_guard.py` 临时上传到远端 `/tmp` 并检查任务文件及 SQLite；预检通过后才覆盖在役代码。发现 queued/running/仍可重试 failed 的旧单体雷达任务时，部署在任何线上文件覆盖前退出
+- **现网 REMOTE_ROOT = `/home/liuxfs/broker-data`**（SD）。`/mnt/broker` 是旧 U 盘挂载点，未挂时 scp 会失败（控制台曾因此假「同步失败」）。本机 console refresh / `sync_pull.sh` 默认已改到 broker-data
 - **Tailscale 已装（三端同 tailnet）**：4B=`liuxfs`(100.111.75.58)、核桃派=`walnutpi`(100.64.2.60)、Windows=`laptop-w0cessade`；`ORCHESTRA_SSH_HOST` 为 env 驱动，切 tailnet 名零代码改动
 - **学校网络切换：见 `orchestra/docs/school-network-switch.md`**（入学前必读）
 

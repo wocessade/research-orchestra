@@ -723,7 +723,61 @@ body {
   align-items: flex-start;
 }
 .msg-body { flex: 1 1 0; min-width: 0; }
-.pending-composer { margin: 0 0 6px; }
+.pending-composer {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  gap: 6px;
+  margin: 0 0 8px;
+  pointer-events: auto;
+}
+.pending-label {
+  font-size: var(--fs-time);
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.pending-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  min-width: 0;
+}
+.pending-row input[type="text"] {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 8rem;
+  min-height: 2.25rem;
+  font: inherit;
+  font-size: var(--fs-data);
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 8px 10px;
+  pointer-events: auto;
+}
+.pending-add,
+.pending-remove {
+  appearance: none;
+  flex: 0 0 auto;
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: #fff;
+  font: inherit;
+  font-size: var(--fs-time);
+  font-weight: 700;
+  border-radius: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.pending-remove {
+  background: var(--surface);
+  color: var(--danger);
+  border-color: #efc3bf;
+  padding: 4px 8px;
+  align-self: center;
+}
 .pending-hint { margin: 0 0 8px; }
 .msg.pending { border-left-color: var(--danger); background: #fbf3f2; }
 .msg.alert { border-left-color: var(--warn); background: #fbf7ef; }

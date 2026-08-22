@@ -458,7 +458,7 @@
           ${m.text ? `<div class="msg-text">${esc(m.text)}</div>` : ""}
         </div>
         ${m.dismissable && tone === "pending"
-          ? `<button type="button" class="task-btn del-btn msg-dismiss" data-pending="${esc(m.text)}" aria-label="撤掉">×</button>`
+          ? `<button type="button" class="pending-remove" data-pending="${esc(m.text)}">撤掉</button>`
           : ""}
       </article>`,
       )
@@ -475,13 +475,21 @@
     $("alert-count").textContent = String(((messages && messages.alerts) || []).length);
   }
 
+  function setPendingStatus(text) {
+    const el = $("pending-status");
+    if (el) el.textContent = text;
+  }
+
   async function addPending(text) {
     const res = await fetch("/api/pending", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text }),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 404) {
+      throw new Error("写入接口不存在：请重启 3100 的 console serve，再 Ctrl+F5");
+    }
     if (!res.ok) throw new Error(data.error || "待决写入失败");
     applyMessages(data);
   }
@@ -490,7 +498,10 @@
     const res = await fetch(`/api/pending?text=${encodeURIComponent(text)}`, {
       method: "DELETE",
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 404) {
+      throw new Error("撤掉接口不存在：请重启 3100 的 console serve，再 Ctrl+F5");
+    }
     if (!res.ok) throw new Error(data.error || "待决删除失败");
     applyMessages(data);
   }
@@ -1033,15 +1044,33 @@
       });
     });
     const pendingForm = $("pending-composer");
+    const pendingInput = $("pending-input");
+    const pendingAdd = $("pending-add");
+    const savePending = () => {
+      const text = (pendingInput && pendingInput.value || "").trim();
+      if (!text) {
+        setPendingStatus("先在框里写一句话，再点写入");
+        if (pendingInput) pendingInput.focus();
+        return;
+      }
+      addPending(text)
+        .then(() => {
+          pendingInput.value = "";
+          setPendingStatus("已写入。办完后点右侧「撤掉」。");
+          pendingInput.focus();
+        })
+        .catch((err) => setPendingStatus(err.message));
+    };
     if (pendingForm) {
       pendingForm.addEventListener("submit", (e) => {
         e.preventDefault();
-        const input = pendingForm.querySelector('input[name="text"]');
-        const text = (input && input.value || "").trim();
-        if (!text) return;
-        addPending(text)
-          .then(() => { input.value = ""; })
-          .catch((err) => setFormStatus(err.message));
+        savePending();
+      });
+    }
+    if (pendingAdd) {
+      pendingAdd.addEventListener("click", (e) => {
+        e.preventDefault();
+        savePending();
       });
     }
     const pendingList = $("messages-pending");

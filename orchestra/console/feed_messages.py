@@ -180,6 +180,31 @@ def append_pending(messages_path: Path, text: str) -> None:
         f.write(f"\n## {stamp} — 待决（首页）\n- 待决：{cleaned}\n")
 
 
+def _strip_empty_home_pending(text: str) -> str:
+    """撤掉待决后清掉空的「待决（首页）」分节，避免留言栏留空标题。"""
+    lines = text.splitlines(keepends=True)
+    out: list[str] = []
+    i = 0
+    header = re.compile(r"^## \d{4}-\d{2}-\d{2} \d{2}:\d{2} — 待决（首页）\s*$")
+    while i < len(lines):
+        if header.match(lines[i].rstrip("\n")):
+            j = i + 1
+            chunk = []
+            while j < len(lines) and not lines[j].startswith("## "):
+                chunk.append(lines[j])
+                j += 1
+            body = "".join(chunk)
+            if re.search(r"^- 待决：", body, re.M):
+                out.append(lines[i])
+                out.extend(chunk)
+            i = j
+            continue
+        out.append(lines[i])
+        i += 1
+    cleaned = "".join(out)
+    return re.sub(r"\n{3,}", "\n\n", cleaned).strip() + ("\n" if cleaned.strip() else "")
+
+
 def remove_pending(messages_path: Path, text: str) -> None:
     cleaned = " ".join(str(text).split())
     if not cleaned:
@@ -196,7 +221,8 @@ def remove_pending(messages_path: Path, text: str) -> None:
         new_lines.append(line)
     if not removed:
         raise KeyError(cleaned)
-    messages_path.write_text("".join(new_lines), encoding="utf-8")
+    messages_path.write_text(
+        _strip_empty_home_pending("".join(new_lines)), encoding="utf-8")
 
 
 def append_alert(messages_path: Path, text: str) -> bool:

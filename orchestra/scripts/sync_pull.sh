@@ -4,7 +4,7 @@ set -euo pipefail
 ORCHESTRA_MONITOR_API="${ORCHESTRA_MONITOR_API:-http://192.168.0.200:5000/api/orchestra}"
 SSH_HOST="${ORCHESTRA_SSH_HOST:?用法: ORCHESTRA_SSH_HOST=192.168.x.x bash sync_pull.sh}"
 SSH_USER="${ORCHESTRA_SSH_USER:-liuxfs}"
-REMOTE_ROOT="${ORCHESTRA_REMOTE_ROOT:-/mnt/broker}"   # SSD 挂载点；SD 过渡期可用 ~/broker-data
+REMOTE_ROOT="${ORCHESTRA_REMOTE_ROOT:-/home/liuxfs/broker-data}"   # 现网 SD；U 盘 /mnt/broker 未挂时不要用旧默认
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 scp -rq "$SSH_USER@$SSH_HOST:$REMOTE_ROOT/results/." "$ROOT/results/"
 scp -rq "$SSH_USER@$SSH_HOST:$REMOTE_ROOT/logs/." "$ROOT/logs/"

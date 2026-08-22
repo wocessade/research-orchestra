@@ -223,8 +223,9 @@ class PendingFileTest(unittest.TestCase):
             self.assertEqual(
                 p.read_text(encoding="utf-8").count("- 待决：买塔式主机"), 1)
             remove_pending(p, "买塔式主机")
-            self.assertEqual(
-                parse_messages(p.read_text(encoding="utf-8"))["pending"], [])
+            leftover = p.read_text(encoding="utf-8")
+            self.assertEqual(parse_messages(leftover)["pending"], [])
+            self.assertNotIn("待决（首页）", leftover)
 
     def test_append_pending_rejects_empty(self):
         import tempfile

@@ -142,7 +142,7 @@ class RefreshTest(unittest.TestCase):
         first = run.call_args_list[0].args[0]
         self.assertEqual(first[0], r"C:\Windows\System32\OpenSSH\scp.exe")
         self.assertEqual(first[1], "-rq")
-        self.assertIn("liuxfs@192.168.0.250:/mnt/broker/results/.", first[2])
+        self.assertIn("liuxfs@192.168.0.250:/home/liuxfs/broker-data/results/.", first[2])
         if sys.platform == "win32":
             for call in run.call_args_list:
                 self.assertEqual(

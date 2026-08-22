@@ -39,7 +39,7 @@ _WINDOW_BEFORE = timedelta(days=30)
 _WINDOW_AFTER = timedelta(days=60)
 DEFAULT_SSH_HOST = "192.168.0.250"
 DEFAULT_SSH_USER = "liuxfs"
-DEFAULT_REMOTE_ROOT = "/mnt/broker"
+DEFAULT_REMOTE_ROOT = "/home/liuxfs/broker-data"
 
 
 def _write_raw(path: Path, text: str) -> None:

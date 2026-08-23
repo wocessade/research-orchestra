@@ -1,0 +1,54 @@
+from __future__ import annotations
+
+import pytest
+
+from bogda_console.config import Settings, assert_safe_port
+
+
+def test_default_mock_profile_uses_3101_and_loopback_3102() -> None:
+    settings = Settings.from_env({})
+    assert settings.profile == "mock-all"
+    assert settings.public_host == "127.0.0.1"
+    assert settings.public_port == 3101
+    assert settings.bff_host == "127.0.0.1"
+    assert settings.bff_port == 3102
+
+
+@pytest.mark.parametrize("purpose", ["public", "bff", "test"])
+def test_every_new_console_entry_point_rejects_3100(purpose: str) -> None:
+    with pytest.raises(ValueError, match="3100 is reserved"):
+        assert_safe_port(3100, purpose)
+
+
+def test_unsupported_profile_fails_closed() -> None:
+    with pytest.raises(ValueError, match="Unsupported BOGDA_CONSOLE_PROFILE"):
+        Settings.from_env({"BOGDA_CONSOLE_PROFILE": "real-prefect-mock-results"})
+
+
+def test_exact_allowlists_are_parsed_without_wildcards() -> None:
+    settings = Settings.from_env(
+        {
+            "BOGDA_CONSOLE_ALLOWED_DEPLOYMENT_IDS": "dep-a, dep-b",
+            "BOGDA_CONSOLE_ALLOWED_SCHEDULE_IDS": "schedule-a",
+            "BOGDA_CONSOLE_ALLOWED_QUEUE_IDS": "queue-a",
+            "BOGDA_CONSOLE_ALLOWED_WORK_POOL_NAMES": "dorm-x86",
+        }
+    )
+    assert settings.allowed_deployment_ids == frozenset({"dep-a", "dep-b"})
+    assert settings.allowed_schedule_ids == frozenset({"schedule-a"})
+    assert settings.allowed_queue_ids == frozenset({"queue-a"})
+    assert settings.allowed_work_pool_names == frozenset({"dorm-x86"})
+
+
+def test_real_readonly_disables_all_commands() -> None:
+    settings = Settings.from_env({"BOGDA_CONSOLE_PROFILE": "real-readonly"})
+    assert settings.commands_enabled is False
+    assert settings.review_enabled is False
+
+
+def test_multiple_replicas_disable_review() -> None:
+    settings = Settings.from_env(
+        {"BOGDA_CONSOLE_PROFILE": "allowlisted-test", "BOGDA_CONSOLE_REPLICA_COUNT": "2"}
+    )
+    assert settings.review_enabled is False
+

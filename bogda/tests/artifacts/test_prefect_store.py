@@ -48,3 +48,41 @@ def test_save_and_load_run_result_uses_one_versioned_key(monkeypatch) -> None:
     assert loaded == result
     assert loaded.execution_status is ExecutionStatus.COMPLETED
     assert loaded.scientific_status is ScientificStatus.UNREVIEWED
+
+
+def test_load_returns_the_latest_saved_review_version(monkeypatch) -> None:
+    stored = {}
+
+    class FakeArtifact:
+        def __init__(self, **values):
+            self.values = values
+
+        def create(self):
+            stored.setdefault(self.values["key"], []).append(
+                json.dumps(self.values["data"])
+            )
+            return SimpleNamespace()
+
+        @classmethod
+        def get(cls, key):
+            versions = stored.get(key)
+            return None if versions is None else SimpleNamespace(data=versions[-1])
+
+    monkeypatch.setattr(prefect_store, "Artifact", FakeArtifact)
+    result = sample_result()
+    reviewed = result.model_copy(
+        update={
+            "scientific_status": ScientificStatus.ACCEPTED,
+            "review_summary": "human accepted",
+        }
+    )
+
+    prefect_store.save_run_result(result)
+    prefect_store.save_run_result(reviewed)
+
+    loaded = prefect_store.load_run_result(result.run_id)
+
+    assert len(stored[prefect_store.artifact_key(result.run_id)]) == 2
+    assert loaded == reviewed
+    assert loaded.scientific_status is ScientificStatus.ACCEPTED
+    assert loaded.review_summary == "human accepted"

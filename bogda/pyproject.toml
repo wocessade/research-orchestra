@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "bogda"
+version = "0.1.0"
+description = "Prefect-based human-supervised research orchestration"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "prefect==3.8.3",
+  "pydantic>=2.11,<3",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.4,<9",
+]
+
+[project.scripts]
+bogda = "bogda.control.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/bogda"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+  "integration: starts a temporary Prefect server",
+]

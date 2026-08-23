@@ -9,5 +9,6 @@ orchestra/results/
 ml-notes/
 pm3-mcp-server/
 .proxmark3/
+.worktrees/
 FCC_IDE_v2.bat
 fcc_inner.cmd

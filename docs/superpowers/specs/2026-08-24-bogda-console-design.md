@@ -472,6 +472,8 @@ Every command:
 5. reads the resource from the authority again;
 6. returns the new authoritative snapshot.
 
+S2 authorization uses exact server configuration sets for Deployment IDs, schedule IDs, Queue IDs, and Work Pool names. Submission requires an allowed Deployment. Schedule commands require both allowed schedule and Deployment IDs, and a fresh Prefect read must prove their current parent-child relation. Queue commands require allowed Queue and Work Pool identifiers plus fresh Prefect membership. Cancel and review authorize a dynamic Flow Run only when a fresh Prefect read shows its non-null `deploymentId` belongs to the allowed Deployment set; standalone runs are never mutable. A newly submitted run qualifies through the `deploymentId` in its authoritative Prefect post-read, not a local allowlist update. Review performs this Prefect ownership check before reading or appending the Artifact. The client never supplies a trusted parent or ownership claim.
+
 Every actionable resource query exposes an opaque `commandVersion`. It is a deterministic digest of only authoritative fields already returned by Prefect: resource identity plus run state name/type/timestamp, schedule active state/update timestamp, or queue paused state/update timestamp. The browser must return it as `expectedCommandVersion` for cancel, schedule pause/resume, and queue pause/resume. It is not persisted and is not an execution state. The BFF recomputes it from the fresh pre-read; a mismatch returns `409 RESOURCE_CHANGED` before any adapter command.
 
 Command-specific preconditions are exact:

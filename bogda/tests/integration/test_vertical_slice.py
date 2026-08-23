@@ -1,4 +1,5 @@
 import sys
+from pathlib import Path
 
 import pytest
 from prefect.testing.utilities import prefect_test_harness
@@ -34,15 +35,17 @@ def test_local_vertical_slice(tmp_path) -> None:
             expected_artifacts=(ArtifactSpec(path="result.txt"),),
         )
 
-        returned = RunResult.model_validate(
-            run_shell_job(
-                request.model_dump(mode="json"),
-                str(tmp_path),
-            )
+        completed_state = run_shell_job(
+            request.model_dump(mode="json"),
+            str(tmp_path),
+            return_state=True,
         )
+        returned = RunResult.model_validate(completed_state.result())
         stored = load_run_result(returned.run_id)
 
+        assert completed_state.name == "Completed"
         assert returned.execution_status.value == "Completed"
+        assert Path(returned.declared_artifacts[0].uri).is_file()
         assert stored is not None
         assert stored.scientific_status is ScientificStatus.UNREVIEWED
 

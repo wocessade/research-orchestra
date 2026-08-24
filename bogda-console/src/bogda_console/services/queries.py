@@ -9,9 +9,11 @@ from bogda_console.contracts.models import (
     ApiEnvelope,
     ApiError,
     ApiErrorCode,
+    AutonomyPolicySnapshot,
     Availability,
     CapabilitySnapshot,
     DeploymentSummary,
+    Freshness,
     InfrastructureView,
     OverviewSnapshot,
     Page,
@@ -21,9 +23,16 @@ from bogda_console.contracts.models import (
     RunResultView,
     RunSummary,
     ScientificSummary,
+    SourceMeta,
+    SourceMode,
 )
-from bogda_console.contracts.ports import PowerStatusPort, PrefectQueryPort, RunResultPort
-from bogda_console.services.errors import SourceUnavailable
+from bogda_console.contracts.ports import (
+    AutonomyPolicyPort,
+    PowerStatusPort,
+    PrefectQueryPort,
+    RunResultPort,
+)
+from bogda_console.services.errors import ServiceError, SourceUnavailable
 from bogda_console.services.snapshots import LastGoodReader, SourceRead
 
 
@@ -39,29 +48,64 @@ class QueryService:
         results: RunResultPort,
         power: PowerStatusPort,
         now: Callable[[], datetime] | None = None,
+        policy: AutonomyPolicyPort | None = None,
     ) -> None:
         self.settings = settings
         self.prefect = prefect
         self.results = results
         self.power = power
+        self.policy = policy
         self._now = now or (lambda: datetime.now(UTC))
         self._readers: dict[str, LastGoodReader[Any]] = {}
 
     async def capabilities(self) -> ApiEnvelope[CapabilitySnapshot]:
         enabled = self.settings.commands_enabled
+        effective = None
+        if self.settings.profile == "mock-all" and self.policy is not None:
+            snapshot = await self.policy.get_policy()
+            effective = snapshot.project_overrides.get("bogda-main", snapshot.global_default)
+        elif self.settings.profile == "mock-all":
+            effective = "supervised"
         return ApiEnvelope(
             data=CapabilitySnapshot(
                 profile=self.settings.profile,
                 projectId="bogda-main",
-                effectiveAutonomyMode="supervised",
+                effectiveAutonomyMode=effective,
                 canSubmitRegisteredDeployment=enabled,
                 canCancelRun=enabled,
                 canPauseSchedule=enabled,
                 canPauseWorkQueue=enabled,
                 canReviewScientificResult=self.settings.review_enabled,
-                canSetAutonomyMode=False,
+                canSetAutonomyMode=self.settings.autonomy_writes_enabled,
             ),
             sources={},
+            errors=[],
+        )
+
+    async def autonomy_policy(self) -> ApiEnvelope[AutonomyPolicySnapshot]:
+        if self.policy is None:
+            raise ServiceError(
+                ApiErrorCode.AUTONOMY_POLICY_UNAVAILABLE,
+                "autonomy policy backend is not wired",
+                source="autonomyPolicy",
+                retryable=False,
+                status_code=503,
+            )
+        snapshot = await self.policy.get_policy()
+        now = self._now()
+        return ApiEnvelope(
+            data=snapshot,
+            sources={
+                "autonomyPolicy": SourceMeta(
+                    source="autonomyPolicy",
+                    sourceMode=SourceMode.MOCK if self.settings.profile == "mock-all" else SourceMode.REAL,
+                    observedAt=now,
+                    receivedAt=now,
+                    lastSuccessfulAt=now,
+                    staleAfterSeconds=60,
+                    freshness=Freshness.FRESH,
+                )
+            },
             errors=[],
         )
 

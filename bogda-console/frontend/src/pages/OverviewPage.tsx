@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { api } from "../api/client";
 import type { OverviewSnapshot, PoolSnapshot, RunSummary } from "../api/types";
+import { AutonomyPolicyPanel } from "../components/AutonomyPolicyPanel";
 import { EnvelopeErrors, QueryFailure, QueryLoading, SourceStrip } from "../components/EnvelopeState";
 import { RunLedger } from "../components/RunLedger";
 
@@ -33,6 +34,7 @@ export function OverviewPage() {
       </header>
       <SourceStrip sources={envelope.sources} />
       <EnvelopeErrors errors={envelope.errors} />
+      <AutonomyPolicyPanel />
 
       <section className="attention-block section-block" aria-labelledby="attention-title">
         <div className="section-heading"><p>01 / ATTENTION</p><h2 id="attention-title">需要判断</h2><span>{attention.length} 条</span></div>

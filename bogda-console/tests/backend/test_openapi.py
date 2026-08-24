@@ -8,6 +8,7 @@ def test_openapi_contains_every_canonical_wire_schema() -> None:
     schemas = create_app(Settings.from_env({})).openapi()["components"]["schemas"]
     required = {
         "ApiError",
+        "AutonomyPolicySnapshot",
         "CapabilitySnapshot",
         "DeploymentSummary",
         "InfrastructureView",

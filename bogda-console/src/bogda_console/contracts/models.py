@@ -74,6 +74,7 @@ class ApiErrorCode(StrEnum):
     PREFECT_UNAVAILABLE = "PREFECT_UNAVAILABLE"
     RUN_RESULT_UNAVAILABLE = "RUN_RESULT_UNAVAILABLE"
     POWER_UNAVAILABLE = "POWER_UNAVAILABLE"
+    AUTONOMY_POLICY_UNAVAILABLE = "AUTONOMY_POLICY_UNAVAILABLE"
     PROJECT_CONTEXT_UNAVAILABLE = "PROJECT_CONTEXT_UNAVAILABLE"
     RESULT_MISSING = "RESULT_MISSING"
     RESULT_INVALID = "RESULT_INVALID"
@@ -306,7 +307,7 @@ class CapabilitySnapshot(WireModel):
     can_pause_schedule: bool
     can_pause_work_queue: bool
     can_review_scientific_result: bool
-    can_set_autonomy_mode: Literal[False] = False
+    can_set_autonomy_mode: bool
 
 
 class RunFilters(WireModel):
@@ -329,6 +330,22 @@ class ReviewRequest(WireModel):
     base_artifact_id: str = Field(min_length=1)
     scientific_status: ScientificStatus
     review_summary: str | None = None
+
+
+class AutonomyPolicySnapshot(WireModel):
+    global_default: AutonomyMode
+    project_overrides: dict[str, AutonomyMode] = Field(default_factory=dict)
+    revision: int = Field(ge=0)
+
+
+class SetGlobalAutonomyRequest(WireModel):
+    mode: AutonomyMode
+    expected_revision: int = Field(ge=0)
+
+
+class SetProjectAutonomyRequest(WireModel):
+    mode: AutonomyMode | None = None
+    expected_revision: int = Field(ge=0)
 
 
 class CommandReceipt(WireModel, Generic[T]):

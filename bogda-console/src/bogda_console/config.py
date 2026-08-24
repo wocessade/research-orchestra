@@ -79,3 +79,7 @@ class Settings:
     @property
     def review_enabled(self) -> bool:
         return self.commands_enabled and self.replica_count == 1
+
+    @property
+    def autonomy_writes_enabled(self) -> bool:
+        return self.profile == "mock-all"

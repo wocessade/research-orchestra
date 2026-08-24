@@ -11,6 +11,12 @@ export type DeploymentSummary = Schemas["DeploymentSummary"];
 export type InfrastructureView = Schemas["InfrastructureView"];
 export type OverviewSnapshot = Schemas["OverviewSnapshot"];
 export type CapabilitySnapshot = Schemas["CapabilitySnapshot"];
+export type AutonomyMode = "manual" | "supervised" | "autonomous";
+export type AutonomyPolicySnapshot = {
+  globalDefault: AutonomyMode;
+  projectOverrides: Record<string, AutonomyMode>;
+  revision: number;
+};
 export type QueueSnapshot = Schemas["QueueSnapshot"];
 export type PoolSnapshot = Schemas["PoolSnapshot"];
 

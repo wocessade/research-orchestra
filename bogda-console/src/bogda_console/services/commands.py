@@ -11,6 +11,8 @@ from bogda_console.config import Settings
 from bogda_console.contracts.models import (
     ApiErrorCode,
     ApiErrorDetails,
+    AutonomyMode,
+    AutonomyPolicySnapshot,
     CommandReceipt,
     DeploymentSummary,
     QueueSnapshot,
@@ -19,6 +21,8 @@ from bogda_console.contracts.models import (
     ScientificStatus,
 )
 from bogda_console.contracts.ports import (
+    AutonomyPolicyConflict,
+    AutonomyPolicyPort,
     PrefectCommandPort,
     PrefectQueryPort,
     RunResultPort,
@@ -34,10 +38,12 @@ class CommandService:
         prefect: PrefectQueryPort | PrefectCommandPort,
         results: RunResultPort,
         now: Callable[[], datetime] | None = None,
+        policy: AutonomyPolicyPort | None = None,
     ) -> None:
         self.settings = settings
         self.prefect = prefect
         self.results = results
+        self.policy = policy
         self._now = now or (lambda: datetime.now(UTC))
         self._locks: dict[str, asyncio.Lock] = {}
 
@@ -270,6 +276,63 @@ class CommandService:
                 )
             return self._receipt(command, queue_id, post)
 
+    async def set_global_autonomy(
+        self, mode: AutonomyMode | str, expected_revision: int
+    ) -> CommandReceipt[AutonomyPolicySnapshot]:
+        async with self._lock("autonomy-policy"):
+            self._require_autonomy_writes()
+            if self.policy is None:
+                self._raise(
+                    ApiErrorCode.AUTONOMY_POLICY_UNAVAILABLE,
+                    503,
+                    "autonomy policy is not wired",
+                    source="autonomyPolicy",
+                )
+            current = await self._pre_read("autonomyPolicy", self.policy.get_policy)
+            if current.revision != expected_revision:
+                self._raise(
+                    ApiErrorCode.RESOURCE_CHANGED,
+                    409,
+                    "resource changed after the action was opened",
+                    current,
+                    source="autonomyPolicy",
+                )
+            await self._mutate(
+                "autonomyPolicy",
+                lambda: self.policy.set_global_mode(AutonomyMode(mode), expected_revision),
+            )
+            post = await self._post_read("autonomyPolicy", self.policy.get_policy)
+            return self._receipt("setGlobalAutonomy", "global", post)
+
+    async def set_project_autonomy(
+        self, project_id: str, mode: AutonomyMode | str | None, expected_revision: int
+    ) -> CommandReceipt[AutonomyPolicySnapshot]:
+        async with self._lock("autonomy-policy"):
+            self._require_autonomy_writes()
+            if self.policy is None:
+                self._raise(
+                    ApiErrorCode.AUTONOMY_POLICY_UNAVAILABLE,
+                    503,
+                    "autonomy policy is not wired",
+                    source="autonomyPolicy",
+                )
+            current = await self._pre_read("autonomyPolicy", self.policy.get_policy)
+            if current.revision != expected_revision:
+                self._raise(
+                    ApiErrorCode.RESOURCE_CHANGED,
+                    409,
+                    "resource changed after the action was opened",
+                    current,
+                    source="autonomyPolicy",
+                )
+            resolved = None if mode is None else AutonomyMode(mode)
+            await self._mutate(
+                "autonomyPolicy",
+                lambda: self.policy.set_project_mode(project_id, resolved, expected_revision),
+            )
+            post = await self._post_read("autonomyPolicy", self.policy.get_policy)
+            return self._receipt("setProjectAutonomy", project_id, post)
+
     def _authorize_run(self, run: RunSummary) -> None:
         if not run.deployment_id or run.deployment_id not in self.settings.allowed_deployment_ids:
             self._raise(ApiErrorCode.RESOURCE_NOT_ALLOWLISTED, 403, run.run_id, run)
@@ -286,6 +349,18 @@ class CommandService:
     def _require_commands(self) -> None:
         if not self.settings.commands_enabled:
             self._raise(ApiErrorCode.RESOURCE_NOT_ALLOWLISTED, 403, "commands disabled")
+
+    def _require_autonomy_writes(self) -> None:
+        if not self.settings.autonomy_writes_enabled:
+            self._raise(ApiErrorCode.RESOURCE_NOT_ALLOWLISTED, 403, "autonomy policy writes disabled")
+
+    @staticmethod
+    def _unavailable_code(source: str) -> ApiErrorCode:
+        return {
+            "prefect": ApiErrorCode.PREFECT_UNAVAILABLE,
+            "runResult": ApiErrorCode.RUN_RESULT_UNAVAILABLE,
+            "autonomyPolicy": ApiErrorCode.AUTONOMY_POLICY_UNAVAILABLE,
+        }.get(source, ApiErrorCode.INTERNAL_ERROR)
 
     def _receipt(self, command: str, resource_id: str, snapshot: Any):
         return CommandReceipt(
@@ -304,25 +379,23 @@ class CommandService:
         except (ServiceError, KeyError):
             raise
         except Exception as error:
-            code = (
-                ApiErrorCode.PREFECT_UNAVAILABLE
-                if source == "prefect"
-                else ApiErrorCode.RUN_RESULT_UNAVAILABLE
-            )
-            self._raise(code, 503, str(error), source=source)
+            self._raise(self._unavailable_code(source), 503, str(error), source=source)
 
     async def _mutate(self, source: str, operation: Callable[[], Awaitable[Any]]) -> Any:
         try:
             return await operation()
         except ReviewConflict:
             raise
-        except (ConnectionError, TimeoutError, httpx.RequestError) as error:
-            code = (
-                ApiErrorCode.PREFECT_UNAVAILABLE
-                if source == "prefect"
-                else ApiErrorCode.RUN_RESULT_UNAVAILABLE
+        except AutonomyPolicyConflict as error:
+            self._raise(
+                ApiErrorCode.RESOURCE_CHANGED,
+                409,
+                "resource changed after the action was opened",
+                error.current,
+                source="autonomyPolicy",
             )
-            self._raise(code, 503, str(error), source=source)
+        except (ConnectionError, TimeoutError, httpx.RequestError) as error:
+            self._raise(self._unavailable_code(source), 503, str(error), source=source)
         except Exception as error:
             self._raise(ApiErrorCode.COMMAND_REJECTED, 409, str(error), source=source)
 

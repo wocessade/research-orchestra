@@ -85,6 +85,7 @@ export function envelope(data: unknown, sources: JsonValue = { prefect: sourceFr
 export function standardRoutes(): Record<string, RouteHandler> {
   return {
     "/api/v1/capabilities": envelope({ profile: "mock-all", projectId: "bogda-main", effectiveAutonomyMode: "supervised", canSubmitRegisteredDeployment: true, canCancelRun: true, canPauseSchedule: true, canPauseWorkQueue: true, canReviewScientificResult: true, canSetAutonomyMode: false }, {}),
+    "/api/v1/autonomy-policy": envelope({ globalDefault: "supervised", projectOverrides: {}, revision: 0 }, {}),
     "/api/v1/overview": envelope({
       execution: {
         countsByPrefectType: { RUNNING: 1, COMPLETED: 1 },

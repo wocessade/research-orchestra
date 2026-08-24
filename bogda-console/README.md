@@ -105,6 +105,14 @@ Power Agent 尚未实现，所有 profile 的宿舍机 sleep、compute、gaming�
 maintenance 数据都来自 `MockPowerAdapter`，界面始终标注“模拟数据”。mock
 适配器不复制 Prefect 调度逻辑。
 
+## 科研自主模式控制
+
+3101总览页提供“手动 / 监督执行 / 范围内自主”三档控制，以及项目“继承全局”。
+当前只有`mock-all`使用进程内策略适配器并允许修改；修改带revision并发检查，
+只影响随后创建的运行。`real-readonly`和`allowlisted-test`没有接入真实Bogda
+Policy后端，保持`canSetAutonomyMode=false`，界面显示只读与“策略后端尚未接入”，
+不会静默使用mock策略。真实策略接线属于后续S2任务。
+
 ## 验证
 
 ```powershell

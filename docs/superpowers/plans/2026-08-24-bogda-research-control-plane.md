@@ -72,7 +72,7 @@
 - [x] 运行Bogda全量测试和本地Prefect纵向切片。
 - [x] 以一个原子提交交付策略与冻结语义，避免中间提交产生“有策略但运行不冻结”的状态。
 
-### Task 3: 3101自主模式API与切换控件
+### Task 3: 3101自主模式API与切换控件（✅ `codex/bogda-console-autonomy-control`）
 
 **Files:**
 - Modify: `bogda-console/src/bogda_console/contracts/models.py`
@@ -89,11 +89,11 @@
 - Produces: `GET /api/v1/autonomy-policy`和带`expectedRevision`的`PUT /api/v1/autonomy-policy/{projectId}`；成功后返回权威快照。
 - UI copy: `手动`、`监督执行`、`范围内自主`；确认框明确“只影响后续新任务”。
 
-- [ ] 先写API和UI失败测试，包括只读profile禁用、revision冲突、作用域提示。
-- [ ] 运行pytest与Vitest聚焦测试，确认路由和控件缺失。
-- [ ] 实现适配器、命令服务和三段控件；`real-readonly`继续返回`canSetAutonomyMode=false`。
-- [ ] 导出OpenAPI并运行 `npm run check:contracts`、`npm run build`及相关测试。
-- [ ] 提交 `feat(console): add guarded autonomy controls`。
+- [x] 先写API和UI测试，包括只读profile禁用、revision冲突、作用域提示；接管时补充了真实策略后端不可用仍显示只读面板的失败测试并完成红绿循环。
+- [x] 复核Grok遗留实现并补齐端口边界、可见作用域标题和只读降级语义。
+- [x] 实现mock策略适配器、未接线真实适配器、命令服务和三段控件；`real-readonly`及`allowlisted-test`继续返回`canSetAutonomyMode=false`。
+- [x] 导出OpenAPI并通过contract、build、后端、前端及完整Playwright矩阵。
+- [x] 提交 `feat(console): add guarded autonomy controls`。
 
 ### Task 4: `manual`与`supervised`人工检查点
 

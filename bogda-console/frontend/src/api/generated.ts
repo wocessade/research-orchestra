@@ -4,6 +4,57 @@
  */
 
 export interface paths {
+    "/api/v1/autonomy-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Autonomy Policy */
+        get: operations["autonomy_policy_api_v1_autonomy_policy_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/autonomy-policy/global": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set Global Autonomy */
+        post: operations["set_global_autonomy_api_v1_autonomy_policy_global_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/autonomy-policy/projects/{project_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set Project Autonomy */
+        post: operations["set_project_autonomy_api_v1_autonomy_policy_projects__project_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/capabilities": {
         parameters: {
             query?: never;
@@ -280,9 +331,29 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ApiEnvelope[AutonomyPolicySnapshot] */
+        ApiEnvelope_AutonomyPolicySnapshot_: {
+            data: components["schemas"]["AutonomyPolicySnapshot"] | null;
+            /** Errors */
+            errors?: components["schemas"]["ApiError"][];
+            /** Sources */
+            sources?: {
+                [key: string]: components["schemas"]["SourceMeta"];
+            };
+        };
         /** ApiEnvelope[CapabilitySnapshot] */
         ApiEnvelope_CapabilitySnapshot_: {
             data: components["schemas"]["CapabilitySnapshot"] | null;
+            /** Errors */
+            errors?: components["schemas"]["ApiError"][];
+            /** Sources */
+            sources?: {
+                [key: string]: components["schemas"]["SourceMeta"];
+            };
+        };
+        /** ApiEnvelope[CommandReceipt[AutonomyPolicySnapshot]] */
+        ApiEnvelope_CommandReceipt_AutonomyPolicySnapshot__: {
+            data: components["schemas"]["CommandReceipt_AutonomyPolicySnapshot_"] | null;
             /** Errors */
             errors?: components["schemas"]["ApiError"][];
             /** Sources */
@@ -415,7 +486,7 @@ export interface components {
          * ApiErrorCode
          * @enum {string}
          */
-        ApiErrorCode: "PREFECT_UNAVAILABLE" | "RUN_RESULT_UNAVAILABLE" | "POWER_UNAVAILABLE" | "PROJECT_CONTEXT_UNAVAILABLE" | "RESULT_MISSING" | "RESULT_INVALID" | "REVIEW_CONFLICT" | "RESOURCE_CHANGED" | "RESOURCE_NOT_ALLOWLISTED" | "COMMAND_NOT_APPLICABLE" | "COMMAND_REJECTED" | "COMMAND_OUTCOME_MISMATCH" | "COMMAND_OUTCOME_UNKNOWN" | "INFRASTRUCTURE_MISCONFIGURED" | "NOT_FOUND" | "VALIDATION_ERROR" | "INTERNAL_ERROR";
+        ApiErrorCode: "PREFECT_UNAVAILABLE" | "RUN_RESULT_UNAVAILABLE" | "POWER_UNAVAILABLE" | "AUTONOMY_POLICY_UNAVAILABLE" | "PROJECT_CONTEXT_UNAVAILABLE" | "RESULT_MISSING" | "RESULT_INVALID" | "REVIEW_CONFLICT" | "RESOURCE_CHANGED" | "RESOURCE_NOT_ALLOWLISTED" | "COMMAND_NOT_APPLICABLE" | "COMMAND_REJECTED" | "COMMAND_OUTCOME_MISMATCH" | "COMMAND_OUTCOME_UNKNOWN" | "INFRASTRUCTURE_MISCONFIGURED" | "NOT_FOUND" | "VALIDATION_ERROR" | "INTERNAL_ERROR";
         /** ApiErrorDetails */
         ApiErrorDetails: {
             /** Currentresource */
@@ -447,6 +518,16 @@ export interface components {
          * @enum {string}
          */
         AutonomyMode: "manual" | "supervised" | "autonomous";
+        /** AutonomyPolicySnapshot */
+        AutonomyPolicySnapshot: {
+            globalDefault: components["schemas"]["AutonomyMode"];
+            /** Projectoverrides */
+            projectOverrides?: {
+                [key: string]: components["schemas"]["AutonomyMode"];
+            };
+            /** Revision */
+            revision: number;
+        };
         /**
          * Availability
          * @enum {string}
@@ -462,12 +543,8 @@ export interface components {
             canPauseWorkQueue: boolean;
             /** Canreviewscientificresult */
             canReviewScientificResult: boolean;
-            /**
-             * Cansetautonomymode
-             * @default false
-             * @constant
-             */
-            canSetAutonomyMode: false;
+            /** Cansetautonomymode */
+            canSetAutonomyMode: boolean;
             /** Cansubmitregistereddeployment */
             canSubmitRegisteredDeployment: boolean;
             effectiveAutonomyMode?: components["schemas"]["AutonomyMode"] | null;
@@ -475,6 +552,19 @@ export interface components {
             profile: string;
             /** Projectid */
             projectId: string;
+        };
+        /** CommandReceipt[AutonomyPolicySnapshot] */
+        CommandReceipt_AutonomyPolicySnapshot_: {
+            /**
+             * Acceptedat
+             * Format: date-time
+             */
+            acceptedAt: string;
+            /** Command */
+            command: string;
+            /** Resourceid */
+            resourceId: string;
+            snapshot: components["schemas"]["AutonomyPolicySnapshot"];
         };
         /** CommandReceipt[DeploymentSummary] */
         CommandReceipt_DeploymentSummary_: {
@@ -812,6 +902,18 @@ export interface components {
             /** Validationissues */
             validationIssues?: string[];
         };
+        /** SetGlobalAutonomyRequest */
+        SetGlobalAutonomyRequest: {
+            /** Expectedrevision */
+            expectedRevision: number;
+            mode: components["schemas"]["AutonomyMode"];
+        };
+        /** SetProjectAutonomyRequest */
+        SetProjectAutonomyRequest: {
+            /** Expectedrevision */
+            expectedRevision: number;
+            mode?: components["schemas"]["AutonomyMode"] | null;
+        };
         /** SourceMeta */
         SourceMeta: {
             freshness: components["schemas"]["Freshness"];
@@ -909,6 +1011,94 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    autonomy_policy_api_v1_autonomy_policy_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiEnvelope_AutonomyPolicySnapshot_"];
+                };
+            };
+        };
+    };
+    set_global_autonomy_api_v1_autonomy_policy_global_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetGlobalAutonomyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiEnvelope_CommandReceipt_AutonomyPolicySnapshot__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_project_autonomy_api_v1_autonomy_policy_projects__project_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetProjectAutonomyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiEnvelope_CommandReceipt_AutonomyPolicySnapshot__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     capabilities_api_v1_capabilities_get: {
         parameters: {
             query?: never;

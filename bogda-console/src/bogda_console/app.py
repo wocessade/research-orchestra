@@ -13,9 +13,11 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from bogda_console.adapters.prefect_api import PrefectApiAdapter
+from bogda_console.adapters.mock_autonomy_policy import MockAutonomyPolicyAdapter
 from bogda_console.adapters.mock_power import MockPowerAdapter
 from bogda_console.adapters.mock_prefect import MockPrefectAdapter
 from bogda_console.adapters.mock_run_results import MockRunResultAdapter
+from bogda_console.adapters.unwired_autonomy_policy import UnwiredAutonomyPolicyAdapter
 from bogda_console.api.routes import router
 from bogda_console.config import Settings
 from bogda_console.contracts.models import (
@@ -44,6 +46,7 @@ class Container:
     power: MockPowerAdapter
     queries: QueryService
     commands: CommandService
+    policy: Any
 
     @classmethod
     def build(cls, settings: Settings, scenario: str | None = None) -> "Container":
@@ -56,28 +59,32 @@ class Container:
                 allowed_deployment_ids=settings.allowed_deployment_ids,
             )
             power = MockPowerAdapter(load_fixture(settings.fixture_scenario))
-            queries = QueryService(settings=settings, prefect=prefect, results=prefect, power=power)
-            commands = CommandService(settings=settings, prefect=prefect, results=prefect)
-            return cls(settings, prefect, prefect, power, queries, commands)
+            policy = UnwiredAutonomyPolicyAdapter()
+            queries = QueryService(settings=settings, prefect=prefect, results=prefect, power=power, policy=policy)
+            commands = CommandService(settings=settings, prefect=prefect, results=prefect, policy=policy)
+            return cls(settings, prefect, prefect, power, queries, commands, policy)
         fixture = load_fixture(scenario or settings.fixture_scenario)
         prefect = MockPrefectAdapter(fixture)
         results = MockRunResultAdapter(fixture)
         power = MockPowerAdapter(fixture)
         clock = datetime.fromisoformat(str(fixture["clock"]).replace("Z", "+00:00"))
+        policy = MockAutonomyPolicyAdapter()
         queries = QueryService(
             settings=settings,
             prefect=prefect,
             results=results,
             power=power,
             now=lambda: clock,
+            policy=policy,
         )
         commands = CommandService(
             settings=settings,
             prefect=prefect,
             results=results,
             now=lambda: clock,
+            policy=policy,
         )
-        return cls(settings, prefect, results, power, queries, commands)
+        return cls(settings, prefect, results, power, queries, commands, policy)
 
     def for_scenario(self, scenario: str) -> "Container":
         if self.settings.profile != "mock-all":

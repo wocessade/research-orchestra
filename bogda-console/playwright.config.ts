@@ -1,4 +1,9 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "@playwright/test";
+
+const localSrc = path.join(path.dirname(fileURLToPath(import.meta.url)), "src");
+const pythonPath = [localSrc, process.env.PYTHONPATH].filter(Boolean).join(path.delimiter);
 
 const viewports = [
   { name: "desktop-1440", width: 1440, height: 900 },
@@ -33,6 +38,7 @@ export default defineConfig({
     timeout: 60_000,
     env: {
       ...process.env,
+      PYTHONPATH: pythonPath,
       BOGDA_CONSOLE_PROFILE: "mock-all",
       BOGDA_CONSOLE_TEST_MODE: "1",
       BOGDA_CONSOLE_ALLOWED_DEPLOYMENT_IDS: "deployment-service,deployment-dorm",

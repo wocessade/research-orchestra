@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import Any, Protocol, runtime_checkable
 
 from bogda_console.contracts.models import (
+    AutonomyMode,
+    AutonomyPolicySnapshot,
     DeploymentSummary,
     Page,
     PoolSnapshot,
@@ -58,3 +60,18 @@ class PowerStatusPort(Protocol):
 class ProjectContextPort(Protocol):
     async def get_run_context(self, run_id: str) -> ProjectContext | None: ...
     async def get_deployment_context(self, deployment_id: str) -> ProjectContext | None: ...
+
+
+@runtime_checkable
+class AutonomyPolicyPort(Protocol):
+    async def get_policy(self) -> AutonomyPolicySnapshot: ...
+    async def set_global_mode(self, mode: AutonomyMode, expected_revision: int) -> AutonomyPolicySnapshot: ...
+    async def set_project_mode(
+        self, project_id: str, mode: AutonomyMode | None, expected_revision: int
+    ) -> AutonomyPolicySnapshot: ...
+
+
+class AutonomyPolicyConflict(Exception):
+    def __init__(self, current: AutonomyPolicySnapshot) -> None:
+        super().__init__("autonomy policy revision mismatch")
+        self.current = current

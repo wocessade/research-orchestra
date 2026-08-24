@@ -1,6 +1,40 @@
 {
   "components": {
     "schemas": {
+      "ApiEnvelope_AutonomyPolicySnapshot_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AutonomyPolicySnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SourceMeta"
+            },
+            "title": "Sources",
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiEnvelope[AutonomyPolicySnapshot]",
+        "type": "object"
+      },
       "ApiEnvelope_CapabilitySnapshot_": {
         "additionalProperties": false,
         "properties": {
@@ -33,6 +67,40 @@
           "data"
         ],
         "title": "ApiEnvelope[CapabilitySnapshot]",
+        "type": "object"
+      },
+      "ApiEnvelope_CommandReceipt_AutonomyPolicySnapshot__": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CommandReceipt_AutonomyPolicySnapshot_"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SourceMeta"
+            },
+            "title": "Sources",
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiEnvelope[CommandReceipt[AutonomyPolicySnapshot]]",
         "type": "object"
       },
       "ApiEnvelope_CommandReceipt_DeploymentSummary__": {
@@ -452,6 +520,7 @@
           "PREFECT_UNAVAILABLE",
           "RUN_RESULT_UNAVAILABLE",
           "POWER_UNAVAILABLE",
+          "AUTONOMY_POLICY_UNAVAILABLE",
           "PROJECT_CONTEXT_UNAVAILABLE",
           "RESULT_MISSING",
           "RESULT_INVALID",
@@ -562,6 +631,32 @@
         "title": "AutonomyMode",
         "type": "string"
       },
+      "AutonomyPolicySnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "globalDefault": {
+            "$ref": "#/components/schemas/AutonomyMode"
+          },
+          "projectOverrides": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/AutonomyMode"
+            },
+            "title": "Projectoverrides",
+            "type": "object"
+          },
+          "revision": {
+            "minimum": 0.0,
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "globalDefault",
+          "revision"
+        ],
+        "title": "AutonomyPolicySnapshot",
+        "type": "object"
+      },
       "Availability": {
         "enum": [
           "available",
@@ -591,8 +686,6 @@
             "type": "boolean"
           },
           "canSetAutonomyMode": {
-            "const": false,
-            "default": false,
             "title": "Cansetautonomymode",
             "type": "boolean"
           },
@@ -626,9 +719,39 @@
           "canCancelRun",
           "canPauseSchedule",
           "canPauseWorkQueue",
-          "canReviewScientificResult"
+          "canReviewScientificResult",
+          "canSetAutonomyMode"
         ],
         "title": "CapabilitySnapshot",
+        "type": "object"
+      },
+      "CommandReceipt_AutonomyPolicySnapshot_": {
+        "additionalProperties": false,
+        "properties": {
+          "acceptedAt": {
+            "format": "date-time",
+            "title": "Acceptedat",
+            "type": "string"
+          },
+          "command": {
+            "title": "Command",
+            "type": "string"
+          },
+          "resourceId": {
+            "title": "Resourceid",
+            "type": "string"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/AutonomyPolicySnapshot"
+          }
+        },
+        "required": [
+          "command",
+          "resourceId",
+          "acceptedAt",
+          "snapshot"
+        ],
+        "title": "CommandReceipt[AutonomyPolicySnapshot]",
         "type": "object"
       },
       "CommandReceipt_DeploymentSummary_": {
@@ -1719,6 +1842,50 @@
         "title": "ScientificSummary",
         "type": "object"
       },
+      "SetGlobalAutonomyRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedRevision": {
+            "minimum": 0.0,
+            "title": "Expectedrevision",
+            "type": "integer"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/AutonomyMode"
+          }
+        },
+        "required": [
+          "mode",
+          "expectedRevision"
+        ],
+        "title": "SetGlobalAutonomyRequest",
+        "type": "object"
+      },
+      "SetProjectAutonomyRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedRevision": {
+            "minimum": 0.0,
+            "title": "Expectedrevision",
+            "type": "integer"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AutonomyMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "expectedRevision"
+        ],
+        "title": "SetProjectAutonomyRequest",
+        "type": "object"
+      },
       "SourceMeta": {
         "additionalProperties": false,
         "properties": {
@@ -1966,6 +2133,111 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/autonomy-policy": {
+      "get": {
+        "operationId": "autonomy_policy_api_v1_autonomy_policy_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_AutonomyPolicySnapshot_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Autonomy Policy"
+      }
+    },
+    "/api/v1/autonomy-policy/global": {
+      "post": {
+        "operationId": "set_global_autonomy_api_v1_autonomy_policy_global_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetGlobalAutonomyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_CommandReceipt_AutonomyPolicySnapshot__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Global Autonomy"
+      }
+    },
+    "/api/v1/autonomy-policy/projects/{project_id}": {
+      "post": {
+        "operationId": "set_project_autonomy_api_v1_autonomy_policy_projects__project_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetProjectAutonomyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_CommandReceipt_AutonomyPolicySnapshot__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Project Autonomy"
+      }
+    },
     "/api/v1/capabilities": {
       "get": {
         "operationId": "capabilities_api_v1_capabilities_get",

@@ -23,6 +23,7 @@ async def test_all_query_routes_have_stable_shapes(client) -> None:
         "/api/v1/runs/run-completed/result/versions",
         "/api/v1/deployments",
         "/api/v1/infrastructure",
+        "/api/v1/autonomy-policy",
     ):
         response = await client.get(path)
         assert response.status_code == 200, path

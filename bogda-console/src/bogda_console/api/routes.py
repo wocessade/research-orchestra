@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict
 
 from bogda_console.contracts.models import (
     ApiEnvelope,
+    AutonomyPolicySnapshot,
     CapabilitySnapshot,
     CommandReceipt,
     DeploymentSummary,
@@ -21,6 +22,8 @@ from bogda_console.contracts.models import (
     RunResultVersionSummary,
     RunResultView,
     RunSummary,
+    SetGlobalAutonomyRequest,
+    SetProjectAutonomyRequest,
     SubmitRequest,
 )
 
@@ -99,6 +102,11 @@ async def deployments(
 @router.get("/infrastructure", response_model=ApiEnvelope[InfrastructureView])
 async def infrastructure(request: Request):
     return await queries(request).infrastructure()
+
+
+@router.get("/autonomy-policy", response_model=ApiEnvelope[AutonomyPolicySnapshot])
+async def autonomy_policy(request: Request):
+    return await queries(request).autonomy_policy()
 
 
 def commands(request: Request):
@@ -187,6 +195,28 @@ async def review(run_id: str, body: ReviewRequest, request: Request):
     return command_envelope(
         await commands(request).review(
             run_id, body.base_artifact_id, body.scientific_status, body.review_summary
+        )
+    )
+
+
+@router.post(
+    "/autonomy-policy/global",
+    response_model=ApiEnvelope[CommandReceipt[AutonomyPolicySnapshot]],
+)
+async def set_global_autonomy(body: SetGlobalAutonomyRequest, request: Request):
+    return command_envelope(
+        await commands(request).set_global_autonomy(body.mode, body.expected_revision)
+    )
+
+
+@router.post(
+    "/autonomy-policy/projects/{project_id}",
+    response_model=ApiEnvelope[CommandReceipt[AutonomyPolicySnapshot]],
+)
+async def set_project_autonomy(project_id: str, body: SetProjectAutonomyRequest, request: Request):
+    return command_envelope(
+        await commands(request).set_project_autonomy(
+            project_id, body.mode, body.expected_revision
         )
     )
 

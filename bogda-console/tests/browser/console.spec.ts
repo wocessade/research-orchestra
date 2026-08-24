@@ -130,3 +130,12 @@ test("review conflict preserves the operator form", async ({ page }) => {
   await expect.poll(() => reviewCalls).toBe(2);
   assertNoErrors();
 });
+
+test("research autonomy controls wrap at 360px", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "phone-360", "360px wrap check");
+  const assertNoErrors = collectUnexpectedBrowserErrors(page);
+  await gotoSettled(page, "/");
+  await expect(page.getByRole("region", { name: "科研自主模式" })).toBeVisible();
+  await assertNoHorizontalOverflow(page);
+  assertNoErrors();
+});

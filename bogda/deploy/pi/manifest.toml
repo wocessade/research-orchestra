@@ -1,0 +1,21 @@
+service_user = "bogda"
+service_group = "bogda"
+program_root = "/opt/bogda"
+config_root = "/etc/bogda"
+env_file = "/etc/bogda/bogda.env"
+data_root = "/mnt/nas/.bogda"
+prefect_home = "/mnt/nas/.bogda/prefect"
+database = "/mnt/nas/.bogda/prefect/prefect.db"
+snapshot_root = "/mnt/nas/.bogda/snapshots"
+health_root = "/mnt/nas/.bogda/manifests/health"
+api_url = "http://127.0.0.1:4200/api"
+work_pool = "pi-service"
+worker_limit = 1
+units = [
+  "bogda-prefect-server.service",
+  "bogda-pi-worker.service",
+  "bogda-prefect-snapshot.service",
+  "bogda-prefect-snapshot.timer",
+  "bogda-shadow-health.service",
+  "bogda-shadow-health.timer",
+]

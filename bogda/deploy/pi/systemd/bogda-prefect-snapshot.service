@@ -1,0 +1,11 @@
+[Unit]
+Description=Bogda Prefect database snapshot
+RequiresMountsFor=/mnt/nas/.bogda
+
+[Service]
+Type=oneshot
+User=bogda
+Group=bogda
+EnvironmentFile=/etc/bogda/bogda.env
+Restart=on-failure
+ExecStart=/opt/bogda/.venv/bin/python -m bogda.ops.snapshot create --source /mnt/nas/.bogda/prefect/prefect.db --destination /mnt/nas/.bogda/snapshots --keep 7

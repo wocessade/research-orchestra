@@ -1,0 +1,13 @@
+[Unit]
+Description=Bogda local Prefect server
+RequiresMountsFor=/mnt/nas/.bogda
+
+[Service]
+User=bogda
+Group=bogda
+EnvironmentFile=/etc/bogda/bogda.env
+Restart=on-failure
+ExecStart=/opt/bogda/.venv/bin/prefect server start --host 0.0.0.0 --port 4200
+
+[Install]
+WantedBy=multi-user.target

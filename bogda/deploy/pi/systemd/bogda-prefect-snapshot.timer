@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily Bogda Prefect database snapshot
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+Unit=bogda-prefect-snapshot.service
+
+[Install]
+WantedBy=timers.target

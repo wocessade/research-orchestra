@@ -1,0 +1,11 @@
+[Unit]
+Description=Bogda shadow health sampling
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=5min
+Persistent=true
+Unit=bogda-shadow-health.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,11 @@
+[Unit]
+Description=Bogda shadow health sample
+RequiresMountsFor=/mnt/nas/.bogda
+
+[Service]
+Type=oneshot
+User=bogda
+Group=bogda
+EnvironmentFile=/etc/bogda/bogda.env
+Restart=on-failure
+ExecStart=/opt/bogda/.venv/bin/python -m bogda.ops.health sample --output /mnt/nas/.bogda/manifests/health/samples.jsonl

@@ -59,11 +59,35 @@ npm run build
 
 ## 3101 本地运行手册
 
-3101 当前是 Windows 主机上的手动进程，不是 Windows 服务，也不会随开机自动
-启动。实际运行应以 `D:\pythonProject\bogda-console` 主工作目录为准，不要依赖
-`.worktrees` 中残留的虚拟环境、前端产物或 Python import 路径。
+日常推荐用启动器管理 3101 上的 `mock-all` 演示。它只启动当前工作树或主目录
+自己的 `.venv\Scripts\python.exe` 和 `frontend\dist`，状态文件写在
+`%LOCALAPPDATA%\BogdaConsole\`，不安装依赖、不跑 `npm ci`、不触碰 3100。
+
+这仍只是本机 mock 演示，不代表已经接通 Pi 或真实 Prefect。启动器不是 Windows
+服务，也不会开机自启。
+
+```powershell
+Set-Location D:\pythonProject\bogda-console
+.\scripts\local-console.ps1 start
+.\scripts\local-console.ps1 status
+.\scripts\local-console.ps1 stop
+```
+
+可从任意工作目录调用；路径按脚本位置解析。`start` 在已由该启动器拉起且健康时
+是幂等的。若 3101 被未知进程占用，启动器会拒绝并离开该进程。`stop` 只停止状态
+文件中记录、且启动时间匹配的进程。
+
+访问 <http://127.0.0.1:3101/>。`status` 的结果是 `healthy`、`degraded`、
+`stopped` 或 `foreign-listener`。健康还要求
+`GET /api/v1/capabilities` 成功且 `data.profile` 为 `mock-all`。
+
+实际运行应以当前要使用的 `bogda-console` 目录为准（通常是
+`D:\pythonProject\bogda-console`），不要混用 `.worktrees` 里残留的虚拟环境、
+前端产物或 Python import 路径。
 
 ### 首次安装或重建依赖
+
+启动器发现 `.venv` 或 `frontend\dist` 缺失时会打印下面的命令，需要时手动执行：
 
 ```powershell
 Set-Location D:\pythonProject\bogda-console
@@ -75,12 +99,12 @@ npm run build
 
 需要运行 Python 测试时，把可编辑安装改为
 `.venv\Scripts\python.exe -m pip install -e ".[dev]"`。前端代码变更后必须重新
-执行 `npm run build` 并重启后端，否则浏览器可能继续显示旧页面。
+执行 `npm run build` 并再次 `.\scripts\local-console.ps1 start`，否则浏览器可能
+继续显示旧页面。
 
-### 启动完整页面
+### 手动启动（故障恢复）
 
-当前本地演示使用 `mock-all`。它可以验证完整 UI 和写入交互，但数据来自内存中
-的 fixture，不代表 Pi、真实 Prefect 或生产状态。
+启动器不可用时，仍可用这些命令在前台启动 `mock-all`：
 
 ```powershell
 Set-Location D:\pythonProject\bogda-console
@@ -100,7 +124,8 @@ $env:BOGDA_CONSOLE_ALLOWED_WORK_POOL_NAMES = "pi-service,dorm-x86"
 
 ### 状态确认
 
-先确认 3101 确实有监听者，再读取能力接口：
+启动器：`.\scripts\local-console.ps1 status`。也可以先确认 3101 确实有监听者，
+再读取能力接口：
 
 ```powershell
 Get-NetTCPConnection -LocalAddress 127.0.0.1 -LocalPort 3101 -State Listen |
@@ -115,8 +140,8 @@ Get-NetTCPConnection -LocalAddress 127.0.0.1 -LocalPort 3101 -State Listen |
 
 ### 停止
 
-优先在启动进程所属的 PowerShell 窗口按 `Ctrl+C`。如果原窗口已经丢失，先查明
-3101 的确切 PID，再停止该 PID：
+优先 `.\scripts\local-console.ps1 stop`。若必须手动恢复，优先在前台启动窗口按
+`Ctrl+C`。如果原窗口已经丢失，先查明 3101 的确切 PID，再停止该 PID：
 
 ```powershell
 $bogdaListener = Get-NetTCPConnection -LocalAddress 127.0.0.1 -LocalPort 3101 -State Listen
@@ -131,16 +156,15 @@ Stop-Process -Id $bogdaListener.OwningProcess
 
 | 现象 | 判断与处理 |
 | --- | --- |
-| 浏览器显示无法连接 | 先运行 `Get-NetTCPConnection`；没有 3101 listener 就是进程未启动或已退出。 |
+| 浏览器显示无法连接 | 先运行 `.\scripts\local-console.ps1 status` 或 `Get-NetTCPConnection`；没有 3101 listener 就是进程未启动或已退出。 |
 | `import bogda_console` 指向 `.worktrees` | 回到主工作目录，使用主目录 `.venv` 重新执行 `pip install -e .`。 |
-| 后端启动但页面 404、空白或缺少新功能 | 运行 `npm ci`、`npm run build`，重启后端，再强制刷新浏览器。 |
+| 后端启动但页面 404、空白或缺少新功能 | 运行 `npm ci`、`npm run build`，再 `.\scripts\local-console.ps1 stop` 后 `start`，再强制刷新浏览器。 |
 | `frontend/dist` 不存在 | 前端尚未构建；运行 `npm run build`。 |
 | 3101 已被占用 | 先查看 `OwningProcess` 并确认归属；不要停止未知进程，也不要改用 3100。 |
-| 能力接口可用但 profile 不是 `mock-all` | 当前进程使用了别的配置；停止它并按“启动完整页面”重新设置环境变量。 |
+| 能力接口可用但 profile 不是 `mock-all` | 当前进程使用了别的配置；用启动器 `stop`（仅当它是受管进程）或按“手动启动”重新设置环境变量。 |
+| 启动器报告 missing `.venv` / `frontend\dist` | 按“首次安装或重建依赖”执行对应命令。 |
 
-这套流程只保证本机可重复运行，不包含开机自启、托盘常驻或后台进程管理。后续
-本地启动器应封装 `start/status/stop`、PID 和日志管理；在它交付前，本节命令是
-权威操作方式。
+本启动器不包含开机自启、任务计划程序、Windows 服务、托盘常驻或 `restart`。
 
 ## 配置
 

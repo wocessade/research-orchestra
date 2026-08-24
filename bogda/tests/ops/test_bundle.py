@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from bogda.ops.bundle import load_manifest, render_dry_run, validate_bundle
+from bogda.ops.bundle import load_manifest, main, render_dry_run, validate_bundle
 
 
 EXPECTED_UNITS = {
@@ -147,6 +147,37 @@ def test_required_unit_fragment_is_reported(bundle_copy: Path) -> None:
 
 
 @pytest.mark.parametrize(
+    ("unit_name", "fragment"),
+    [
+        (unit_name, fragment)
+        for unit_name in (
+            "bogda-prefect-server.service",
+            "bogda-pi-worker.service",
+            "bogda-prefect-snapshot.service",
+            "bogda-shadow-health.service",
+        )
+        for fragment in (
+            "ConditionPathIsMountPoint=/mnt/nas",
+            "ExecCondition=/bin/sh -c 'test \"$(/usr/bin/findmnt -no FSTYPE /mnt/nas)\" = \"ext4\"'",
+            "RestartSec=10s",
+            "StartLimitIntervalSec=5min",
+            "StartLimitBurst=5",
+        )
+    ],
+)
+def test_validator_requires_runtime_mount_ext4_and_restart_guards(
+    bundle_copy: Path, unit_name: str, fragment: str
+) -> None:
+    """Removing any runtime guard must make the public validator reject a unit."""
+    unit_path = bundle_copy / "systemd" / unit_name
+    unit_path.write_text(
+        unit_path.read_text(encoding="utf-8").replace(fragment, ""), encoding="utf-8"
+    )
+
+    assert f"{unit_name} missing required fragment: {fragment}" in validate_bundle(bundle_copy)
+
+
+@pytest.mark.parametrize(
     "manifest_text",
     [
         'service_user = "bogda"\nunits = [',
@@ -181,3 +212,20 @@ def test_dry_run_is_read_only(bundle_copy: Path) -> None:
     assert lines
     assert all(line.startswith(("CHECK ", "INSTALL ", "PRESERVE ")) for line in lines)
     assert after == before
+
+
+def test_dry_run_rejects_invalid_bundle_and_describes_preserved_runtime_env(
+    bundle_copy: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    manifest_path = bundle_copy / "manifest.toml"
+    manifest_path.write_text(
+        manifest_path.read_text(encoding="utf-8").replace("worker_limit = 1", "worker_limit = 2"),
+        encoding="utf-8",
+    )
+
+    assert main(["dry-run", str(bundle_copy)]) == 1
+    assert "CHECK manifest worker_limit must be 1" in capsys.readouterr().out
+
+    lines = render_dry_run(Path(__file__).parents[2] / "deploy" / "pi")
+    assert "PRESERVE existing runtime env /etc/bogda/bogda.env" in lines
+    assert "INSTALL example env only when /etc/bogda/bogda.env is absent" in lines

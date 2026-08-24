@@ -147,6 +147,35 @@ def _is_number(value: object) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
+def _summarize_oom_counter(
+    samples: Sequence[Mapping[str, object]],
+) -> tuple[int | float | None, int, int]:
+    """Sum known adjacent OOM increments while retaining reboot and gap evidence."""
+    delta: int | float = 0
+    previous: int | float | None = None
+    saw_numeric = False
+    unavailable_span_open = False
+    resets = 0
+    unavailable_spans = 0
+    for sample in samples:
+        current = sample.get("oom_kill_count")
+        if not _is_number(current):
+            if not unavailable_span_open:
+                unavailable_spans += 1
+                unavailable_span_open = True
+            previous = None
+            continue
+        saw_numeric = True
+        unavailable_span_open = False
+        if previous is not None:
+            if current >= previous:
+                delta += current - previous
+            else:
+                resets += 1
+        previous = current
+    return (delta if saw_numeric else None), resets, unavailable_spans
+
+
 def summarize_samples(
     samples: Sequence[Mapping[str, object]], expected_interval_seconds: int = 300
 ) -> dict[str, object]:
@@ -162,8 +191,7 @@ def summarize_samples(
     disk = _numeric_values(ordered, "disk_free_bytes")
     first_swap = ordered[0].get("swap_used_bytes") if ordered else None
     last_swap = ordered[-1].get("swap_used_bytes") if ordered else None
-    first_oom = ordered[0].get("oom_kill_count") if ordered else None
-    last_oom = ordered[-1].get("oom_kill_count") if ordered else None
+    oom_delta, oom_resets, oom_unavailable_spans = _summarize_oom_counter(ordered)
     return {
         "started_at": _format_timestamp(timestamps[0]) if timestamps else None,
         "ended_at": _format_timestamp(timestamps[-1]) if timestamps else None,
@@ -173,7 +201,9 @@ def summarize_samples(
         "api_latency_p95_ms": nearest_rank_p95(latency),
         "min_mem_available_bytes": min(memory) if memory else None,
         "swap_growth_bytes": last_swap - first_swap if _is_number(first_swap) and _is_number(last_swap) else None,
-        "oom_kill_delta": last_oom - first_oom if _is_number(first_oom) and _is_number(last_oom) else None,
+        "oom_kill_delta": oom_delta,
+        "oom_kill_counter_reset_count": oom_resets,
+        "oom_kill_unavailable_span_count": oom_unavailable_spans,
         "database_integrity_failure_count": sum(
             1 for sample in ordered if sample.get("database_integrity") not in (None, "ok")
         ),

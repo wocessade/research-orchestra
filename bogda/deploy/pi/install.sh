@@ -13,14 +13,96 @@ bogda-shadow-health.timer
 "
 
 usage() {
-    echo "usage: $0 --dry-run | --install [--start]" >&2
+    echo "usage: $0 --dry-run | --install [--start] | --start-server | --start-services" >&2
     exit 64
+}
+
+validate_runtime_env() {
+    env_file=$1
+    assignment_count=0
+    home_seen=false
+    api_seen=false
+    server_auth_seen=false
+    client_auth_seen=false
+    server_auth=
+    client_auth=
+    if [ -L "$env_file" ] || [ ! -f "$env_file" ]; then
+        echo "runtime environment file must be a regular non-symlink file" >&2
+        exit 1
+    fi
+    while IFS= read -r line || [ -n "$line" ]; do
+        assignment_count=$((assignment_count + 1))
+        case "$line" in
+            PREFECT_HOME=/mnt/nas/.bogda/prefect)
+                if [ "$home_seen" = true ]; then
+                    echo "runtime environment has duplicate or invalid assignments" >&2
+                    exit 1
+                fi
+                home_seen=true
+                ;;
+            PREFECT_API_URL=http://127.0.0.1:4200/api)
+                if [ "$api_seen" = true ]; then
+                    echo "runtime environment has duplicate or invalid assignments" >&2
+                    exit 1
+                fi
+                api_seen=true
+                ;;
+            PREFECT_SERVER_API_AUTH_STRING=*)
+                if [ "$server_auth_seen" = true ]; then
+                    echo "runtime environment has duplicate or invalid assignments" >&2
+                    exit 1
+                fi
+                server_auth=${line#PREFECT_SERVER_API_AUTH_STRING=}
+                server_auth_seen=true
+                ;;
+            PREFECT_API_AUTH_STRING=*)
+                if [ "$client_auth_seen" = true ]; then
+                    echo "runtime environment has duplicate or invalid assignments" >&2
+                    exit 1
+                fi
+                client_auth=${line#PREFECT_API_AUTH_STRING=}
+                client_auth_seen=true
+                ;;
+            *)
+                echo "runtime environment has duplicate or invalid assignments" >&2
+                exit 1
+                ;;
+        esac
+    done < "$env_file"
+    if [ "$assignment_count" -ne 4 ] || [ "$home_seen" != true ] || [ "$api_seen" != true ] || \
+        [ "$server_auth_seen" != true ] || [ "$client_auth_seen" != true ] || \
+        [ -z "$server_auth" ] || [ -z "$client_auth" ] || \
+        [ "$server_auth" = "SET_ON_PI_NOT_IN_GIT" ] || \
+        [ "$client_auth" = "SET_ON_PI_NOT_IN_GIT" ] || \
+        [ "$server_auth" != "$client_auth" ]; then
+        echo "runtime environment has invalid authentication configuration" >&2
+        exit 1
+    fi
+}
+
+validate_managed_targets() {
+    for target in \
+        /etc/bogda/bogda.env \
+        /etc/bogda/last-backup \
+        /etc/systemd/system/bogda-prefect-server.service \
+        /etc/systemd/system/bogda-pi-worker.service \
+        /etc/systemd/system/bogda-prefect-snapshot.service \
+        /etc/systemd/system/bogda-prefect-snapshot.timer \
+        /etc/systemd/system/bogda-shadow-health.service \
+        /etc/systemd/system/bogda-shadow-health.timer; do
+        if [ -L "$target" ]; then
+            echo "managed target must not be a symlink" >&2
+            exit 1
+        fi
+    done
 }
 
 case "$#:${1:-}${2:+:${2:-}}" in
     1:--dry-run) mode=dry-run ; start=false ;;
     1:--install) mode=install ; start=false ;;
     2:--install:--start) mode=install ; start=true ;;
+    1:--start-server) mode=start-server ; start=false ;;
+    1:--start-services) mode=start-services ; start=false ;;
     *) usage ;;
 esac
 
@@ -41,6 +123,44 @@ if [ "$mode" = dry-run ]; then
     exit 0
 fi
 
+if [ "$mode" = install ]; then
+    validate_managed_targets
+    if [ "$start" = true ]; then
+        if [ -f /etc/bogda/bogda.env ]; then
+            validate_runtime_env /etc/bogda/bogda.env
+        else
+            validate_runtime_env "$script_dir/bogda.env.example"
+        fi
+    fi
+fi
+
+if [ "$mode" = start-server ] || [ "$mode" = start-services ]; then
+    validate_runtime_env /etc/bogda/bogda.env
+    if [ "$(id -u)" -ne 0 ]; then
+        echo "$mode must run as root" >&2
+        exit 1
+    fi
+    if ! command -v systemctl >/dev/null 2>&1; then
+        echo "systemctl is required" >&2
+        exit 1
+    fi
+    if [ "$mode" = start-server ]; then
+        systemctl enable --now bogda-prefect-server.service
+        exit 0
+    fi
+    if ! systemctl is-active --quiet bogda-prefect-server.service; then
+        echo "bogda-prefect-server.service must be active before --start-services" >&2
+        exit 1
+    fi
+    for unit_name in \
+        bogda-pi-worker.service \
+        bogda-prefect-snapshot.timer \
+        bogda-shadow-health.timer; do
+        systemctl enable --now "$unit_name"
+    done
+    exit 0
+fi
+
 if [ "$(id -u)" -ne 0 ]; then
     echo "--install must run as root" >&2
     exit 1
@@ -56,17 +176,6 @@ done
 if [ "$(findmnt -no FSTYPE /mnt/nas)" != "ext4" ]; then
     echo "/mnt/nas must be an ext4 mount" >&2
     exit 1
-fi
-
-if [ "$start" = true ]; then
-    start_env=/etc/bogda/bogda.env
-    if [ ! -e "$start_env" ]; then
-        start_env="$script_dir/bogda.env.example"
-    fi
-    if grep -F -q "SET_ON_PI_NOT_IN_GIT" "$start_env"; then
-        echo "--start requires configured Bogda auth values" >&2
-        exit 1
-    fi
 fi
 
 if ! getent passwd bogda >/dev/null 2>&1; then

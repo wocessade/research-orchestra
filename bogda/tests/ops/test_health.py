@@ -196,9 +196,42 @@ def test_summary_reports_72_hour_window_evidence() -> None:
         "min_mem_available_bytes": 100,
         "swap_growth_bytes": 40,
         "oom_kill_delta": 1,
+        "oom_kill_counter_reset_count": 0,
+        "oom_kill_unavailable_span_count": 0,
         "database_integrity_failure_count": 1,
         "min_disk_free_bytes": 700,
     }
+
+
+def test_summary_sums_adjacent_oom_increments_across_a_reboot() -> None:
+    samples = [
+        {"timestamp": "2026-08-24T00:00:00Z", "api_ok": True, "oom_kill_count": 0},
+        {"timestamp": "2026-08-24T00:05:00Z", "api_ok": True, "oom_kill_count": 2},
+        {"timestamp": "2026-08-24T00:10:00Z", "api_ok": True, "oom_kill_count": 0},
+        {"timestamp": "2026-08-24T00:15:00Z", "api_ok": True, "oom_kill_count": 1},
+    ]
+
+    summary = summarize_samples(samples)
+
+    assert summary["oom_kill_delta"] == 3
+    assert summary["oom_kill_counter_reset_count"] == 1
+    assert summary["oom_kill_unavailable_span_count"] == 0
+
+
+def test_summary_reports_oom_counter_unavailable_spans_without_fabricating_delta() -> None:
+    samples = [
+        {"timestamp": "2026-08-24T00:00:00Z", "api_ok": True, "oom_kill_count": 1},
+        {"timestamp": "2026-08-24T00:05:00Z", "api_ok": True, "oom_kill_count": None},
+        {"timestamp": "2026-08-24T00:10:00Z", "api_ok": True, "oom_kill_count": None},
+        {"timestamp": "2026-08-24T00:15:00Z", "api_ok": True, "oom_kill_count": 3},
+        {"timestamp": "2026-08-24T00:20:00Z", "api_ok": True, "oom_kill_count": None},
+    ]
+
+    summary = summarize_samples(samples)
+
+    assert summary["oom_kill_delta"] == 0
+    assert summary["oom_kill_counter_reset_count"] == 0
+    assert summary["oom_kill_unavailable_span_count"] == 2
 
 
 def test_summary_sorts_samples_and_handles_empty_metrics() -> None:
@@ -222,7 +255,7 @@ def test_summary_sorts_samples_and_handles_empty_metrics() -> None:
         ({"swap_used_bytes": 10, "oom_kill_count": 2}, {"swap_used_bytes": None, "oom_kill_count": None}),
     ],
 )
-def test_summary_requires_numeric_window_endpoints_for_growth_and_delta(
+def test_summary_requires_swap_endpoints_and_reports_oom_counter_gaps(
     first: dict[str, object], last: dict[str, object]
 ) -> None:
     samples = [
@@ -234,7 +267,8 @@ def test_summary_requires_numeric_window_endpoints_for_growth_and_delta(
     summary = summarize_samples(samples)
 
     assert summary["swap_growth_bytes"] is None
-    assert summary["oom_kill_delta"] is None
+    assert summary["oom_kill_delta"] in (0, 1)
+    assert summary["oom_kill_unavailable_span_count"] == 1
 
 
 def test_wait_for_api_stops_after_first_success() -> None:

@@ -85,9 +85,109 @@ def test_dry_run_preserves_checkout_and_stays_within_bogda_boundary(
 def test_install_checks_start_auth_before_host_mutations() -> None:
     source = INSTALL.read_text(encoding="utf-8")
 
-    assert "start_env=" in source
-    assert source.index("start_env=") < source.index("if ! getent passwd bogda")
-    assert 'grep -F -q "SET_ON_PI_NOT_IN_GIT" "$start_env"' in source
+    assert "validate_runtime_env()" in source
+    assert "PREFECT_HOME=/mnt/nas/.bogda/prefect" in source
+    assert "PREFECT_API_URL=http://127.0.0.1:4200/api" in source
+    assert "PREFECT_SERVER_API_AUTH_STRING" in source
+    assert "PREFECT_API_AUTH_STRING" in source
+    assert "--start-server" in source
+    assert "--start-services" in source
+    assert source.index("validate_runtime_env /etc/bogda/bogda.env") < source.index(
+        "if ! getent passwd bogda"
+    )
+
+
+def test_install_prevalidates_literal_managed_paths_before_root_mutations() -> None:
+    source = INSTALL.read_text(encoding="utf-8")
+
+    assert "validate_managed_targets()" in source
+    assert "/etc/bogda/bogda.env" in source
+    assert "/etc/bogda/last-backup" in source
+    assert "[ -L \"$target\" ]" in source
+    install_mode = source.index('if [ "$mode" = install ]; then')
+    assert source.index("validate_managed_targets", install_mode) < source.index(
+        "if ! getent passwd bogda"
+    )
+
+
+def test_start_only_modes_are_separate_from_backup_and_install_paths() -> None:
+    source = INSTALL.read_text(encoding="utf-8")
+
+    staged_start = source.index(
+        'if [ "$mode" = start-server ] || [ "$mode" = start-services ]; then'
+    )
+    start_server = source.index('if [ "$mode" = start-server ]; then', staged_start)
+    backup = source.index('backup_dir="/etc/bogda/backups/')
+    sync = source.index("UV_PROJECT_ENVIRONMENT=/opt/bogda/.venv uv sync")
+    assert staged_start < start_server < backup
+    assert "must be active before --start-services" in source
+    assert start_server < sync
+    assert staged_start < sync
+
+
+def test_runtime_auth_preflight_requires_exact_matching_nonsecret_assignments(
+    tmp_path: Path,
+) -> None:
+    source = INSTALL.read_text(encoding="utf-8")
+    start = source.index("validate_runtime_env() {")
+    end = source.index("\nvalidate_managed_targets()", start)
+    validator = tmp_path / "validate-runtime-env.sh"
+    validator.write_text(
+        "#!/usr/bin/env bash\nset -eu\n"
+        + source[start:end]
+        + "\nvalidate_runtime_env \"$1\"\n",
+        encoding="utf-8",
+    )
+    valid = tmp_path / "valid.env"
+    valid.write_bytes(
+        b"PREFECT_HOME=/mnt/nas/.bogda/prefect\n"
+        b"PREFECT_API_URL=http://127.0.0.1:4200/api\n"
+        b"PREFECT_SERVER_API_AUTH_STRING=alice:matched-secret\n"
+        b"PREFECT_API_AUTH_STRING=alice:matched-secret\n"
+    )
+
+    assert subprocess.run(
+        [os.environ["BOGDA_BASH"], str(validator), str(valid)],
+        text=True,
+        capture_output=True,
+        check=False,
+    ).returncode == 0
+
+    for invalid_lines in (
+        valid.read_text(encoding="utf-8").replace(
+            "PREFECT_HOME=/mnt/nas/.bogda/prefect",
+            "PREFECT_HOME=/mnt/nas/.bogda/other",
+        ),
+        valid.read_text(encoding="utf-8").replace(
+            "PREFECT_API_URL=http://127.0.0.1:4200/api",
+            "PREFECT_API_URL=http://127.0.0.1:9999/api",
+        ),
+        valid.read_text(encoding="utf-8").replace(
+            "PREFECT_API_AUTH_STRING=alice:matched-secret",
+            "PREFECT_API_AUTH_STRING=alice:different-secret",
+        ),
+        valid.read_text(encoding="utf-8").replace(
+            "alice:matched-secret", "SET_ON_PI_NOT_IN_GIT"
+        ),
+        valid.read_text(encoding="utf-8") + "UNRELATED_FLAG=true\n",
+        valid.read_text(encoding="utf-8") + "PREFECT_HOME=/mnt/nas/.bogda/prefect\n",
+        valid.read_text(encoding="utf-8").replace(
+            "PREFECT_SERVER_API_AUTH_STRING=alice:matched-secret",
+            "PREFECT_SERVER_API_AUTH_STRING=",
+        ),
+        valid.read_text(encoding="utf-8") + "not an assignment\n",
+    ):
+        invalid = tmp_path / "invalid.env"
+        invalid.write_bytes(invalid_lines.encode("utf-8"))
+        result = subprocess.run(
+            [os.environ["BOGDA_BASH"], str(validator), str(invalid)],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        assert result.returncode != 0
+        assert "matched-secret" not in result.stdout + result.stderr
+        assert "different-secret" not in result.stdout + result.stderr
 
 
 def test_rollback_validates_inventory_before_state_changes() -> None:

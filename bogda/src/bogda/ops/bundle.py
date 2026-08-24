@@ -30,8 +30,16 @@ EXPECTED_UNITS = (
     "bogda-shadow-health.service",
     "bogda-shadow-health.timer",
 )
+RUNTIME_SERVICE_GUARDS = (
+    "ConditionPathIsMountPoint=/mnt/nas",
+    "ExecCondition=/bin/sh -c 'test \"$(/usr/bin/findmnt -no FSTYPE /mnt/nas)\" = \"ext4\"'",
+    "RestartSec=10s",
+    "StartLimitIntervalSec=5min",
+    "StartLimitBurst=5",
+)
 REQUIRED_UNIT_FRAGMENTS = {
     "bogda-prefect-server.service": (
+        *RUNTIME_SERVICE_GUARDS,
         "User=bogda",
         "Group=bogda",
         "EnvironmentFile=/etc/bogda/bogda.env",
@@ -40,6 +48,7 @@ REQUIRED_UNIT_FRAGMENTS = {
         "ExecStart=/opt/bogda/.venv/bin/prefect server start --host 0.0.0.0 --port 4200",
     ),
     "bogda-pi-worker.service": (
+        *RUNTIME_SERVICE_GUARDS,
         "User=bogda",
         "Group=bogda",
         "EnvironmentFile=/etc/bogda/bogda.env",
@@ -51,6 +60,7 @@ REQUIRED_UNIT_FRAGMENTS = {
         "ExecStart=/opt/bogda/.venv/bin/prefect worker start --pool pi-service --type process --limit 1 --create-pool-if-not-found",
     ),
     "bogda-prefect-snapshot.service": (
+        *RUNTIME_SERVICE_GUARDS,
         "User=bogda",
         "Group=bogda",
         "EnvironmentFile=/etc/bogda/bogda.env",
@@ -65,6 +75,7 @@ REQUIRED_UNIT_FRAGMENTS = {
         "Unit=bogda-prefect-snapshot.service",
     ),
     "bogda-shadow-health.service": (
+        *RUNTIME_SERVICE_GUARDS,
         "User=bogda",
         "Group=bogda",
         "EnvironmentFile=/etc/bogda/bogda.env",
@@ -231,7 +242,8 @@ def render_dry_run(bundle_root: Path) -> tuple[str, ...]:
         f"INSTALL target directory {manifest.config_root}",
         f"INSTALL target directory {manifest.snapshot_root}",
         f"INSTALL target directory {manifest.health_root}",
-        f"INSTALL env {bundle_root / 'bogda.env.example'} -> {manifest.env_file}",
+        f"PRESERVE existing runtime env {manifest.env_file}",
+        f"INSTALL example env only when {manifest.env_file} is absent",
     ]
     lines.extend(
         f"INSTALL unit {bundle_root / 'systemd' / unit} -> /etc/systemd/system/{unit}"
@@ -255,11 +267,6 @@ def main(arguments: list[str] | None = None) -> int:
     args = parser.parse_args(arguments)
 
     try:
-        if args.command == "dry-run":
-            for line in render_dry_run(args.bundle_root):
-                print(line)
-            return 0
-
         violations = validate_bundle(args.bundle_root)
     except ValueError as error:
         print(f"CHECK {error}")
@@ -269,6 +276,10 @@ def main(arguments: list[str] | None = None) -> int:
         for violation in violations:
             print(f"CHECK {violation}")
         return 1
+    if args.command == "dry-run":
+        for line in render_dry_run(args.bundle_root):
+            print(line)
+        return 0
     print("CHECK bundle valid")
     return 0
 

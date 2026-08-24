@@ -1,6 +1,9 @@
 [Unit]
 Description=Bogda shadow health sample
 RequiresMountsFor=/mnt/nas/.bogda
+ConditionPathIsMountPoint=/mnt/nas
+StartLimitIntervalSec=5min
+StartLimitBurst=5
 
 [Service]
 Type=oneshot
@@ -8,4 +11,6 @@ User=bogda
 Group=bogda
 EnvironmentFile=/etc/bogda/bogda.env
 Restart=on-failure
+RestartSec=10s
+ExecCondition=/bin/sh -c 'test "$(/usr/bin/findmnt -no FSTYPE /mnt/nas)" = "ext4"'
 ExecStart=/opt/bogda/.venv/bin/python -m bogda.ops.health sample --output /mnt/nas/.bogda/manifests/health/samples.jsonl

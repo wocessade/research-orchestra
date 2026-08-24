@@ -1,12 +1,17 @@
 [Unit]
 Description=Bogda local Prefect server
 RequiresMountsFor=/mnt/nas/.bogda
+ConditionPathIsMountPoint=/mnt/nas
+StartLimitIntervalSec=5min
+StartLimitBurst=5
 
 [Service]
 User=bogda
 Group=bogda
 EnvironmentFile=/etc/bogda/bogda.env
 Restart=on-failure
+RestartSec=10s
+ExecCondition=/bin/sh -c 'test "$(/usr/bin/findmnt -no FSTYPE /mnt/nas)" = "ext4"'
 ExecStart=/opt/bogda/.venv/bin/prefect server start --host 0.0.0.0 --port 4200
 
 [Install]

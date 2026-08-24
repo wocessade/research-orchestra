@@ -1,6 +1,9 @@
 [Unit]
 Description=Bogda Pi Prefect worker
 RequiresMountsFor=/mnt/nas/.bogda
+ConditionPathIsMountPoint=/mnt/nas
+StartLimitIntervalSec=5min
+StartLimitBurst=5
 After=bogda-prefect-server.service
 Requires=bogda-prefect-server.service
 
@@ -9,6 +12,8 @@ User=bogda
 Group=bogda
 EnvironmentFile=/etc/bogda/bogda.env
 Restart=on-failure
+RestartSec=10s
+ExecCondition=/bin/sh -c 'test "$(/usr/bin/findmnt -no FSTYPE /mnt/nas)" = "ext4"'
 ExecStartPre=/opt/bogda/.venv/bin/python -m bogda.ops.health wait-api --url http://127.0.0.1:4200/api --timeout 60
 ExecStart=/opt/bogda/.venv/bin/prefect worker start --pool pi-service --type process --limit 1 --create-pool-if-not-found
 

@@ -42,6 +42,8 @@ df -B1 --output=source,avail,target /mnt/nas
 tailscale status --json
 tailscale ip -4
 tailscale netcheck
+command -v uv
+uv --version
 systemd-analyze verify \
   deploy/pi/systemd/bogda-prefect-server.service \
   deploy/pi/systemd/bogda-pi-worker.service \
@@ -54,6 +56,8 @@ printf 'verify_exit=%s\n' "$rc"
 ```
 
 Expected facts: uname -m is aarch64; Python is 3.11 or newer; /mnt/nas is an approved local SSD partition with FSTYPE ext4; its UUID/PARTUUID and source match the approved SSD and /etc/fstab; and the available-byte value has capacity for the approved 72-hour evidence plus seven snapshots. Record the Tailscale identity, tailnet IPv4 address, and netcheck output; it must show the approved tailnet rather than an unreviewed public exposure. A missing mount, wrong source/identity, non-ext4 filesystem, or inadequate capacity is a hard failure.
+
+uv is a Gate 3 install prerequisite. Record `command -v uv` and `uv --version`. If uv is missing, stop and obtain separate authorization to install it; install.sh must not fetch uv from the network on its own. This Pi already has owner-authorized uv 0.12.5 at /usr/local/bin, so this change does not install uv again.
 
 systemd-analyze verify must still run on all six reviewed unit files. Record the command, the time, and verify_exit. The units are statically checked locally; this command is the Pi gate for actual systemd parsing. Before installation, command resolution may fail only because /opt/bogda/.venv/bin/python does not exist and/or /opt/bogda/.venv/bin/prefect does not exist. Those expected absences may make verify_exit=1 and are not a Gate 2 hard failure. Unknown keys, illegal sections, or any other command errors on Bogda units remain hard failures. Timezone ignoring warnings from already-installed non-bogda units are recorded and are not Bogda failures. Do not treat Gate 2 as the command-resolution acceptance gate. Check available memory as an observation threshold: less than 400 MB available requires investigation, but is not by itself a hard failure.
 

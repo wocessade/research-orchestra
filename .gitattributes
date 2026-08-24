@@ -1,0 +1,2 @@
+bogda/deploy/pi/*.sh text eol=lf
+bogda/deploy/pi/systemd/* text eol=lf

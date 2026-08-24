@@ -19,7 +19,7 @@
 - 运行时秘密只放 `/etc/bogda/bogda.env`，不得提交到 Git。
 - Prefect API 只能通过预定的局域网/Tailscale 边界访问。任何来自非 Tailnet/非许可地址的 HTTP 响应，包括 401/403，都表示服务已经暴露，必须停止。
 - 并发仍为 1；SLC SD、宿舍 runner 唤醒桥、GPU executor、3100 正式切换均为后续事项。
-- Windows 上 `npm run build` 的契约门禁存在既有换行漂移：Git 索引中的 `frontend/src/api/generated.ts` 为 LF，`core.autocrlf` 工作树为 CRLF，而 `check_contracts.py` 逐字节比较新生成的 LF 文件。不要在无 API 变化时重生成契约；单独修复门禁的跨平台比较语义。
+- Windows 契约门禁的 LF/CRLF 假漂移已在 `c57a9ab` 修复：比较仅规范化换行，其他字节变化仍会失败；无需重生成 API 契约。
 
 ## Grok 的任务（高判断力阶段）
 

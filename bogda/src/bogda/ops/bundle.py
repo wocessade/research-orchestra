@@ -82,6 +82,12 @@ REQUIRED_UNIT_FRAGMENTS = {
 }
 REQUIRED_KEYS = (*EXPECTED_VALUES, "worker_limit", "units")
 AUTH_SENTINEL = "SET_ON_PI_NOT_IN_GIT"
+EXPECTED_ENV_VALUES = {
+    "PREFECT_HOME": "/mnt/nas/.bogda/prefect",
+    "PREFECT_API_URL": "http://127.0.0.1:4200/api",
+    "PREFECT_SERVER_API_AUTH_STRING": AUTH_SENTINEL,
+    "PREFECT_API_AUTH_STRING": AUTH_SENTINEL,
+}
 
 
 @dataclass(frozen=True)
@@ -174,11 +180,32 @@ def validate_bundle(bundle_root: Path) -> tuple[str, ...]:
 
     env_path = bundle_root / "bogda.env.example"
     if env_path.is_file():
-        env_lines = set(env_path.read_text(encoding="utf-8").splitlines())
-        for variable in ("PREFECT_SERVER_API_AUTH_STRING", "PREFECT_API_AUTH_STRING"):
-            required = f"{variable}={AUTH_SENTINEL}"
-            if required not in env_lines:
-                violations.append(f"{variable} must use the non-secret sentinel")
+        env_lines = [
+            line
+            for line in env_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        env_values: dict[str, str] = {}
+        if len(env_lines) != len(EXPECTED_ENV_VALUES):
+            violations.append("environment example must contain exactly four assignments")
+        for line in env_lines:
+            if "=" not in line:
+                violations.append(f"malformed environment assignment: {line}")
+                continue
+            key, value = line.split("=", 1)
+            if not key:
+                violations.append(f"malformed environment assignment: {line}")
+                continue
+            if key in env_values:
+                violations.append(f"duplicate environment key: {key}")
+            env_values[key] = value
+            if key.endswith("_AUTH_STRING") and value != AUTH_SENTINEL:
+                violations.append(f"{key} must use the non-secret sentinel")
+        if set(env_values) != set(EXPECTED_ENV_VALUES):
+            violations.append("environment example must use the fixed key set")
+        for key, expected in EXPECTED_ENV_VALUES.items():
+            if env_values.get(key) != expected:
+                violations.append(f"{key} must be {expected!r}")
 
     for unit, fragments in REQUIRED_UNIT_FRAGMENTS.items():
         unit_path = bundle_root / "systemd" / unit

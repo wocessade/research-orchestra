@@ -16,6 +16,12 @@ EXPECTED_UNITS = {
     "bogda-shadow-health.service",
     "bogda-shadow-health.timer",
 }
+EXPECTED_ENV_LINES = (
+    "PREFECT_HOME=/mnt/nas/.bogda/prefect",
+    "PREFECT_API_URL=http://127.0.0.1:4200/api",
+    "PREFECT_SERVER_API_AUTH_STRING=SET_ON_PI_NOT_IN_GIT",
+    "PREFECT_API_AUTH_STRING=SET_ON_PI_NOT_IN_GIT",
+)
 
 
 @pytest.fixture
@@ -93,6 +99,28 @@ def test_real_looking_auth_value_is_reported(bundle_copy: Path) -> None:
     )
 
     assert validate_bundle(bundle_copy)
+
+
+@pytest.mark.parametrize(
+    ("name", "env_lines"),
+    [
+        ("wrong prefect home", ("PREFECT_HOME=/mnt/nas/.bogda/wrong", "PREFECT_API_URL=http://127.0.0.1:4200/api", "PREFECT_SERVER_API_AUTH_STRING=SET_ON_PI_NOT_IN_GIT", "PREFECT_API_AUTH_STRING=SET_ON_PI_NOT_IN_GIT")),
+        ("wrong API URL", ("PREFECT_HOME=/mnt/nas/.bogda/prefect", "PREFECT_API_URL=http://127.0.0.1:9999/api", "PREFECT_SERVER_API_AUTH_STRING=SET_ON_PI_NOT_IN_GIT", "PREFECT_API_AUTH_STRING=SET_ON_PI_NOT_IN_GIT")),
+        ("missing required key", EXPECTED_ENV_LINES[:-1]),
+        ("duplicate key", (*EXPECTED_ENV_LINES, "PREFECT_HOME=/mnt/nas/.bogda/prefect")),
+        ("extra key", (*EXPECTED_ENV_LINES, "UNRELATED_FLAG=true")),
+        ("malformed line", (*EXPECTED_ENV_LINES, "not an assignment")),
+        ("non-sentinel auth duplicate", (*EXPECTED_ENV_LINES, "PREFECT_SERVER_API_AUTH_STRING=Basic c2VjcmV0")),
+    ],
+)
+def test_env_example_contract_mutations_are_reported(
+    bundle_copy: Path, name: str, env_lines: tuple[str, ...]
+) -> None:
+    (bundle_copy / "bogda.env.example").write_text(
+        "\n".join(env_lines) + "\n", encoding="utf-8"
+    )
+
+    assert validate_bundle(bundle_copy), name
 
 
 @pytest.mark.parametrize("forbidden_reference", ["/mnt/broker", "orchestra-legacy"])

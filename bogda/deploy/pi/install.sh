@@ -34,10 +34,10 @@ if [ -z "$python_bin" ]; then
     exit 1
 fi
 
-PYTHONPATH="$project_dir/src" "$python_bin" -m bogda.ops.bundle check "$script_dir"
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$project_dir/src" "$python_bin" -m bogda.ops.bundle check "$script_dir"
 
 if [ "$mode" = dry-run ]; then
-    PYTHONPATH="$project_dir/src" "$python_bin" -m bogda.ops.bundle dry-run "$script_dir"
+    PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$project_dir/src" "$python_bin" -m bogda.ops.bundle dry-run "$script_dir"
     exit 0
 fi
 
@@ -56,6 +56,17 @@ done
 if [ "$(findmnt -no FSTYPE /mnt/nas)" != "ext4" ]; then
     echo "/mnt/nas must be an ext4 mount" >&2
     exit 1
+fi
+
+if [ "$start" = true ]; then
+    start_env=/etc/bogda/bogda.env
+    if [ ! -e "$start_env" ]; then
+        start_env="$script_dir/bogda.env.example"
+    fi
+    if grep -F -q "SET_ON_PI_NOT_IN_GIT" "$start_env"; then
+        echo "--start requires configured Bogda auth values" >&2
+        exit 1
+    fi
 fi
 
 if ! getent passwd bogda >/dev/null 2>&1; then
@@ -106,10 +117,6 @@ done
 systemctl daemon-reload
 
 if [ "$start" = true ]; then
-    if grep -F -q "SET_ON_PI_NOT_IN_GIT" /etc/bogda/bogda.env; then
-        echo "--start requires configured Bogda auth values" >&2
-        exit 1
-    fi
     for unit_name in \
         bogda-prefect-server.service \
         bogda-pi-worker.service \

@@ -28,15 +28,15 @@ On the Pi, first confirm the intended checkout, `python3`, `uv`, and the fixed s
 ```sh
 findmnt -no FSTYPE /mnt/nas
 systemd-analyze verify \
-  /etc/systemd/system/bogda-prefect-server.service \
-  /etc/systemd/system/bogda-pi-worker.service \
-  /etc/systemd/system/bogda-prefect-snapshot.service \
-  /etc/systemd/system/bogda-prefect-snapshot.timer \
-  /etc/systemd/system/bogda-shadow-health.service \
-  /etc/systemd/system/bogda-shadow-health.timer
+  deploy/pi/systemd/bogda-prefect-server.service \
+  deploy/pi/systemd/bogda-pi-worker.service \
+  deploy/pi/systemd/bogda-prefect-snapshot.service \
+  deploy/pi/systemd/bogda-prefect-snapshot.timer \
+  deploy/pi/systemd/bogda-shadow-health.service \
+  deploy/pi/systemd/bogda-shadow-health.timer
 ```
 
-`findmnt -no FSTYPE /mnt/nas` must equal `ext4`. A missing SSD mount is a hard failure. Before installing units, retain the output of `systemd-analyze verify` for all six units; repeat this command after Gate 3, when the files exist at their deployed paths. Check available memory as an observation threshold: less than 400 MB available requires investigation, but is not by itself a hard failure.
+`findmnt -no FSTYPE /mnt/nas` must equal `ext4`. A missing SSD mount is a hard failure. Before installing units, retain the output of `systemd-analyze verify` for the reviewed checkout's six unit files; repeat verification against `/etc/systemd/system/bogda-*` after Gate 3. Check available memory as an observation threshold: less than 400 MB available requires investigation, but is not by itself a hard failure.
 
 ## Gate 3 — Install without start
 

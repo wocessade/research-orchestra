@@ -70,6 +70,76 @@ if [ ! -f "$inventory" ]; then
     exit 1
 fi
 
+validate_inventory() {
+    seen_targets=""
+    row_count=0
+    while IFS="$(printf '\t')" read -r target status extra; do
+        if [ -z "$target" ] || [ -z "$status" ] || [ -n "${extra:-}" ]; then
+            echo "invalid inventory row" >&2
+            exit 1
+        fi
+        case "$target" in
+            /etc/bogda/bogda.env) ;;
+            /etc/systemd/system/bogda-prefect-server.service) ;;
+            /etc/systemd/system/bogda-pi-worker.service) ;;
+            /etc/systemd/system/bogda-prefect-snapshot.service) ;;
+            /etc/systemd/system/bogda-prefect-snapshot.timer) ;;
+            /etc/systemd/system/bogda-shadow-health.service) ;;
+            /etc/systemd/system/bogda-shadow-health.timer) ;;
+            *)
+                echo "inventory target is not managed" >&2
+                exit 1
+                ;;
+        esac
+        if [ -L "$target" ]; then
+            echo "managed target must not be a symlink" >&2
+            exit 1
+        fi
+        case "|$seen_targets|" in
+            *"|$target|"*)
+                echo "duplicate inventory target" >&2
+                exit 1
+                ;;
+        esac
+        seen_targets="${seen_targets}${target}|"
+        row_count=$((row_count + 1))
+        case "$status" in
+            present)
+                backup_file="$backup_dir/$(basename -- "$target")"
+                if [ -L "$backup_file" ] || [ ! -f "$backup_file" ]; then
+                    echo "backup source must be a regular non-symlink file" >&2
+                    exit 1
+                fi
+                backup_parent="$(CDPATH= cd -- "$(dirname -- "$backup_file")" && pwd -P)"
+                canonical_file="$backup_parent/$(basename -- "$backup_file")"
+                if [ "$backup_parent" != "$backup_dir" ] || [ "$canonical_file" != "$backup_file" ]; then
+                    echo "backup source resolves outside backup directory" >&2
+                    exit 1
+                fi
+                ;;
+            absent) ;;
+            *)
+                echo "unknown inventory status" >&2
+                exit 1
+                ;;
+        esac
+    done < "$inventory"
+    if [ "$row_count" -ne 7 ]; then
+        echo "inventory must contain all managed targets" >&2
+        exit 1
+    fi
+}
+
+apply_inventory() {
+    while IFS="$(printf '\t')" read -r target status extra; do
+        case "$status" in
+            present) cp -p "$backup_dir/$(basename -- "$target")" "$target" ;;
+            absent) rm -f "$target" ;;
+        esac
+    done < "$inventory"
+}
+
+validate_inventory
 for unit_name in \
     bogda-prefect-server.service \
     bogda-pi-worker.service \
@@ -77,54 +147,6 @@ for unit_name in \
     bogda-shadow-health.timer; do
     systemctl disable --now "$unit_name"
 done
-
-seen_targets=""
-row_count=0
-while IFS="$(printf '\t')" read -r target status extra; do
-    if [ -z "$target" ] || [ -z "$status" ] || [ -n "${extra:-}" ]; then
-        echo "invalid inventory row" >&2
-        exit 1
-    fi
-    case "$target" in
-        /etc/bogda/bogda.env) ;;
-        /etc/systemd/system/bogda-prefect-server.service) ;;
-        /etc/systemd/system/bogda-pi-worker.service) ;;
-        /etc/systemd/system/bogda-prefect-snapshot.service) ;;
-        /etc/systemd/system/bogda-prefect-snapshot.timer) ;;
-        /etc/systemd/system/bogda-shadow-health.service) ;;
-        /etc/systemd/system/bogda-shadow-health.timer) ;;
-        *)
-            echo "inventory target is not managed" >&2
-            exit 1
-            ;;
-    esac
-    case "|$seen_targets|" in
-        *"|$target|"*)
-            echo "duplicate inventory target" >&2
-            exit 1
-            ;;
-    esac
-    seen_targets="${seen_targets}${target}|"
-    row_count=$((row_count + 1))
-    case "$status" in
-        present)
-            backup_file="$backup_dir/$(basename -- "$target")"
-            if [ ! -f "$backup_file" ]; then
-                echo "missing backup file for managed target" >&2
-                exit 1
-            fi
-            cp -p "$backup_file" "$target"
-            ;;
-        absent) rm -f "$target" ;;
-        *)
-            echo "unknown inventory status" >&2
-            exit 1
-            ;;
-    esac
-done < "$inventory"
-if [ "$row_count" -ne 7 ]; then
-    echo "inventory must contain all managed targets" >&2
-    exit 1
-fi
+apply_inventory
 
 systemctl daemon-reload

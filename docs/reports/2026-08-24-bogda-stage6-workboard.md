@@ -4,9 +4,40 @@
 
 目的：在模型额度和执行者切换后，以本文件作为当前唯一工作入口。不要从聊天记录重新拼装状态。
 
+## 收班补记：下周从这里恢复
+
+本节记录 2026-08-24 晚间最终状态；与下方较早快照冲突时，以本节和后续正式
+Gate 报告为准。
+
+- Git `main` 为 `151fd96`，已推送到 `origin/main`；当前没有辅助 worktree。
+- 3101 已完成 Windows 启动器真实 `start → status → stop → start → status`
+  验收，当前由启动器托管且为 `healthy / mock-all`。它不是开机服务，电脑重启或
+  睡眠后先运行 `bogda-console/scripts/local-console.ps1 status`。
+- 3100 在真实启停验收前后保持不变；3101 仍未连接真实 Prefect。
+- Pi 最后确认仍处于 Gate 6 自动观察期；晚间没有为本地软件工作连接或修改 Pi。
+- 三档科研模式的权威本地策略和 mock UI 已完成；下一项软件难题仍是
+  `manual / supervised` 的可恢复 Prefect 人工检查点，不是自主规划循环。
+
+下周恢复顺序：
+
+1. 先读本文件、`bogda/docs/pi-shadow-runbook.md` 和最新 Gate 报告；不要从聊天
+   记录拼命令。
+2. 对 Pi 做只读检查，确认 Gate 6 样本、每日快照、服务、SSD、Orchestra 和网络
+   边界。72 小时已过不等于自动通过。
+3. 保存 `bogda.ops.health summarize` 原始 JSON。受控重启和独立 restore 演练仍需
+   owner 明确批准；未批准时只读，不改 systemd 或运行状态。
+4. Gate 6 证据齐全后交给确定性复核，再由 owner/强模型做 Gate 7 裁决。
+5. 软件线可继续人工检查点 Task 4，但与 Pi 观察隔离；真实 Prefect 写入、宿舍机、
+   GPU 和 3100 切换仍不得顺带开启。
+
+本地仓库留意事项：根工作树的 `.gitignore`、两份锐评删除、`.codegraph/`、天气
+项目和 Orchestra 任务卡是既有用户状态，不得顺手清理或带入 Bogda 提交。
+`codex/bogda-gate3-install` 没有 worktree，其补丁已由主线等价提交覆盖；它只是
+待 owner 以后确认删除的本地分支，不阻塞下周工作。
+
 ## 当前快照
 
-Git `main`：`c3afdeb`，已推送到 `origin/main`。
+Git `main`：`151fd96`，已推送到 `origin/main`。
 
 Pi 快照时间：2026-08-24T08:56:05Z（北京时间16:56）。
 
@@ -120,12 +151,14 @@ Pi 快照时间：2026-08-24T08:56:05Z（北京时间16:56）。
 
 1. **已完成（2026-08-24）**：三档模式策略权威存储、全局默认、项目覆盖/取消覆盖、revision冲突、损坏策略fail-closed，以及创建运行时冻结`autonomy_mode + policy_revision`；仅本地实现，未连接或修改Pi。
 2. **已完成（2026-08-24）**：3101模式查询/命令契约、mock三档切换、项目继承全局、revision冲突、确认文案、只读降级和320/360px验收；真实profile仍禁写且不回退mock。
-3. **下一项（强模型优先）**：`manual`与`supervised`人工检查点；先不实现自主规划循环。
-4. **再后可做**：按任务启动的科研协调Agent，限制工具、预算、步骤数和产物。
-5. **Gate 6通过且owner批准S2后**：3101连接真实Prefect并仅对测试资源开放精确allowlist写操作。
-6. **笔记本模拟阶段**：Wake Bridge、Power Agent协议、CPU Worker、睡眠/游戏模式；不承担7×24职责。
-7. **宿舍机到位后**：真实WoL、WSL Worker和CPU队列；GPU不作为接入前置条件。
-8. **最后**：逐类迁移科研工作流、完成3101 shadow证据，再单独设计3100切换。
+3. **已完成（2026-08-24）**：3101 Windows 本地启动器、PID/日志管理与真实
+   `start/status/stop` 闭环；仍为 `mock-all`，不是开机服务。
+4. **下一项（强模型优先）**：`manual`与`supervised`人工检查点；先不实现自主规划循环。
+5. **再后可做**：按任务启动的科研协调Agent，限制工具、预算、步骤数和产物。
+6. **Gate 6通过且owner批准S2后**：3101连接真实Prefect并仅对测试资源开放精确allowlist写操作。
+7. **笔记本模拟阶段**：Wake Bridge、Power Agent协议、CPU Worker、睡眠/游戏模式；不承担7×24职责。
+8. **宿舍机到位后**：真实WoL、WSL Worker和CPU队列；GPU不作为接入前置条件。
+9. **最后**：逐类迁移科研工作流、完成3101 shadow证据，再单独设计3100切换。
 
 ## 停止条件
 
@@ -147,5 +180,6 @@ Pi 快照时间：2026-08-24T08:56:05Z（北京时间16:56）。
 - Gate 2：`docs/reports/2026-08-24-bogda-pi-gate2-preflight.md`
 - Gate 3：`docs/reports/2026-08-24-bogda-pi-gate3-install.md`
 - Gate 4–5：`docs/reports/2026-08-24-bogda-pi-gate4-5-start.md`
+- 3101 启动器真实验收：`docs/reports/2026-08-24-bogda-console-local-launcher-live-acceptance.md`
 - 接班清单：`docs/reports/2026-08-24-bogda-grok-deepseek-handoff.md`
 - 硬件行情：`docs/reports/2026-08-24-bogda-dorm-runner-hardware-market.md`

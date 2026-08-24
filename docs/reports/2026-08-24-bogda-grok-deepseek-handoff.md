@@ -5,11 +5,28 @@
 
 ## 当前事实
 
-- `main` 当前基线为 `61d2eb6`，Bogda Console、科研评审入口、跨平台契约门禁和 Pi shadow 部署包均已合并；3100 端口尚未切换到 Bogda。
-- Pi shadow 部署包已通过本地最终验收但尚未部署：101 passed、1 项因 Windows 符号链接权限跳过；bundle、Bash 语法、install/rollback dry-run 和禁区扫描通过。
+- `main` 当前基线为 `151fd96`，已推送。Bogda Console、科研评审入口、三档模式
+  mock 控制、跨平台契约门禁、Pi shadow 部署包和 Windows 本地启动器均已合并；
+  3100 尚未切换到 Bogda。
+- Pi 已完成 Gate 1–5：安装、鉴权、server、单并发 worker、快照 timer 和健康
+  timer 已启动。Gate 6 的 72 小时自动采样最后确认仍在运行；尚未做受控重启、
+  独立 restore 演练、确定性复核或 Gate 7 裁决。
 - 曝光门禁修复 `9eac204` 已包含在主线：非许可网络得到任何 HTTP 响应均为失败，只有传输失败且 HTTP 000 才通过。
-- 没有连接 Pi，没有修改 systemd，没有安装、启动或应用服务，也没有改 Orchestra。
+- 3101 已通过真实 `start → status → stop → start → status`，当前为启动器托管的
+  `healthy / mock-all`；它不会开机自启，也没有连接真实 Prefect。3100 在验收中
+  未变化。
 - 根工作树里的两份锐评删除、`.codegraph/` 和两张未跟踪任务卡属于用户现有状态，不得清理或带入 Bogda 提交。
+
+## 下周恢复顺序
+
+1. 读取 `docs/reports/2026-08-24-bogda-stage6-workboard.md`、Pi runbook 和最新
+   Gate 报告，不重复 Gate 1–5。
+2. 先对 Pi 做只读检查并保存完整健康摘要；核对样本跨度、间隔、API、OOM、swap、
+   SQLite integrity、SSD、快照和 Orchestra。
+3. 受控重启与独立 restore 演练仍需 owner 明确批准。没有批准就停在只读证据收集。
+4. 证据完成后由 DeepSeek 做确定性复核，再交 owner/强模型做 Gate 7 裁决。
+5. 软件线下一项是 `manual / supervised` 的可恢复 Prefect 人工检查点。不要先做
+   自主规划循环、常驻管家 Agent、真实 Prefect 写入、宿舍 runner 或 GPU。
 
 ## 已确定的架构边界
 
@@ -23,12 +40,13 @@
 
 ## Grok 的任务（高判断力阶段）
 
-1. 读取本文件、Pi spec、plan 和 runbook，不重新设计已经批准的范围。
-2. 在 Pi 分支确认曝光检测修复：连接失败/无 HTTP 响应才算通过；任意 HTTP 状态都算失败。
-3. 将最新 `main` 合入 Pi 分支，解决冲突，并在该工作树运行完整验证。不要反向把未验收分支直接推入 `main`。
-4. 记录验证结果；满足合并条件后请求或执行已获授权的本地合并。不得擅自推送远端。
-5. 安排一次允许停机的 Pi 部署窗口。先备份和回滚演练，再启动 server；网络边界验证通过后，才启动 worker/timer。
-6. 启动 72 小时 shadow 观察并留下结构化证据。观察期未结束前不得宣称迁移完成，也不得切换 3100。
+1. 不重复部署或重启 Gate 1–5；先收集 Gate 6 只读证据并写新报告。
+2. 核对曝光检测仍满足：连接失败且 HTTP 000 才通过；任意 HTTP 状态都失败。
+3. 达到 72 小时时先保存原始 summary，不凭“服务仍 active”宣布通过。
+4. 获得 owner 明确批准后，才执行受控重启和独立 restore 演练；不得覆盖 live
+   SQLite 数据库。
+5. 留下当前主线 SHA、操作时间、服务状态、证据目录、异常和回滚结果，再交给
+   DeepSeek 确定性复核。
 
 合并前最低验证：
 
@@ -53,7 +71,8 @@ Pi 停机本身已经获准，不需要为停机再次询问；但停机不等�
 
 ## 交给 DeepSeek 的条件与任务
 
-只有 Grok 留下以下检查点后才交接：Pi 分支/合并提交号、部署时间、回滚结果、服务状态、shadow 起始时间、证据目录和所有异常。
+只有 Grok 留下以下检查点后才交接：主线提交号、健康摘要、受控重启授权与结果、
+restore 结果、服务状态、shadow 起止时间、证据目录和所有异常。
 
 DeepSeek 负责确定性执行：
 

@@ -51,4 +51,20 @@ Prefect Completed means the command ran and required artifacts exist. Scientific
 
 Implemented: local shell flow, attempt directories, required artifact checks, versioned RunResult artifacts, and separate scientific review status.
 
-Deferred: Pi deployment, Wake Bridge, Windows Power Agent, CPU/GPU work queues, autonomous planning, SLC SD purchase, higher concurrency, and 3100 migration.
+## Pi shadow operations
+
+The fixed Pi deployment inventory is in [deploy/pi/manifest.toml](deploy/pi/manifest.toml). Future deployment, acceptance, and rollback are gated by the [Pi shadow operations runbook](docs/pi-shadow-runbook.md); local checks do not authorize a Pi install.
+
+## Deferred
+
+- Actual Pi deployment and 72-hour acceptance
+- Wake Bridge/WoL
+- Laptop `dorm-x86`
+- Windows Power Agent/game mode
+- Task migration
+- CPU/GPU worker and higher concurrency
+- SLC/pSLC purchase
+- 3100 cutover
+- CLI error polish
+- Streaming logs
+- Review, merge, and regression of `bogda-console`

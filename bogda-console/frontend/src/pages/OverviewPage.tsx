@@ -46,7 +46,8 @@ export function OverviewPage() {
 
       <section className="section-block" aria-labelledby="review-title">
         <div className="section-heading"><p>03 / SCIENCE</p><h2 id="review-title">等待评审</h2><span>{review.length} 条</span></div>
-        <RunLedger runs={review.slice(0, 4)} emptyText="当前没有待评审结果" />
+        <p className="lede">先阅读证据，再提交科研判断。打开详情会定位到追加评审区，不会在列表上一键接受或拒绝。</p>
+        <RunLedger runs={review.slice(0, 4)} emptyText="当前没有待评审结果" reviewEntry />
       </section>
 
       <section className="field-band section-block" aria-labelledby="field-title">

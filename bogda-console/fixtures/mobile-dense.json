@@ -1,0 +1,15 @@
+{
+  "clock": "2026-08-24T11:00:00Z",
+  "prefect": {
+    "source": {"available": true, "observedAt": "2026-08-24T10:59:58Z", "lastSuccessfulAt": "2026-08-24T10:59:58Z"},
+    "deployments": [],
+    "pools": [{"name": "pi-service", "status": "READY", "isPaused": false, "concurrencyLimit": 1, "activeSlots": 0, "queues": [], "workers": []}, {"name": "dorm-x86", "status": "READY", "isPaused": false, "concurrencyLimit": 1, "activeSlots": 1, "queues": [{"queueId": "queue-cpu", "name": "cpu", "status": "READY", "isPaused": false, "concurrencyLimit": null, "updatedAt": "2026-08-24T10:59:00Z"}, {"queueId": "queue-gpu", "name": "gpu", "status": "READY", "isPaused": false, "concurrencyLimit": null, "updatedAt": "2026-08-24T10:59:00Z"}], "workers": [{"workerId": "worker-dorm", "name": "dorm-x86", "status": "ONLINE", "lastHeartbeatTime": "2026-08-24T10:59:55Z"}]}],
+    "runs": [
+      {"runId": "dense-1", "name": "transect α", "deploymentId": "deployment-dorm", "deploymentName": "alpine-assay", "projectId": "bogda-main", "workPoolName": "dorm-x86", "workQueueName": "cpu", "state": {"type": "RUNNING", "name": "Retrying", "timestamp": "2026-08-24T10:50:00Z", "terminal": false}, "scheduledAt": "2026-08-24T10:40:00Z", "startedAt": "2026-08-24T10:41:00Z", "endedAt": null, "parameters": {}, "tags": []},
+      {"runId": "dense-2", "name": "transect β", "deploymentId": "deployment-dorm", "deploymentName": "alpine-assay", "projectId": "bogda-main", "workPoolName": "dorm-x86", "workQueueName": "gpu", "state": {"type": "SCHEDULED", "name": "AwaitingRetry", "timestamp": "2026-08-24T10:52:00Z", "terminal": false}, "scheduledAt": "2026-08-24T10:52:00Z", "startedAt": null, "endedAt": null, "parameters": {}, "tags": []},
+      {"runId": "dense-3", "name": "transect γ", "deploymentId": "deployment-dorm", "deploymentName": "alpine-assay", "projectId": "bogda-main", "workPoolName": "dorm-x86", "workQueueName": "cpu", "state": {"type": "CANCELLED", "name": "Cancelled", "timestamp": "2026-08-24T10:30:00Z", "terminal": true}, "scheduledAt": "2026-08-24T10:20:00Z", "startedAt": null, "endedAt": "2026-08-24T10:30:00Z", "parameters": {}, "tags": []}
+    ]
+  },
+  "runResults": {"source": {"available": true, "observedAt": "2026-08-24T10:59:50Z", "lastSuccessfulAt": "2026-08-24T10:59:50Z"}, "artifactsByRun": {"dense-1": [], "dense-2": [], "dense-3": []}},
+  "power": {"sourceMode": "mock", "available": true, "observedAt": "2026-08-24T10:59:55Z", "lastSuccessfulAt": "2026-08-24T10:59:55Z", "host": "dorm-x86", "mode": "compute", "agentReachable": true, "sleepInhibited": true, "lastTransitionAt": "2026-08-24T10:40:00Z"}
+}

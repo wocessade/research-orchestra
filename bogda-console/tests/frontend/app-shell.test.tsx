@@ -1,0 +1,26 @@
+import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { describe, expect, it } from "vitest";
+
+import { AppShell } from "../../frontend/src/components/AppShell";
+
+
+describe("AppShell", () => {
+  it("renders four primary destinations and a skip link", () => {
+    render(
+      <MemoryRouter>
+        <AppShell><p>content</p></AppShell>
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("link", { name: "跳到主要内容" })).toHaveAttribute("href", "#main-content");
+    for (const name of ["总览", "运行", "评审", "基础设施"]) {
+      expect(screen.getAllByRole("link", { name })[0]).toBeVisible();
+    }
+    expect(screen.getByRole("main")).toHaveAttribute("id", "main-content");
+  });
+
+  it("labels the mountain contours as decorative", () => {
+    render(<MemoryRouter><AppShell><p>content</p></AppShell></MemoryRouter>);
+    expect(screen.getByTestId("bogda-contours")).toHaveAttribute("aria-hidden", "true");
+  });
+});

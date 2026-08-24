@@ -1,0 +1,11 @@
+{
+  "clock": "2026-08-24T23:10:00Z",
+  "prefect": {
+    "source": {"available": true, "observedAt": "2026-08-24T23:09:58Z", "lastSuccessfulAt": "2026-08-24T23:09:58Z"},
+    "deployments": [{"deploymentId": "deployment-dorm", "name": "alpine-assay", "flowName": "alpine-assay", "projectId": "bogda-main", "autonomyMode": "supervised", "workPoolName": "dorm-x86", "workQueueName": "cpu", "parameterSchema": {"type": "object"}, "allowlisted": true, "schedules": []}],
+    "pools": [{"name": "pi-service", "status": "READY", "isPaused": false, "concurrencyLimit": 1, "activeSlots": 0, "queues": [], "workers": []}, {"name": "dorm-x86", "status": "NOT_READY", "isPaused": false, "concurrencyLimit": 1, "activeSlots": 0, "queues": [{"queueId": "queue-cpu", "name": "cpu", "status": "NOT_READY", "isPaused": false, "concurrencyLimit": null, "updatedAt": "2026-08-24T23:09:00Z"}, {"queueId": "queue-gpu", "name": "gpu", "status": "NOT_READY", "isPaused": false, "concurrencyLimit": null, "updatedAt": "2026-08-24T23:09:00Z"}], "workers": [{"workerId": "worker-dorm", "name": "dorm-x86", "status": "OFFLINE", "lastHeartbeatTime": "2026-08-24T22:41:00Z"}]}],
+    "runs": [{"runId": "run-queued", "name": "overnight assay", "deploymentId": "deployment-dorm", "deploymentName": "alpine-assay", "projectId": "bogda-main", "workPoolName": "dorm-x86", "workQueueName": "cpu", "state": {"type": "SCHEDULED", "name": "AwaitingConcurrencySlot", "timestamp": "2026-08-24T23:00:00Z", "terminal": false}, "scheduledAt": "2026-08-24T23:00:00Z", "startedAt": null, "endedAt": null, "parameters": {}, "tags": []}]
+  },
+  "runResults": {"source": {"available": true, "observedAt": "2026-08-24T23:09:50Z", "lastSuccessfulAt": "2026-08-24T23:09:50Z"}, "artifactsByRun": {"run-queued": []}},
+  "power": {"sourceMode": "mock", "available": true, "observedAt": "2026-08-24T23:09:55Z", "lastSuccessfulAt": "2026-08-24T23:09:55Z", "host": "dorm-x86", "mode": "sleep", "agentReachable": true, "sleepInhibited": false, "lastTransitionAt": "2026-08-24T22:45:00Z"}
+}

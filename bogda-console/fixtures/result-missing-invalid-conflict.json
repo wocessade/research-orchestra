@@ -1,0 +1,22 @@
+{
+  "clock": "2026-08-24T10:00:00Z",
+  "prefect": {
+    "source": {"available": true, "observedAt": "2026-08-24T09:59:58Z", "lastSuccessfulAt": "2026-08-24T09:59:58Z"},
+    "deployments": [{"deploymentId": "deployment-dorm", "name": "alpine-assay", "flowName": "alpine-assay", "projectId": "bogda-main", "autonomyMode": "supervised", "workPoolName": "dorm-x86", "workQueueName": "cpu", "parameterSchema": {"type": "object"}, "allowlisted": true, "schedules": []}],
+    "pools": [{"name": "dorm-x86", "status": "READY", "isPaused": false, "concurrencyLimit": 1, "activeSlots": 0, "queues": [{"queueId": "queue-cpu", "name": "cpu", "status": "READY", "isPaused": false, "concurrencyLimit": null, "updatedAt": "2026-08-24T09:59:00Z"}, {"queueId": "queue-gpu", "name": "gpu", "status": "NOT_READY", "isPaused": false, "concurrencyLimit": null, "updatedAt": "2026-08-24T09:59:00Z"}], "workers": [{"workerId": "worker-dorm", "name": "dorm-x86", "status": "ONLINE", "lastHeartbeatTime": "2026-08-24T09:59:55Z"}]}],
+    "runs": [
+      {"runId": "run-missing", "name": "missing result", "deploymentId": "deployment-dorm", "deploymentName": "alpine-assay", "projectId": "bogda-main", "workPoolName": "dorm-x86", "workQueueName": "cpu", "state": {"type": "FAILED", "name": "Failed", "timestamp": "2026-08-24T09:10:00Z", "terminal": true}, "scheduledAt": "2026-08-24T09:00:00Z", "startedAt": "2026-08-24T09:01:00Z", "endedAt": "2026-08-24T09:10:00Z", "parameters": {}, "tags": []},
+      {"runId": "run-invalid", "name": "invalid result", "deploymentId": "deployment-dorm", "deploymentName": "alpine-assay", "projectId": "bogda-main", "workPoolName": "dorm-x86", "workQueueName": "cpu", "state": {"type": "COMPLETED", "name": "Completed", "timestamp": "2026-08-24T09:20:00Z", "terminal": true}, "scheduledAt": "2026-08-24T09:11:00Z", "startedAt": "2026-08-24T09:12:00Z", "endedAt": "2026-08-24T09:20:00Z", "parameters": {}, "tags": []},
+      {"runId": "run-review", "name": "review conflict", "deploymentId": "deployment-dorm", "deploymentName": "alpine-assay", "projectId": "bogda-main", "workPoolName": "dorm-x86", "workQueueName": "cpu", "state": {"type": "CRASHED", "name": "Crashed", "timestamp": "2026-08-24T09:40:00Z", "terminal": true}, "scheduledAt": "2026-08-24T09:25:00Z", "startedAt": "2026-08-24T09:26:00Z", "endedAt": "2026-08-24T09:40:00Z", "parameters": {}, "tags": []}
+    ]
+  },
+  "runResults": {
+    "source": {"available": true, "observedAt": "2026-08-24T09:59:50Z", "lastSuccessfulAt": "2026-08-24T09:59:50Z"},
+    "artifactsByRun": {
+      "run-missing": [],
+      "run-invalid": [{"artifactId": "artifact-invalid-older", "createdAt": "2026-08-24T09:20:05Z", "key": "bogda-run-run-invalid", "type": "bogda.run-result", "payload": {"run_id": "run-invalid", "job_id": "job-invalid", "execution_status": "Completed", "scientific_status": "unreviewed", "started_at": "2026-08-24T09:12:00Z", "finished_at": "2026-08-24T09:20:00Z", "executor": "shell", "attempt": 1, "declared_artifacts": [], "summary": "valid older", "review_summary": null}}, {"artifactId": "artifact-invalid-newest", "createdAt": "2026-08-24T09:20:08Z", "key": "bogda-run-run-invalid", "type": "bogda.run-result", "payload": {"scientific_status": "proven"}}],
+      "run-review": [{"artifactId": "artifact-old", "createdAt": "2026-08-24T09:40:02Z", "key": "bogda-run-run-review", "type": "bogda.run-result", "payload": {"run_id": "run-review", "job_id": "job-review", "execution_status": "Crashed", "scientific_status": "unreviewed", "started_at": "2026-08-24T09:26:00Z", "finished_at": "2026-08-24T09:40:00Z", "executor": "shell", "attempt": 1, "declared_artifacts": [], "summary": "partial evidence", "review_summary": null, "future_core_field": "kept"}}, {"artifactId": "artifact-newest", "createdAt": "2026-08-24T09:50:00Z", "key": "bogda-run-run-review", "type": "bogda.run-result", "payload": {"run_id": "run-review", "job_id": "job-review", "execution_status": "Crashed", "scientific_status": "inconclusive", "started_at": "2026-08-24T09:26:00Z", "finished_at": "2026-08-24T09:40:00Z", "executor": "shell", "attempt": 1, "declared_artifacts": [], "summary": "partial evidence", "review_summary": "needs another assay", "future_core_field": "kept"}}]
+    }
+  },
+  "power": {"sourceMode": "mock", "available": true, "observedAt": "2026-08-24T09:59:55Z", "lastSuccessfulAt": "2026-08-24T09:59:55Z", "host": "dorm-x86", "mode": "maintenance", "agentReachable": true, "sleepInhibited": true, "lastTransitionAt": "2026-08-24T09:45:00Z"}
+}

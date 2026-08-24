@@ -1,0 +1,11 @@
+{
+  "clock": "2026-08-24T13:20:00Z",
+  "prefect": {
+    "source": {"available": true, "observedAt": "2026-08-24T13:19:58Z", "lastSuccessfulAt": "2026-08-24T13:19:58Z"},
+    "deployments": [{"deploymentId": "deployment-dorm", "name": "alpine-assay", "flowName": "alpine-assay", "projectId": "bogda-main", "autonomyMode": "manual", "workPoolName": "dorm-x86", "workQueueName": "cpu", "parameterSchema": {"type": "object"}, "allowlisted": true, "schedules": [{"scheduleId": "schedule-dorm", "label": "evening", "active": false, "updatedAt": "2026-08-24T13:00:00Z"}]}],
+    "pools": [{"name": "pi-service", "status": "READY", "isPaused": false, "concurrencyLimit": 1, "activeSlots": 0, "queues": [], "workers": []}, {"name": "dorm-x86", "status": "PAUSED", "isPaused": false, "concurrencyLimit": 1, "activeSlots": 0, "queues": [{"queueId": "queue-cpu", "name": "cpu", "status": "PAUSED", "isPaused": true, "concurrencyLimit": null, "updatedAt": "2026-08-24T13:00:00Z"}, {"queueId": "queue-gpu", "name": "gpu", "status": "PAUSED", "isPaused": true, "concurrencyLimit": null, "updatedAt": "2026-08-24T13:00:00Z"}], "workers": [{"workerId": "worker-dorm", "name": "dorm-x86", "status": "ONLINE", "lastHeartbeatTime": "2026-08-24T13:19:55Z"}]}],
+    "runs": [{"runId": "run-paused-native", "name": "held assay", "deploymentId": "deployment-dorm", "deploymentName": "alpine-assay", "projectId": "bogda-main", "workPoolName": "dorm-x86", "workQueueName": "cpu", "state": {"type": "PAUSED", "name": "Paused", "timestamp": "2026-08-24T13:00:00Z", "terminal": false}, "scheduledAt": "2026-08-24T12:55:00Z", "startedAt": null, "endedAt": null, "parameters": {}, "tags": []}]
+  },
+  "runResults": {"source": {"available": true, "observedAt": "2026-08-24T13:19:50Z", "lastSuccessfulAt": "2026-08-24T13:19:50Z"}, "artifactsByRun": {"run-paused-native": []}},
+  "power": {"sourceMode": "mock", "available": true, "observedAt": "2026-08-24T13:19:55Z", "lastSuccessfulAt": "2026-08-24T13:19:55Z", "host": "dorm-x86", "mode": "gaming", "agentReachable": true, "sleepInhibited": true, "lastTransitionAt": "2026-08-24T12:58:00Z"}
+}

@@ -108,14 +108,25 @@ curl --fail --silent --show-error --user "$AUTH_PAIR" "http://$PI_TAILNET_IP:420
 unset AUTH_PAIR
 ```
 
-The tailnet request must succeed. From a client that is not on the tailnet, run the reachability-negative test; a connection or HTTP response is a hard failure:
+The tailnet request must succeed. From a client that is not on the tailnet, run the reachability-negative test; any HTTP response is a hard failure, while transport failure with no response is expected:
 
 ```sh
-if curl --connect-timeout 5 --max-time 10 --fail --silent --show-error "http://$PI_TAILNET_IP:4200/api/health"; then
-  echo 'unexpected non-tailnet API reachability' >&2
+http_code="$(curl --connect-timeout 5 --max-time 10 --silent --show-error \
+  --output /dev/null --write-out '%{http_code}' \
+  "http://$PI_TAILNET_IP:4200/api/health")"
+curl_status=$?
+if [ "$http_code" != "000" ]; then
+  echo "unexpected non-tailnet API HTTP response: $http_code" >&2
   exit 1
 fi
+if [ "$curl_status" -eq 0 ]; then
+  echo 'unexpected non-tailnet API reachability without an HTTP response' >&2
+  exit 1
+fi
+echo 'non-tailnet API transport is unreachable as expected'
 ```
+
+Do not add `--fail` to this negative test: an HTTP 401/403 is still proof that the API is reachable and must fail the gate. Curl's `000` code plus a nonzero transport status is the expected no-response case.
 
 ## Gate 5 — Rotate trial evidence, then start worker and timers
 

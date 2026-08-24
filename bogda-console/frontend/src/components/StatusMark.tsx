@@ -1,13 +1,3 @@
-const executionLabels: Record<string, string> = {
-  SCHEDULED: "排程",
-  RUNNING: "运行",
-  COMPLETED: "完成",
-  FAILED: "失败",
-  CRASHED: "崩溃",
-  CANCELLED: "取消",
-  PAUSED: "暂停",
-};
-
 const scienceLabels: Record<string, string> = {
   unreviewed: "待评审",
   accepted: "已接受",
@@ -16,7 +6,7 @@ const scienceLabels: Record<string, string> = {
 };
 
 export function ExecutionMark({ type, name }: { type: string; name: string }) {
-  return <span className={`status-mark execution execution--${type.toLowerCase()}`}><i aria-hidden="true" />{name}<small>{executionLabels[type] ?? type}</small></span>;
+  return <span className={`status-mark execution execution--${type.toLowerCase()}`}><i aria-hidden="true" />{name}<small>{type}</small></span>;
 }
 
 export function ScientificMark({ status }: { status: string | null | undefined }) {

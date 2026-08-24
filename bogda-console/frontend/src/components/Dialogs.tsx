@@ -21,7 +21,8 @@ export function ModalDialog({ open, title, onClose, children, footer, busy = fal
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     queueMicrotask(() => {
-      const initial = panelRef.current?.querySelector<HTMLElement>("[data-autofocus],button,input,select,textarea,a[href]");
+      const initial = panelRef.current?.querySelector<HTMLElement>("[data-autofocus]")
+        ?? panelRef.current?.querySelector<HTMLElement>("button,input,select,textarea,a[href]");
       initial?.focus();
     });
     return () => {

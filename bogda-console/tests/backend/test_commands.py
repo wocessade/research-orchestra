@@ -137,3 +137,54 @@ async def test_review_conflict_exposes_current_resource(fixture_loader) -> None:
         await service.review("run-review", "artifact-old", "rejected", "stale form")
     assert error.value.code == "REVIEW_CONFLICT"
     assert error.value.details.current_resource["artifactId"] == "artifact-newest"
+
+
+@pytest.mark.asyncio
+async def test_prefect_pre_read_unavailable_is_source_scoped(fixture_loader) -> None:
+    service, prefect, _ = harness(fixture_loader("normal-active"))
+    prefect._prefect["source"]["available"] = False
+    with pytest.raises(ServiceError) as error:
+        await service.cancel("run-active", "unreadable")
+    assert (error.value.code, error.value.status_code) == ("PREFECT_UNAVAILABLE", 503)
+
+
+@pytest.mark.asyncio
+async def test_rejection_and_failed_post_read_are_distinct(
+    fixture_loader, monkeypatch
+) -> None:
+    service, prefect, _ = harness(fixture_loader("normal-active"))
+    current = await prefect.get_run("run-active")
+
+    async def reject(_run_id: str):
+        raise ValueError("transition rejected")
+
+    monkeypatch.setattr(prefect, "cancel_run", reject)
+    with pytest.raises(ServiceError) as rejected:
+        await service.cancel("run-active", current.run.command_version)
+    assert (rejected.value.code, rejected.value.status_code) == ("COMMAND_REJECTED", 409)
+
+    service, prefect, _ = harness(fixture_loader("normal-active"))
+    current = await prefect.get_run("run-active")
+    original_get = prefect.get_run
+    reads = 0
+
+    async def fail_post_read(run_id: str):
+        nonlocal reads
+        reads += 1
+        if reads == 2:
+            raise ConnectionError("post-read unavailable")
+        return await original_get(run_id)
+
+    monkeypatch.setattr(prefect, "get_run", fail_post_read)
+    with pytest.raises(ServiceError) as unknown:
+        await service.cancel("run-active", current.run.command_version)
+    assert (unknown.value.code, unknown.value.status_code) == ("COMMAND_OUTCOME_UNKNOWN", 503)
+
+
+@pytest.mark.asyncio
+async def test_run_result_pre_read_unavailable_is_source_scoped(fixture_loader) -> None:
+    service, _, results = harness(fixture_loader("result-missing-invalid-conflict"))
+    results._source["source"]["available"] = False
+    with pytest.raises(ServiceError) as error:
+        await service.review("run-review", "artifact-newest", "accepted", "checked")
+    assert (error.value.code, error.value.status_code) == ("RUN_RESULT_UNAVAILABLE", 503)

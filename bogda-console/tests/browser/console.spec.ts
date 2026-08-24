@@ -84,7 +84,15 @@ test("cancel and append-only scientific review update only after authority repli
 test("review conflict preserves the operator form", async ({ page }) => {
   const expected = new Set(["POST /api/v1/runs/run-completed/reviews 409"]);
   const assertNoErrors = collectUnexpectedBrowserErrors(page, expected);
+  let reviewCalls = 0;
   await page.route("**/api/v1/runs/run-completed/reviews", async (route) => {
+    reviewCalls += 1;
+    const body = route.request().postDataJSON();
+    if (reviewCalls > 1) {
+      expect(body.baseArtifactId).toBe("artifact-concurrent");
+      await route.continue();
+      return;
+    }
     await route.fulfill({
       status: 409,
       contentType: "application/json",
@@ -115,5 +123,10 @@ test("review conflict preserves the operator form", async ({ page }) => {
   await expect(page.getByRole("alert")).toContainText("结果已被其他评审更新");
   await expect(page.getByLabel("评审说明")).toHaveValue("这段文字必须保留");
   await expect(page.getByText("artifact-concurrent", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "确认采用最新版本" }).click();
+  await expect(page.getByRole("status")).toContainText("artifact-concurrent");
+  await expect(page.getByLabel("评审说明")).toHaveValue("这段文字必须保留");
+  await page.getByRole("button", { name: "提交评审" }).click();
+  await expect.poll(() => reviewCalls).toBe(2);
   assertNoErrors();
 });

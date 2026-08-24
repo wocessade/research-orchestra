@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "../api/client";
@@ -25,15 +25,53 @@ function PoolLedger({ pool, canPause, onAction }: { pool: PoolSnapshot; canPause
 }
 
 type PropertySchema = { type?: string; title?: string; description?: string };
+type DeploymentSchema = { properties?: Record<string, PropertySchema>; required?: string[] };
+
+export function coerceDeploymentParameters(values: Record<string, string>, schema?: DeploymentSchema): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [name, property] of Object.entries(schema?.properties ?? {})) {
+    const value = values[name] ?? "";
+    if (schema?.required?.includes(name) && value === "") throw new Error(`${property.title ?? name} 为必填项`);
+    if (value === "") continue;
+    if (!property.type || property.type === "string") result[name] = value;
+    else if (property.type === "integer") {
+      if (!/^-?\d+$/.test(value)) throw new Error(`${property.title ?? name} 必须是整数`);
+      result[name] = Number(value);
+    } else if (property.type === "number") {
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) throw new Error(`${property.title ?? name} 必须是数字`);
+      result[name] = parsed;
+    } else if (property.type === "boolean") result[name] = value === "true";
+    else throw new Error(`${property.title ?? name} 的参数类型暂不支持`);
+  }
+  return result;
+}
 
 function SubmitDialog({ deployment, open, onClose, onSubmitted }: { deployment: DeploymentSummary | null; open: boolean; onClose: () => void; onSubmitted: (run: RunSummary) => void }) {
   const [parameters, setParameters] = useState<Record<string, string>>({});
-  const schema = deployment?.parameterSchema as { properties?: Record<string, PropertySchema>; required?: string[] } | undefined;
+  const [idempotencyKey, setIdempotencyKey] = useState("");
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const schema = deployment?.parameterSchema as DeploymentSchema | undefined;
   const fields = Object.entries(schema?.properties ?? {});
-  const mutation = useMutation({ mutationFn: () => api.command<CommandReceipt<RunSummary>>(`/api/v1/deployments/${deployment!.deploymentId}/runs`, { parameters, idempotencyKey: `bogda-console-${Date.now()}` }) });
+  const mutation = useMutation({ mutationFn: (typedParameters: Record<string, unknown>) => api.command<CommandReceipt<RunSummary>>(`/api/v1/deployments/${deployment!.deploymentId}/runs`, { parameters: typedParameters, idempotencyKey }) });
+
+  useEffect(() => {
+    if (!open || !deployment) return;
+    setParameters({});
+    setValidationError(null);
+    setIdempotencyKey(`bogda-console-${deployment.deploymentId}-${Date.now()}`);
+  }, [open, deployment]);
 
   async function submit() {
-    const response = await mutation.mutateAsync().catch(() => null);
+    let typedParameters: Record<string, unknown>;
+    try {
+      typedParameters = coerceDeploymentParameters(parameters, schema);
+      setValidationError(null);
+    } catch (error) {
+      setValidationError(error instanceof Error ? error.message : "参数无效");
+      return;
+    }
+    const response = await mutation.mutateAsync(typedParameters).catch(() => null);
     if (!response) return;
     if (response.data) {
       onSubmitted(response.data.snapshot);
@@ -44,7 +82,8 @@ function SubmitDialog({ deployment, open, onClose, onSubmitted }: { deployment: 
   return <ModalDialog open={open} title={`提交 ${deployment?.name ?? "Deployment"}`} onClose={onClose} busy={mutation.isPending} footer={<><button type="button" className="secondary-action" data-autofocus onClick={onClose} disabled={mutation.isPending}>返回</button><button type="button" className="primary-action" onClick={() => void submit()} disabled={mutation.isPending}>{mutation.isPending ? "等待 Prefect 回执…" : "提交运行"}</button></>}>
     <p>只提交这个已注册且 allowlisted 的 Deployment；参数结构由服务端提供。</p>
     <dl className="dialog-facts"><div><dt>Flow</dt><dd>{deployment?.flowName}</dd></div><div><dt>执行位置</dt><dd>{deployment?.workPoolName} / {deployment?.workQueueName}</dd></div></dl>
-    <div className="parameter-fields">{fields.map(([name, property]) => <label key={name}>{property.title ?? name}<input aria-label={property.title ?? name} required={schema?.required?.includes(name)} value={parameters[name] ?? ""} onChange={(event) => setParameters((current) => ({ ...current, [name]: event.target.value }))} /><small>{property.description ?? name}</small></label>)}</div>
+    <div className="parameter-fields">{fields.map(([name, property]) => <label key={name}>{property.title ?? name}{property.type === "boolean" ? <select aria-label={property.title ?? name} required={schema?.required?.includes(name)} value={parameters[name] ?? ""} onChange={(event) => setParameters((current) => ({ ...current, [name]: event.target.value }))}><option value="">请选择</option><option value="true">true</option><option value="false">false</option></select> : <input type={property.type === "integer" || property.type === "number" ? "number" : "text"} step={property.type === "integer" ? "1" : property.type === "number" ? "any" : undefined} aria-label={property.title ?? name} required={schema?.required?.includes(name)} value={parameters[name] ?? ""} onChange={(event) => setParameters((current) => ({ ...current, [name]: event.target.value }))} />}<small>{property.description ?? name}</small></label>)}</div>
+    {validationError && <p className="command-error" role="alert">{validationError}</p>}
     {mutation.isError && <p className="command-error" role="alert">提交未获得权威回执；没有自动重试。</p>}
   </ModalDialog>;
 }

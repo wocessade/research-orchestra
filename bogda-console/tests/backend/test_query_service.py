@@ -74,3 +74,13 @@ async def test_infrastructure_keeps_power_when_prefect_has_no_snapshot(fixture_l
     assert response.data.dorm_power.mode == "compute"
     assert response.sources["prefect"].freshness == "unavailable"
     assert response.sources["power"].freshness == "fresh"
+
+
+@pytest.mark.asyncio
+async def test_last_good_run_pages_are_scoped_to_the_complete_query(fixture_loader) -> None:
+    service = service_for(fixture_loader("normal-active"))
+    first = await service.runs(RunFilters(executionType="RUNNING"), None, 1)
+    assert [run.run_id for run in first.data.items] == ["run-active"]
+    service.prefect._prefect["source"]["available"] = False
+    with pytest.raises(SourceUnavailable):
+        await service.runs(RunFilters(executionType="COMPLETED"), None, 20)

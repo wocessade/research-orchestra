@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from contextlib import AbstractAsyncContextManager
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
@@ -72,8 +72,8 @@ class PrefectApiAdapter:
         self._client_factory = client_factory or self._default_client
 
     @property
-    def observed_at(self) -> datetime:
-        return datetime.now(UTC)
+    def observed_at(self) -> None:
+        return None
 
     def _default_client(self) -> PrefectClient:
         return PrefectClient(self.api_url, api_key=self.api_key)

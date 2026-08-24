@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 
@@ -28,10 +28,17 @@ function ReviewControl({ runId, view, enabled, onReviewed }: { runId: string; vi
   const queryClient = useQueryClient();
   const [status, setStatus] = useState("accepted");
   const [summary, setSummary] = useState("");
-  const mutation = useMutation({ mutationFn: () => api.command<CommandReceipt<RunResultView>>(`/api/v1/runs/${runId}/reviews`, { baseArtifactId: view.artifactId, scientificStatus: status, reviewSummary: summary || null }) });
+  const [baseArtifactId, setBaseArtifactId] = useState(view.artifactId ?? "");
+  const [adoptedArtifactId, setAdoptedArtifactId] = useState<string | null>(null);
+  const mutation = useMutation({ mutationFn: () => api.command<CommandReceipt<RunResultView>>(`/api/v1/runs/${runId}/reviews`, { baseArtifactId, scientificStatus: status, reviewSummary: summary || null }) });
   const conflict = mutation.error instanceof ApiClientError && mutation.error.errors[0]?.code === "REVIEW_CONFLICT"
     ? mutation.error.errors[0].details?.currentResource as RunResultView | undefined
     : undefined;
+
+  useEffect(() => {
+    setBaseArtifactId(view.artifactId ?? "");
+    setAdoptedArtifactId(null);
+  }, [view.artifactId]);
 
   async function submit() {
     const response = await mutation.mutateAsync().catch(() => null);
@@ -49,7 +56,8 @@ function ReviewControl({ runId, view, enabled, onReviewed }: { runId: string; vi
       <button type="submit" className="primary-action" disabled={!enabled || mutation.isPending}>{mutation.isPending ? "等待 RunResult 回执…" : "提交评审"}</button>
     </form>
     {!enabled && <p className="readonly-note">当前 profile 只读，评审控件已禁用。</p>}
-    {conflict && <div className="command-conflict" role="alert"><strong>结果已被其他评审更新</strong><span>表单内容已保留。请先检查最新 Artifact：</span><code>{conflict.artifactId}</code></div>}
+    {conflict && <div className="command-conflict" role="alert"><strong>结果已被其他评审更新</strong><span>表单内容已保留。请先检查最新 Artifact：</span><code>{conflict.artifactId}</code><button type="button" className="quiet-action" onClick={() => { if (!conflict.artifactId) return; setBaseArtifactId(conflict.artifactId); setAdoptedArtifactId(conflict.artifactId); mutation.reset(); }}>确认采用最新版本</button></div>}
+    {adoptedArtifactId && <p className="command-notice" role="status">已确认采用最新 Artifact {adoptedArtifactId}；再次提交将创建新版本。</p>}
     {mutation.isError && !conflict && <div className="command-error" role="alert">评审未获得权威回执；没有自动重试。</div>}
   </section>;
 }

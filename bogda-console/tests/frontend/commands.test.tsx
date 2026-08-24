@@ -3,6 +3,15 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { completedRun, envelope, renderAppAt, sourceFresh, standardRoutes, validResult } from "./helpers";
+import { coerceDeploymentParameters } from "../../frontend/src/pages/InfrastructurePage";
+
+describe("Deployment parameter schema", () => {
+  it("preserves declared scalar types and rejects invalid values", () => {
+    const schema = { properties: { sample: { type: "string" }, attempt: { type: "integer" }, threshold: { type: "number" }, enabled: { type: "boolean" } }, required: ["sample", "attempt"] };
+    expect(coerceDeploymentParameters({ sample: "ridge", attempt: "2", threshold: "0.5", enabled: "false" }, schema)).toEqual({ sample: "ridge", attempt: 2, threshold: 0.5, enabled: false });
+    expect(() => coerceDeploymentParameters({ sample: "ridge", attempt: "2.5" }, schema)).toThrow(/整数/);
+  });
+});
 
 function activeRunRoutes() {
   const routes = standardRoutes();
@@ -42,13 +51,28 @@ describe("guarded commands", () => {
     routes["/api/v1/runs/run-review"] = envelope({ run, parameters: {}, tags: [], projectContext: null });
     routes["/api/v1/runs/run-review/result"] = envelope(result, { runResult: { ...sourceFresh, source: "runResult" } });
     routes["/api/v1/runs/run-review/result/versions"] = envelope({ items: [], nextCursor: null }, { runResult: { ...sourceFresh, source: "runResult" } });
-    routes["/api/v1/runs/run-review/reviews"] = () => new Response(JSON.stringify(envelope(null, {}, [{ code: "REVIEW_CONFLICT", message: "changed", source: "runResult", retryable: false, details: { currentResource: { availability: "available", artifactId: "artifact-newest", artifactCreatedAt: "2026-08-24T09:50:00Z", result: { ...result.result, scientific_status: "inconclusive", review_summary: "needs another assay" }, validationIssues: [] }, fields: [], expected: null, observed: null } }])), { status: 409, headers: { "Content-Type": "application/json" } });
+    let reviewCalls = 0;
+    routes["/api/v1/runs/run-review/reviews"] = ({ init }) => {
+      reviewCalls += 1;
+      const body = JSON.parse(String(init?.body));
+      if (reviewCalls === 1) {
+        expect(body.baseArtifactId).toBe("artifact-old");
+        return new Response(JSON.stringify(envelope(null, {}, [{ code: "REVIEW_CONFLICT", message: "changed", source: "runResult", retryable: false, details: { currentResource: { availability: "available", artifactId: "artifact-newest", artifactCreatedAt: "2026-08-24T09:50:00Z", result: { ...result.result, scientific_status: "inconclusive", review_summary: "needs another assay" }, validationIssues: [] }, fields: [], expected: null, observed: null } }])), { status: 409, headers: { "Content-Type": "application/json" } });
+      }
+      expect(body.baseArtifactId).toBe("artifact-newest");
+      return envelope({ command: "review", resourceId: "run-review", acceptedAt: "2026-08-24T09:55:00Z", snapshot: { ...result, artifactId: "artifact-reviewed", result: { ...result.result!, scientific_status: "accepted", review_summary: "证据链不完整" } } }, {});
+    };
     renderAppAt("/runs/run-review", routes);
     await user.type(await screen.findByLabelText("评审说明"), "证据链不完整");
     await user.click(screen.getByRole("button", { name: "提交评审" }));
     expect(await screen.findByText(/结果已被其他评审更新/)).toBeVisible();
     expect(screen.getByLabelText("评审说明")).toHaveValue("证据链不完整");
     expect(screen.getByText("artifact-newest")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "确认采用最新版本" }));
+    expect(screen.getByRole("status")).toHaveTextContent("artifact-newest");
+    expect(screen.getByLabelText("评审说明")).toHaveValue("证据链不完整");
+    await user.click(screen.getByRole("button", { name: "提交评审" }));
+    expect(await screen.findByText("已接受")).toBeVisible();
   });
 
   it("appends a review version and waits for the RunResult receipt", async () => {
@@ -68,15 +92,24 @@ describe("guarded commands", () => {
   it("submits only the selected registered Deployment", async () => {
     const user = userEvent.setup();
     const routes = standardRoutes();
+    const idempotencyKeys: string[] = [];
+    let submitCalls = 0;
     routes["/api/v1/deployments/deployment-dorm/runs"] = ({ init }) => {
-      expect(JSON.parse(String(init?.body)).parameters).toEqual({ sample: "ridge-a" });
+      submitCalls += 1;
+      const body = JSON.parse(String(init?.body));
+      expect(body.parameters).toEqual({ sample: "ridge-a" });
+      idempotencyKeys.push(body.idempotencyKey);
+      if (submitCalls === 1) return new Response(JSON.stringify(envelope(null, {}, [{ code: "COMMAND_OUTCOME_UNKNOWN", message: "unknown", source: "prefect", retryable: true, details: { fields: [], expected: null, observed: null } }])), { status: 503, headers: { "Content-Type": "application/json" } });
       return envelope({ command: "submit", resourceId: "mock-submitted-1", acceptedAt: "2026-08-24T08:30:00Z", snapshot: { ...completedRun, runId: "mock-submitted-1", name: "alpine-assay · 1", state: { ...completedRun.state, type: "SCHEDULED", name: "Scheduled", terminal: false } } }, {});
     };
     renderAppAt("/infrastructure", routes);
     await user.click(await screen.findByRole("button", { name: "提交 alpine-assay" }));
     await user.type(screen.getByLabelText("Sample"), "ridge-a");
     await user.click(screen.getByRole("button", { name: "提交运行" }));
+    expect(await screen.findByRole("alert")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "提交运行" }));
     expect(await screen.findByText("已提交：alpine-assay · 1")).toBeVisible();
+    expect(idempotencyKeys[0]).toBe(idempotencyKeys[1]);
   });
 
   it("uses the server command version for queue and schedule actions", async () => {

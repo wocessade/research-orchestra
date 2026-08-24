@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -17,7 +18,12 @@ from bogda_console.adapters.mock_prefect import MockPrefectAdapter
 from bogda_console.adapters.mock_run_results import MockRunResultAdapter
 from bogda_console.api.routes import router
 from bogda_console.config import Settings
-from bogda_console.contracts.models import ApiEnvelope, ApiError, ApiErrorCode
+from bogda_console.contracts.models import (
+    ApiEnvelope,
+    ApiError,
+    ApiErrorCode,
+    ApiErrorDetails,
+)
 from bogda_console.services.errors import ServiceError
 from bogda_console.services.commands import CommandService
 from bogda_console.services.queries import QueryService
@@ -114,6 +120,37 @@ def create_app(settings: Settings | None = None, *, frontend_dist: Path | None =
             retryable=False,
         )
         return JSONResponse(status_code=404, content=_error_envelope(service_error))
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_error_handler(_request: Request, error: RequestValidationError):
+        service_error = ServiceError(
+            ApiErrorCode.VALIDATION_ERROR,
+            "Request validation failed",
+            source="request",
+            retryable=False,
+            status_code=422,
+            details=ApiErrorDetails(
+                fields=[
+                    {
+                        "field": ".".join(str(part) for part in issue["loc"]),
+                        "message": issue["msg"],
+                    }
+                    for issue in error.errors()
+                ]
+            ),
+        )
+        return JSONResponse(status_code=422, content=_error_envelope(service_error))
+
+    @app.exception_handler(Exception)
+    async def internal_error_handler(_request: Request, _error: Exception):
+        service_error = ServiceError(
+            ApiErrorCode.INTERNAL_ERROR,
+            "Unexpected server failure",
+            source="console",
+            retryable=False,
+            status_code=500,
+        )
+        return JSONResponse(status_code=500, content=_error_envelope(service_error))
 
     if frontend_dist is not None:
         index = frontend_dist / "index.html"

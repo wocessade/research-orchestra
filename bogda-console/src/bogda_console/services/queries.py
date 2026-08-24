@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from typing import Any, Awaitable, Callable, TypeVar
 
@@ -67,8 +68,17 @@ class QueryService:
     async def runs(
         self, filters: RunFilters, cursor: str | None, limit: int
     ) -> ApiEnvelope[Page[RunSummary]]:
+        query_key = json.dumps(
+            {
+                "filters": filters.model_dump(mode="json", by_alias=True),
+                "cursor": cursor,
+                "limit": limit,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
         prefect = await self._read(
-            "prefect:runs",
+            f"prefect:runs:{query_key}",
             "prefect",
             getattr(self.prefect, "source_mode", "real"),
             getattr(self.prefect, "observed_at", None),

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from httpx import ASGITransport, AsyncClient
 
 
 @pytest.mark.asyncio
@@ -74,3 +75,31 @@ async def test_schedule_and_queue_pause_resume(client) -> None:
         json={"expectedCommandVersion": new_queue["commandVersion"]},
     )
     assert resumed_queue.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_request_validation_uses_the_closed_error_envelope(client) -> None:
+    response = await client.post(
+        "/api/v1/runs/run-active/cancel",
+        json={"expectedCommandVersion": ""},
+    )
+    assert response.status_code == 422
+    assert response.json()["errors"][0]["code"] == "VALIDATION_ERROR"
+
+
+@pytest.mark.asyncio
+async def test_unexpected_command_failure_uses_the_closed_error_envelope(client, monkeypatch) -> None:
+    async def fail_unexpectedly(*_args, **_kwargs):
+        raise RuntimeError("unexpected")
+
+    monkeypatch.setattr(client.app.state.container.commands, "cancel", fail_unexpectedly)
+    async with AsyncClient(
+        transport=ASGITransport(app=client.app, raise_app_exceptions=False),
+        base_url="http://test",
+    ) as isolated:
+        response = await isolated.post(
+            "/api/v1/runs/run-active/cancel",
+            json={"expectedCommandVersion": "run-active-v1"},
+        )
+    assert response.status_code == 500
+    assert response.json()["errors"][0]["code"] == "INTERNAL_ERROR"

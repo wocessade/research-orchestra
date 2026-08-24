@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
-from typing import Any, Callable
+from typing import Any, Awaitable, Callable
+
+import httpx
 
 from bogda_console.adapters.mock_run_results import ReviewConflict
 from bogda_console.config import Settings
@@ -46,19 +48,28 @@ class CommandService:
             self._require_commands()
             if deployment_id not in self.settings.allowed_deployment_ids:
                 self._raise(ApiErrorCode.RESOURCE_NOT_ALLOWLISTED, 403, deployment_id)
-            deployment = await self.prefect.get_deployment(deployment_id)
+            deployment = await self._pre_read(
+                "prefect", lambda: self.prefect.get_deployment(deployment_id)
+            )
             if deployment.work_pool_name == "dorm-x86":
-                pool = await self.prefect.get_work_pool_concurrency("dorm-x86")
+                pool = await self._pre_read(
+                    "prefect", lambda: self.prefect.get_work_pool_concurrency("dorm-x86")
+                )
                 if pool.concurrency_limit != 1:
                     self._raise(
                         ApiErrorCode.INFRASTRUCTURE_MISCONFIGURED,
                         409,
                         "dorm-x86 concurrency limit must equal one",
                     )
-            submitted = await self.prefect.submit_registered_deployment(
-                deployment_id, parameters, idempotency_key
+            submitted = await self._mutate(
+                "prefect",
+                lambda: self.prefect.submit_registered_deployment(
+                    deployment_id, parameters, idempotency_key
+                ),
             )
-            post = await self.prefect.get_run(submitted.run_id)
+            post = await self._post_read(
+                "prefect", lambda: self.prefect.get_run(submitted.run_id)
+            )
             return self._receipt("submit", submitted.run_id, post.run)
 
     async def cancel(
@@ -66,7 +77,7 @@ class CommandService:
     ) -> CommandReceipt[RunSummary]:
         async with self._lock(f"run:{run_id}"):
             self._require_commands()
-            current = (await self.prefect.get_run(run_id)).run
+            current = (await self._pre_read("prefect", lambda: self.prefect.get_run(run_id))).run
             self._authorize_run(current)
             self._check_version(current.command_version, expected_command_version, current)
             if current.state.terminal:
@@ -76,8 +87,8 @@ class CommandService:
                     "terminal Flow Run cannot be cancelled",
                     current,
                 )
-            await self.prefect.cancel_run(run_id)
-            post = (await self.prefect.get_run(run_id)).run
+            await self._mutate("prefect", lambda: self.prefect.cancel_run(run_id))
+            post = (await self._post_read("prefect", lambda: self.prefect.get_run(run_id))).run
             if post.state.name not in {"Cancelling", "Cancelled"}:
                 self._raise(
                     ApiErrorCode.COMMAND_OUTCOME_MISMATCH,
@@ -121,9 +132,9 @@ class CommandService:
         async with self._lock(f"review:{run_id}"):
             if not self.settings.review_enabled:
                 self._raise(ApiErrorCode.RESOURCE_NOT_ALLOWLISTED, 403, "review disabled")
-            run = (await self.prefect.get_run(run_id)).run
+            run = (await self._pre_read("prefect", lambda: self.prefect.get_run(run_id))).run
             self._authorize_run(run)
-            current = await self.results.get_latest(run_id)
+            current = await self._pre_read("runResult", lambda: self.results.get_latest(run_id))
             if current.artifact_id != base_artifact_id:
                 self._raise(
                     ApiErrorCode.REVIEW_CONFLICT,
@@ -139,11 +150,14 @@ class CommandService:
                     current,
                 )
             try:
-                await self.results.append_review(
-                    run_id,
-                    base_artifact_id,
-                    ScientificStatus(scientific_status),
-                    review_summary,
+                await self._mutate(
+                    "runResult",
+                    lambda: self.results.append_review(
+                        run_id,
+                        base_artifact_id,
+                        ScientificStatus(scientific_status),
+                        review_summary,
+                    ),
                 )
             except ReviewConflict as error:
                 self._raise(
@@ -152,7 +166,7 @@ class CommandService:
                     str(error),
                     error.current_resource,
                 )
-            post = await self.results.get_latest(run_id)
+            post = await self._post_read("runResult", lambda: self.results.get_latest(run_id))
             return self._receipt("review", run_id, post)
 
     async def _schedule(
@@ -170,7 +184,9 @@ class CommandService:
                 or schedule_id not in self.settings.allowed_schedule_ids
             ):
                 self._raise(ApiErrorCode.RESOURCE_NOT_ALLOWLISTED, 403, schedule_id)
-            deployment = await self.prefect.get_deployment(deployment_id)
+            deployment = await self._pre_read(
+                "prefect", lambda: self.prefect.get_deployment(deployment_id)
+            )
             schedule = next(
                 (item for item in deployment.schedules if item.schedule_id == schedule_id), None
             )
@@ -187,10 +203,16 @@ class CommandService:
                     deployment,
                 )
             if active:
-                await self.prefect.resume_schedule(deployment_id, schedule_id)
+                await self._mutate(
+                    "prefect", lambda: self.prefect.resume_schedule(deployment_id, schedule_id)
+                )
             else:
-                await self.prefect.pause_schedule(deployment_id, schedule_id)
-            post = await self.prefect.get_deployment(deployment_id)
+                await self._mutate(
+                    "prefect", lambda: self.prefect.pause_schedule(deployment_id, schedule_id)
+                )
+            post = await self._post_read(
+                "prefect", lambda: self.prefect.get_deployment(deployment_id)
+            )
             post_schedule = next(item for item in post.schedules if item.schedule_id == schedule_id)
             if post_schedule.active != active:
                 self._raise(
@@ -212,7 +234,7 @@ class CommandService:
             self._require_commands()
             if queue_id not in self.settings.allowed_queue_ids:
                 self._raise(ApiErrorCode.RESOURCE_NOT_ALLOWLISTED, 403, queue_id)
-            pools = await self.prefect.list_work_pools()
+            pools = await self._pre_read("prefect", self.prefect.list_work_pools)
             pool = next(
                 (pool for pool in pools if any(queue.queue_id == queue_id for queue in pool.queues)),
                 None,
@@ -229,10 +251,10 @@ class CommandService:
                     current,
                 )
             if paused:
-                await self.prefect.pause_work_queue(queue_id)
+                await self._mutate("prefect", lambda: self.prefect.pause_work_queue(queue_id))
             else:
-                await self.prefect.resume_work_queue(queue_id)
-            post_pools = await self.prefect.list_work_pools()
+                await self._mutate("prefect", lambda: self.prefect.resume_work_queue(queue_id))
+            post_pools = await self._post_read("prefect", self.prefect.list_work_pools)
             post = next(
                 queue
                 for item in post_pools
@@ -276,12 +298,52 @@ class CommandService:
     def _lock(self, key: str) -> asyncio.Lock:
         return self._locks.setdefault(key, asyncio.Lock())
 
+    async def _pre_read(self, source: str, operation: Callable[[], Awaitable[Any]]) -> Any:
+        try:
+            return await operation()
+        except (ServiceError, KeyError):
+            raise
+        except Exception as error:
+            code = (
+                ApiErrorCode.PREFECT_UNAVAILABLE
+                if source == "prefect"
+                else ApiErrorCode.RUN_RESULT_UNAVAILABLE
+            )
+            self._raise(code, 503, str(error), source=source)
+
+    async def _mutate(self, source: str, operation: Callable[[], Awaitable[Any]]) -> Any:
+        try:
+            return await operation()
+        except ReviewConflict:
+            raise
+        except (ConnectionError, TimeoutError, httpx.RequestError) as error:
+            code = (
+                ApiErrorCode.PREFECT_UNAVAILABLE
+                if source == "prefect"
+                else ApiErrorCode.RUN_RESULT_UNAVAILABLE
+            )
+            self._raise(code, 503, str(error), source=source)
+        except Exception as error:
+            self._raise(ApiErrorCode.COMMAND_REJECTED, 409, str(error), source=source)
+
+    async def _post_read(self, source: str, operation: Callable[[], Awaitable[Any]]) -> Any:
+        try:
+            return await operation()
+        except Exception as error:
+            self._raise(
+                ApiErrorCode.COMMAND_OUTCOME_UNKNOWN,
+                503,
+                str(error),
+                source=source,
+            )
+
     @staticmethod
     def _raise(
         code: ApiErrorCode,
         status: int,
         message: str,
         resource: Any | None = None,
+        source: str | None = None,
     ) -> None:
         details = None
         if resource is not None:
@@ -296,7 +358,7 @@ class CommandService:
         raise ServiceError(
             code,
             message,
-            source="prefect" if code != ApiErrorCode.REVIEW_CONFLICT else "runResult",
+            source=source or ("prefect" if code != ApiErrorCode.REVIEW_CONFLICT else "runResult"),
             retryable=False,
             status_code=status,
             details=details,

@@ -1,0 +1,2746 @@
+{
+  "components": {
+    "schemas": {
+      "ApiEnvelope_CapabilitySnapshot_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CapabilitySnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SourceMeta"
+            },
+            "title": "Sources",
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiEnvelope[CapabilitySnapshot]",
+        "type": "object"
+      },
+      "ApiEnvelope_CommandReceipt_DeploymentSummary__": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CommandReceipt_DeploymentSummary_"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SourceMeta"
+            },
+            "title": "Sources",
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiEnvelope[CommandReceipt[DeploymentSummary]]",
+        "type": "object"
+      },
+      "ApiEnvelope_CommandReceipt_QueueSnapshot__": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CommandReceipt_QueueSnapshot_"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SourceMeta"
+            },
+            "title": "Sources",
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiEnvelope[CommandReceipt[QueueSnapshot]]",
+        "type": "object"
+      },
+      "ApiEnvelope_CommandReceipt_RunResultView__": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CommandReceipt_RunResultView_"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SourceMeta"
+            },
+            "title": "Sources",
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiEnvelope[CommandReceipt[RunResultView]]",
+        "type": "object"
+      },
+      "ApiEnvelope_CommandReceipt_RunSummary__": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CommandReceipt_RunSummary_"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SourceMeta"
+            },
+            "title": "Sources",
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiEnvelope[CommandReceipt[RunSummary]]",
+        "type": "object"
+      },
+      "ApiEnvelope_InfrastructureView_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InfrastructureView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SourceMeta"
+            },
+            "title": "Sources",
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiEnvelope[InfrastructureView]",
+        "type": "object"
+      },
+      "ApiEnvelope_OverviewSnapshot_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OverviewSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SourceMeta"
+            },
+            "title": "Sources",
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiEnvelope[OverviewSnapshot]",
+        "type": "object"
+      },
+      "ApiEnvelope_Page_DeploymentSummary__": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Page_DeploymentSummary_"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SourceMeta"
+            },
+            "title": "Sources",
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiEnvelope[Page[DeploymentSummary]]",
+        "type": "object"
+      },
+      "ApiEnvelope_Page_RunResultVersionSummary__": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Page_RunResultVersionSummary_"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SourceMeta"
+            },
+            "title": "Sources",
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiEnvelope[Page[RunResultVersionSummary]]",
+        "type": "object"
+      },
+      "ApiEnvelope_Page_RunSummary__": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Page_RunSummary_"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SourceMeta"
+            },
+            "title": "Sources",
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiEnvelope[Page[RunSummary]]",
+        "type": "object"
+      },
+      "ApiEnvelope_RunDetail_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunDetail"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SourceMeta"
+            },
+            "title": "Sources",
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiEnvelope[RunDetail]",
+        "type": "object"
+      },
+      "ApiEnvelope_RunResultView_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunResultView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SourceMeta"
+            },
+            "title": "Sources",
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiEnvelope[RunResultView]",
+        "type": "object"
+      },
+      "ApiError": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ApiErrorCode"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApiErrorDetails"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "retryable": {
+            "title": "Retryable",
+            "type": "boolean"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "source",
+          "retryable"
+        ],
+        "title": "ApiError",
+        "type": "object"
+      },
+      "ApiErrorCode": {
+        "enum": [
+          "PREFECT_UNAVAILABLE",
+          "RUN_RESULT_UNAVAILABLE",
+          "POWER_UNAVAILABLE",
+          "PROJECT_CONTEXT_UNAVAILABLE",
+          "RESULT_MISSING",
+          "RESULT_INVALID",
+          "REVIEW_CONFLICT",
+          "RESOURCE_CHANGED",
+          "RESOURCE_NOT_ALLOWLISTED",
+          "COMMAND_NOT_APPLICABLE",
+          "COMMAND_REJECTED",
+          "COMMAND_OUTCOME_MISMATCH",
+          "COMMAND_OUTCOME_UNKNOWN",
+          "INFRASTRUCTURE_MISCONFIGURED",
+          "NOT_FOUND",
+          "VALIDATION_ERROR",
+          "INTERNAL_ERROR"
+        ],
+        "title": "ApiErrorCode",
+        "type": "string"
+      },
+      "ApiErrorDetails": {
+        "additionalProperties": false,
+        "properties": {
+          "currentResource": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currentresource"
+          },
+          "expected": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected"
+          },
+          "fields": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "title": "Fields",
+            "type": "array"
+          },
+          "observed": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed"
+          }
+        },
+        "title": "ApiErrorDetails",
+        "type": "object"
+      },
+      "ArtifactRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "exists": {
+            "title": "Exists",
+            "type": "boolean"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "sizeBytes": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sizebytes"
+          },
+          "uri": {
+            "title": "Uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "uri",
+          "kind",
+          "exists"
+        ],
+        "title": "ArtifactRecord",
+        "type": "object"
+      },
+      "AutonomyMode": {
+        "enum": [
+          "manual",
+          "supervised",
+          "autonomous"
+        ],
+        "title": "AutonomyMode",
+        "type": "string"
+      },
+      "Availability": {
+        "enum": [
+          "available",
+          "missing",
+          "invalid"
+        ],
+        "title": "Availability",
+        "type": "string"
+      },
+      "CapabilitySnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "canCancelRun": {
+            "title": "Cancancelrun",
+            "type": "boolean"
+          },
+          "canPauseSchedule": {
+            "title": "Canpauseschedule",
+            "type": "boolean"
+          },
+          "canPauseWorkQueue": {
+            "title": "Canpauseworkqueue",
+            "type": "boolean"
+          },
+          "canReviewScientificResult": {
+            "title": "Canreviewscientificresult",
+            "type": "boolean"
+          },
+          "canSetAutonomyMode": {
+            "const": false,
+            "default": false,
+            "title": "Cansetautonomymode",
+            "type": "boolean"
+          },
+          "canSubmitRegisteredDeployment": {
+            "title": "Cansubmitregistereddeployment",
+            "type": "boolean"
+          },
+          "effectiveAutonomyMode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AutonomyMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "profile": {
+            "title": "Profile",
+            "type": "string"
+          },
+          "projectId": {
+            "title": "Projectid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "profile",
+          "projectId",
+          "canSubmitRegisteredDeployment",
+          "canCancelRun",
+          "canPauseSchedule",
+          "canPauseWorkQueue",
+          "canReviewScientificResult"
+        ],
+        "title": "CapabilitySnapshot",
+        "type": "object"
+      },
+      "CommandReceipt_DeploymentSummary_": {
+        "additionalProperties": false,
+        "properties": {
+          "acceptedAt": {
+            "format": "date-time",
+            "title": "Acceptedat",
+            "type": "string"
+          },
+          "command": {
+            "title": "Command",
+            "type": "string"
+          },
+          "resourceId": {
+            "title": "Resourceid",
+            "type": "string"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/DeploymentSummary"
+          }
+        },
+        "required": [
+          "command",
+          "resourceId",
+          "acceptedAt",
+          "snapshot"
+        ],
+        "title": "CommandReceipt[DeploymentSummary]",
+        "type": "object"
+      },
+      "CommandReceipt_QueueSnapshot_": {
+        "additionalProperties": false,
+        "properties": {
+          "acceptedAt": {
+            "format": "date-time",
+            "title": "Acceptedat",
+            "type": "string"
+          },
+          "command": {
+            "title": "Command",
+            "type": "string"
+          },
+          "resourceId": {
+            "title": "Resourceid",
+            "type": "string"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/QueueSnapshot"
+          }
+        },
+        "required": [
+          "command",
+          "resourceId",
+          "acceptedAt",
+          "snapshot"
+        ],
+        "title": "CommandReceipt[QueueSnapshot]",
+        "type": "object"
+      },
+      "CommandReceipt_RunResultView_": {
+        "additionalProperties": false,
+        "properties": {
+          "acceptedAt": {
+            "format": "date-time",
+            "title": "Acceptedat",
+            "type": "string"
+          },
+          "command": {
+            "title": "Command",
+            "type": "string"
+          },
+          "resourceId": {
+            "title": "Resourceid",
+            "type": "string"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/RunResultView"
+          }
+        },
+        "required": [
+          "command",
+          "resourceId",
+          "acceptedAt",
+          "snapshot"
+        ],
+        "title": "CommandReceipt[RunResultView]",
+        "type": "object"
+      },
+      "CommandReceipt_RunSummary_": {
+        "additionalProperties": false,
+        "properties": {
+          "acceptedAt": {
+            "format": "date-time",
+            "title": "Acceptedat",
+            "type": "string"
+          },
+          "command": {
+            "title": "Command",
+            "type": "string"
+          },
+          "resourceId": {
+            "title": "Resourceid",
+            "type": "string"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/RunSummary"
+          }
+        },
+        "required": [
+          "command",
+          "resourceId",
+          "acceptedAt",
+          "snapshot"
+        ],
+        "title": "CommandReceipt[RunSummary]",
+        "type": "object"
+      },
+      "DeploymentSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "allowlisted": {
+            "title": "Allowlisted",
+            "type": "boolean"
+          },
+          "deploymentId": {
+            "title": "Deploymentid",
+            "type": "string"
+          },
+          "flowName": {
+            "title": "Flowname",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "parameterSchema": {
+            "additionalProperties": true,
+            "title": "Parameterschema",
+            "type": "object"
+          },
+          "projectContext": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProjectContext"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "schedules": {
+            "items": {
+              "$ref": "#/components/schemas/ScheduleSummary"
+            },
+            "title": "Schedules",
+            "type": "array"
+          },
+          "workPoolName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workpoolname"
+          },
+          "workQueueName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workqueuename"
+          }
+        },
+        "required": [
+          "deploymentId",
+          "name",
+          "flowName",
+          "allowlisted"
+        ],
+        "title": "DeploymentSummary",
+        "type": "object"
+      },
+      "ExecutionStatus": {
+        "enum": [
+          "Scheduled",
+          "Running",
+          "Completed",
+          "Failed",
+          "Crashed",
+          "Cancelled"
+        ],
+        "title": "ExecutionStatus",
+        "type": "string"
+      },
+      "ExpectedVersionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedCommandVersion": {
+            "minLength": 1,
+            "title": "Expectedcommandversion",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expectedCommandVersion"
+        ],
+        "title": "ExpectedVersionRequest",
+        "type": "object"
+      },
+      "Freshness": {
+        "enum": [
+          "fresh",
+          "stale",
+          "unavailable"
+        ],
+        "title": "Freshness",
+        "type": "string"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "InfrastructureView": {
+        "additionalProperties": false,
+        "properties": {
+          "dormPower": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PowerSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pools": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PoolSnapshot"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pools"
+          }
+        },
+        "title": "InfrastructureView",
+        "type": "object"
+      },
+      "OverviewSnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "execution": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution"
+          },
+          "infrastructure": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PoolSnapshot"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Infrastructure"
+          },
+          "power": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PowerSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "science": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Science"
+          }
+        },
+        "title": "OverviewSnapshot",
+        "type": "object"
+      },
+      "Page_DeploymentSummary_": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DeploymentSummary"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextcursor"
+          }
+        },
+        "title": "Page[DeploymentSummary]",
+        "type": "object"
+      },
+      "Page_RunResultVersionSummary_": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RunResultVersionSummary"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextcursor"
+          }
+        },
+        "title": "Page[RunResultVersionSummary]",
+        "type": "object"
+      },
+      "Page_RunSummary_": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RunSummary"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextcursor"
+          }
+        },
+        "title": "Page[RunSummary]",
+        "type": "object"
+      },
+      "PoolSnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "activeSlots": {
+            "default": 0,
+            "title": "Activeslots",
+            "type": "integer"
+          },
+          "concurrencyLimit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concurrencylimit"
+          },
+          "isPaused": {
+            "title": "Ispaused",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "queues": {
+            "items": {
+              "$ref": "#/components/schemas/QueueSnapshot"
+            },
+            "title": "Queues",
+            "type": "array"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "workers": {
+            "items": {
+              "$ref": "#/components/schemas/WorkerSnapshot"
+            },
+            "title": "Workers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "status",
+          "isPaused"
+        ],
+        "title": "PoolSnapshot",
+        "type": "object"
+      },
+      "PowerMode": {
+        "enum": [
+          "sleep",
+          "compute",
+          "gaming",
+          "maintenance",
+          "unknown"
+        ],
+        "title": "PowerMode",
+        "type": "string"
+      },
+      "PowerSnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "agentReachable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "const": "unknown",
+                "type": "string"
+              }
+            ],
+            "title": "Agentreachable"
+          },
+          "host": {
+            "title": "Host",
+            "type": "string"
+          },
+          "lastTransitionAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lasttransitionat"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/PowerMode"
+          },
+          "sleepInhibited": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "const": "unknown",
+                "type": "string"
+              }
+            ],
+            "title": "Sleepinhibited"
+          }
+        },
+        "required": [
+          "host",
+          "mode",
+          "agentReachable",
+          "sleepInhibited"
+        ],
+        "title": "PowerSnapshot",
+        "type": "object"
+      },
+      "PrefectStateSnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "terminal": {
+            "title": "Terminal",
+            "type": "boolean"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "name",
+          "timestamp",
+          "terminal"
+        ],
+        "title": "PrefectStateSnapshot",
+        "type": "object"
+      },
+      "ProjectContext": {
+        "additionalProperties": false,
+        "properties": {
+          "effectiveAutonomyMode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AutonomyMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "modeSource": {
+            "enum": [
+              "frozen-run-request",
+              "deployment-default",
+              "unavailable"
+            ],
+            "title": "Modesource",
+            "type": "string"
+          },
+          "projectId": {
+            "title": "Projectid",
+            "type": "string"
+          },
+          "writable": {
+            "const": false,
+            "default": false,
+            "title": "Writable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "projectId",
+          "effectiveAutonomyMode",
+          "modeSource"
+        ],
+        "title": "ProjectContext",
+        "type": "object"
+      },
+      "QueueSnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "commandVersion": {
+            "title": "Commandversion",
+            "type": "string"
+          },
+          "concurrencyLimit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concurrencylimit"
+          },
+          "isPaused": {
+            "title": "Ispaused",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "queueId": {
+            "title": "Queueid",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "queueId",
+          "name",
+          "status",
+          "isPaused",
+          "commandVersion"
+        ],
+        "title": "QueueSnapshot",
+        "type": "object"
+      },
+      "ReviewRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "baseArtifactId": {
+            "minLength": 1,
+            "title": "Baseartifactid",
+            "type": "string"
+          },
+          "reviewSummary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewsummary"
+          },
+          "scientificStatus": {
+            "$ref": "#/components/schemas/ScientificStatus"
+          }
+        },
+        "required": [
+          "baseArtifactId",
+          "scientificStatus"
+        ],
+        "title": "ReviewRequest",
+        "type": "object"
+      },
+      "RunDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "parameters": {
+            "additionalProperties": true,
+            "title": "Parameters",
+            "type": "object"
+          },
+          "projectContext": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProjectContext"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "run": {
+            "$ref": "#/components/schemas/RunSummary"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          }
+        },
+        "required": [
+          "run"
+        ],
+        "title": "RunDetail",
+        "type": "object"
+      },
+      "RunResultVersionSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "artifactId": {
+            "title": "Artifactid",
+            "type": "string"
+          },
+          "availability": {
+            "enum": [
+              "available",
+              "invalid"
+            ],
+            "title": "Availability",
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "title": "Createdat",
+            "type": "string"
+          },
+          "reviewSummary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewsummary"
+          },
+          "scientificStatus": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScientificStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "artifactId",
+          "createdAt",
+          "availability"
+        ],
+        "title": "RunResultVersionSummary",
+        "type": "object"
+      },
+      "RunResultView": {
+        "additionalProperties": false,
+        "properties": {
+          "artifactCreatedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifactcreatedat"
+          },
+          "artifactId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifactid"
+          },
+          "availability": {
+            "$ref": "#/components/schemas/Availability"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ValidRunResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "validationIssues": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Validationissues",
+            "type": "array"
+          }
+        },
+        "required": [
+          "availability"
+        ],
+        "title": "RunResultView",
+        "type": "object"
+      },
+      "RunSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "commandVersion": {
+            "title": "Commandversion",
+            "type": "string"
+          },
+          "deploymentId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deploymentid"
+          },
+          "deploymentName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deploymentname"
+          },
+          "endedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endedat"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "projectId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Projectid"
+          },
+          "runId": {
+            "title": "Runid",
+            "type": "string"
+          },
+          "scheduledAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scheduledat"
+          },
+          "scientific": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScientificSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "startedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Startedat"
+          },
+          "state": {
+            "$ref": "#/components/schemas/PrefectStateSnapshot"
+          },
+          "workPoolName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workpoolname"
+          },
+          "workQueueName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workqueuename"
+          }
+        },
+        "required": [
+          "runId",
+          "name",
+          "state",
+          "commandVersion"
+        ],
+        "title": "RunSummary",
+        "type": "object"
+      },
+      "ScenarioRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "scenario": {
+            "enum": [
+              "normal-active",
+              "sleep-queued",
+              "gaming-paused",
+              "degraded-stale",
+              "result-missing-invalid-conflict",
+              "mobile-dense"
+            ],
+            "title": "Scenario",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scenario"
+        ],
+        "title": "ScenarioRequest",
+        "type": "object"
+      },
+      "ScheduleSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "commandVersion": {
+            "title": "Commandversion",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "scheduleId": {
+            "title": "Scheduleid",
+            "type": "string"
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updatedat"
+          }
+        },
+        "required": [
+          "scheduleId",
+          "label",
+          "active",
+          "commandVersion"
+        ],
+        "title": "ScheduleSummary",
+        "type": "object"
+      },
+      "ScientificStatus": {
+        "enum": [
+          "unreviewed",
+          "accepted",
+          "rejected",
+          "inconclusive"
+        ],
+        "title": "ScientificStatus",
+        "type": "string"
+      },
+      "ScientificSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "artifactCreatedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifactcreatedat"
+          },
+          "artifactId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifactid"
+          },
+          "availability": {
+            "$ref": "#/components/schemas/Availability"
+          },
+          "reviewSummary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewsummary"
+          },
+          "scientificStatus": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScientificStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "validationIssues": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Validationissues",
+            "type": "array"
+          }
+        },
+        "required": [
+          "availability"
+        ],
+        "title": "ScientificSummary",
+        "type": "object"
+      },
+      "SourceMeta": {
+        "additionalProperties": false,
+        "properties": {
+          "freshness": {
+            "$ref": "#/components/schemas/Freshness"
+          },
+          "lastSuccessfulAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastsuccessfulat"
+          },
+          "observedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observedat"
+          },
+          "receivedAt": {
+            "format": "date-time",
+            "title": "Receivedat",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "sourceMode": {
+            "$ref": "#/components/schemas/SourceMode"
+          },
+          "staleAfterSeconds": {
+            "minimum": 1.0,
+            "title": "Staleafterseconds",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "source",
+          "sourceMode",
+          "observedAt",
+          "receivedAt",
+          "lastSuccessfulAt",
+          "staleAfterSeconds",
+          "freshness"
+        ],
+        "title": "SourceMeta",
+        "type": "object"
+      },
+      "SourceMode": {
+        "enum": [
+          "real",
+          "mock"
+        ],
+        "title": "SourceMode",
+        "type": "string"
+      },
+      "SubmitRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "idempotencyKey": {
+            "minLength": 1,
+            "title": "Idempotencykey",
+            "type": "string"
+          },
+          "parameters": {
+            "additionalProperties": true,
+            "title": "Parameters",
+            "type": "object"
+          }
+        },
+        "required": [
+          "idempotencyKey"
+        ],
+        "title": "SubmitRequest",
+        "type": "object"
+      },
+      "ValidRunResult": {
+        "additionalProperties": true,
+        "properties": {
+          "attempt": {
+            "minimum": 1.0,
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "declared_artifacts": {
+            "items": {
+              "$ref": "#/components/schemas/ArtifactRecord"
+            },
+            "title": "Declared Artifacts",
+            "type": "array"
+          },
+          "execution_status": {
+            "$ref": "#/components/schemas/ExecutionStatus"
+          },
+          "executor": {
+            "minLength": 1,
+            "title": "Executor",
+            "type": "string"
+          },
+          "finished_at": {
+            "format": "date-time",
+            "title": "Finished At",
+            "type": "string"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "review_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Summary"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "scientific_status": {
+            "$ref": "#/components/schemas/ScientificStatus",
+            "default": "unreviewed"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "job_id",
+          "execution_status",
+          "started_at",
+          "finished_at",
+          "executor",
+          "attempt",
+          "declared_artifacts",
+          "summary"
+        ],
+        "title": "ValidRunResult",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "WorkerSnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "lastHeartbeatTime": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastheartbeattime"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "workerId": {
+            "title": "Workerid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workerId",
+          "name",
+          "status"
+        ],
+        "title": "WorkerSnapshot",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "Bogda Console API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/capabilities": {
+      "get": {
+        "operationId": "capabilities_api_v1_capabilities_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_CapabilitySnapshot_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Capabilities"
+      }
+    },
+    "/api/v1/deployments": {
+      "get": {
+        "operationId": "deployments_api_v1_deployments_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_Page_DeploymentSummary__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Deployments"
+      }
+    },
+    "/api/v1/deployments/{deployment_id}/runs": {
+      "post": {
+        "operationId": "submit_api_v1_deployments__deployment_id__runs_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deployment_id",
+            "required": true,
+            "schema": {
+              "title": "Deployment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_CommandReceipt_RunSummary__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Submit"
+      }
+    },
+    "/api/v1/deployments/{deployment_id}/schedules/{schedule_id}/pause": {
+      "post": {
+        "operationId": "pause_schedule_api_v1_deployments__deployment_id__schedules__schedule_id__pause_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deployment_id",
+            "required": true,
+            "schema": {
+              "title": "Deployment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "schedule_id",
+            "required": true,
+            "schema": {
+              "title": "Schedule Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpectedVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_CommandReceipt_DeploymentSummary__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pause Schedule"
+      }
+    },
+    "/api/v1/deployments/{deployment_id}/schedules/{schedule_id}/resume": {
+      "post": {
+        "operationId": "resume_schedule_api_v1_deployments__deployment_id__schedules__schedule_id__resume_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deployment_id",
+            "required": true,
+            "schema": {
+              "title": "Deployment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "schedule_id",
+            "required": true,
+            "schema": {
+              "title": "Schedule Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpectedVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_CommandReceipt_DeploymentSummary__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resume Schedule"
+      }
+    },
+    "/api/v1/infrastructure": {
+      "get": {
+        "operationId": "infrastructure_api_v1_infrastructure_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_InfrastructureView_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Infrastructure"
+      }
+    },
+    "/api/v1/overview": {
+      "get": {
+        "operationId": "overview_api_v1_overview_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_OverviewSnapshot_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Overview"
+      }
+    },
+    "/api/v1/runs": {
+      "get": {
+        "operationId": "runs_api_v1_runs_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "executionType",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Executiontype"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scientificStatus",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scientificstatus"
+            }
+          },
+          {
+            "in": "query",
+            "name": "deploymentId",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Deploymentid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "projectId",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Projectid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_Page_RunSummary__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Runs"
+      }
+    },
+    "/api/v1/runs/{run_id}": {
+      "get": {
+        "operationId": "run_detail_api_v1_runs__run_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_RunDetail_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Detail"
+      }
+    },
+    "/api/v1/runs/{run_id}/cancel": {
+      "post": {
+        "operationId": "cancel_api_v1_runs__run_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpectedVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_CommandReceipt_RunSummary__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel"
+      }
+    },
+    "/api/v1/runs/{run_id}/result": {
+      "get": {
+        "operationId": "result_api_v1_runs__run_id__result_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_RunResultView_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Result"
+      }
+    },
+    "/api/v1/runs/{run_id}/result/versions": {
+      "get": {
+        "operationId": "result_versions_api_v1_runs__run_id__result_versions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_Page_RunResultVersionSummary__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Result Versions"
+      }
+    },
+    "/api/v1/runs/{run_id}/reviews": {
+      "post": {
+        "operationId": "review_api_v1_runs__run_id__reviews_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_CommandReceipt_RunResultView__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Review"
+      }
+    },
+    "/api/v1/test/scenario": {
+      "post": {
+        "operationId": "scenario_api_v1_test_scenario_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScenarioRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Scenario"
+      }
+    },
+    "/api/v1/work-queues/{queue_id}/pause": {
+      "post": {
+        "operationId": "pause_queue_api_v1_work_queues__queue_id__pause_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "queue_id",
+            "required": true,
+            "schema": {
+              "title": "Queue Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpectedVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_CommandReceipt_QueueSnapshot__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pause Queue"
+      }
+    },
+    "/api/v1/work-queues/{queue_id}/resume": {
+      "post": {
+        "operationId": "resume_queue_api_v1_work_queues__queue_id__resume_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "queue_id",
+            "required": true,
+            "schema": {
+              "title": "Queue Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpectedVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_CommandReceipt_QueueSnapshot__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resume Queue"
+      }
+    }
+  }
+}

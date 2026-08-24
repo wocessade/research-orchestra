@@ -7,9 +7,20 @@ from pydantic import BaseModel, ConfigDict
 
 from bogda_console.contracts.models import (
     ApiEnvelope,
+    CapabilitySnapshot,
+    CommandReceipt,
+    DeploymentSummary,
     ExpectedVersionRequest,
+    InfrastructureView,
+    OverviewSnapshot,
+    Page,
+    QueueSnapshot,
     ReviewRequest,
+    RunDetail,
     RunFilters,
+    RunResultVersionSummary,
+    RunResultView,
+    RunSummary,
     SubmitRequest,
 )
 
@@ -21,17 +32,17 @@ def queries(request: Request):
     return request.app.state.container.queries
 
 
-@router.get("/capabilities")
+@router.get("/capabilities", response_model=ApiEnvelope[CapabilitySnapshot])
 async def capabilities(request: Request):
     return await queries(request).capabilities()
 
 
-@router.get("/overview")
+@router.get("/overview", response_model=ApiEnvelope[OverviewSnapshot])
 async def overview(request: Request):
     return await queries(request).overview()
 
 
-@router.get("/runs")
+@router.get("/runs", response_model=ApiEnvelope[Page[RunSummary]])
 async def runs(
     request: Request,
     cursor: str | None = None,
@@ -53,17 +64,20 @@ async def runs(
     )
 
 
-@router.get("/runs/{run_id}")
+@router.get("/runs/{run_id}", response_model=ApiEnvelope[RunDetail])
 async def run_detail(run_id: str, request: Request):
     return await queries(request).run_detail(run_id)
 
 
-@router.get("/runs/{run_id}/result")
+@router.get("/runs/{run_id}/result", response_model=ApiEnvelope[RunResultView])
 async def result(run_id: str, request: Request):
     return await queries(request).result(run_id)
 
 
-@router.get("/runs/{run_id}/result/versions")
+@router.get(
+    "/runs/{run_id}/result/versions",
+    response_model=ApiEnvelope[Page[RunResultVersionSummary]],
+)
 async def result_versions(
     run_id: str,
     request: Request,
@@ -73,7 +87,7 @@ async def result_versions(
     return await queries(request).result_versions(run_id, cursor, limit)
 
 
-@router.get("/deployments")
+@router.get("/deployments", response_model=ApiEnvelope[Page[DeploymentSummary]])
 async def deployments(
     request: Request,
     cursor: str | None = None,
@@ -82,7 +96,7 @@ async def deployments(
     return await queries(request).deployments(cursor, limit)
 
 
-@router.get("/infrastructure")
+@router.get("/infrastructure", response_model=ApiEnvelope[InfrastructureView])
 async def infrastructure(request: Request):
     return await queries(request).infrastructure()
 
@@ -95,7 +109,10 @@ def command_envelope(receipt):
     return ApiEnvelope(data=receipt, sources={}, errors=[])
 
 
-@router.post("/deployments/{deployment_id}/runs")
+@router.post(
+    "/deployments/{deployment_id}/runs",
+    response_model=ApiEnvelope[CommandReceipt[RunSummary]],
+)
 async def submit(deployment_id: str, body: SubmitRequest, request: Request):
     return command_envelope(
         await commands(request).submit(
@@ -104,14 +121,20 @@ async def submit(deployment_id: str, body: SubmitRequest, request: Request):
     )
 
 
-@router.post("/runs/{run_id}/cancel")
+@router.post(
+    "/runs/{run_id}/cancel",
+    response_model=ApiEnvelope[CommandReceipt[RunSummary]],
+)
 async def cancel(run_id: str, body: ExpectedVersionRequest, request: Request):
     return command_envelope(
         await commands(request).cancel(run_id, body.expected_command_version)
     )
 
 
-@router.post("/deployments/{deployment_id}/schedules/{schedule_id}/pause")
+@router.post(
+    "/deployments/{deployment_id}/schedules/{schedule_id}/pause",
+    response_model=ApiEnvelope[CommandReceipt[DeploymentSummary]],
+)
 async def pause_schedule(
     deployment_id: str, schedule_id: str, body: ExpectedVersionRequest, request: Request
 ):
@@ -122,7 +145,10 @@ async def pause_schedule(
     )
 
 
-@router.post("/deployments/{deployment_id}/schedules/{schedule_id}/resume")
+@router.post(
+    "/deployments/{deployment_id}/schedules/{schedule_id}/resume",
+    response_model=ApiEnvelope[CommandReceipt[DeploymentSummary]],
+)
 async def resume_schedule(
     deployment_id: str, schedule_id: str, body: ExpectedVersionRequest, request: Request
 ):
@@ -133,21 +159,30 @@ async def resume_schedule(
     )
 
 
-@router.post("/work-queues/{queue_id}/pause")
+@router.post(
+    "/work-queues/{queue_id}/pause",
+    response_model=ApiEnvelope[CommandReceipt[QueueSnapshot]],
+)
 async def pause_queue(queue_id: str, body: ExpectedVersionRequest, request: Request):
     return command_envelope(
         await commands(request).pause_queue(queue_id, body.expected_command_version)
     )
 
 
-@router.post("/work-queues/{queue_id}/resume")
+@router.post(
+    "/work-queues/{queue_id}/resume",
+    response_model=ApiEnvelope[CommandReceipt[QueueSnapshot]],
+)
 async def resume_queue(queue_id: str, body: ExpectedVersionRequest, request: Request):
     return command_envelope(
         await commands(request).resume_queue(queue_id, body.expected_command_version)
     )
 
 
-@router.post("/runs/{run_id}/reviews")
+@router.post(
+    "/runs/{run_id}/reviews",
+    response_model=ApiEnvelope[CommandReceipt[RunResultView]],
+)
 async def review(run_id: str, body: ReviewRequest, request: Request):
     return command_envelope(
         await commands(request).review(

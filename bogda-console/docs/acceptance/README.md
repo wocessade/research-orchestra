@@ -1,6 +1,6 @@
 # Bogda Console S3 影子验收证据
 
-- 被测提交：`1ed1d3f5062d5e065732de34aaf5fd1ea5eb358e`
+- 被测提交：`e2e0974802d0a15687e16079bc5dd5834d638908`
 - 分支：`codex/bogda-console`
 - 日期：2026-08-24（Asia/Shanghai）
 - Profile：`mock-all`
@@ -13,7 +13,8 @@
 Stage S3 影子验收通过。Prefect 执行状态和 RunResult 科研判断在桌面、平板、
 手机及所有异常场景中保持分栏展示；Completed 文案没有表达科研结论成立。
 受限提交、取消、schedule/queue 暂停与恢复、追加评审和冲突保留表单均等待权威
-回执。浏览器没有意外 JS、React、HTTP 或静态资源错误。
+回执；评审冲突需明确采用最新 Artifact 后才能再次提交。浏览器没有意外 JS、
+React、HTTP 或静态资源错误。
 
 这不是 3100 切换批准，也不包含切换方案。
 
@@ -21,13 +22,13 @@ Stage S3 影子验收通过。Prefect 执行状态和 RunResult 科研判断在�
 
 | 命令 | 结果 |
 | --- | --- |
-| `py -3.11 -m pytest tests/backend -q` | 71 passed |
+| `py -3.11 -m pytest tests/backend -q` | 77 passed |
 | `py -3.11 -m pytest tests/integration/test_local_prefect.py -q` | 1 passed；Prefect 官方本地 test harness，随机端口 |
 | `npm run check:contracts` | OpenAPI 与生成的 TypeScript 契约一致 |
-| `npm run test:frontend -- --run` | 9 files / 32 tests passed |
+| `npm run test:frontend` | 9 files / 33 tests passed |
 | `npm run build` | TypeScript 与 Vite production build passed |
-| `npm run test:browser` | 84 tests passed，1 worker，约 2.5 分钟 |
-| `py -3.11 -m unittest discover -v`（`orchestra/console`） | 99 tests passed |
+| `npm run test:browser` | 84 tests passed，1 worker，约 2.7 分钟 |
+| `py -3.11 -m pytest orchestra/console/tests -q`（仓库根目录） | 99 tests passed |
 | `git diff --check` | 无 whitespace error |
 
 axe-core 在总览、运行列表、评审、运行详情/评审表单、基础设施和降级态上运行；

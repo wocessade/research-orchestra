@@ -1,0 +1,76 @@
+from __future__ import annotations
+
+from datetime import datetime
+
+import pytest
+
+from bogda_console.adapters.mock_power import MockPowerAdapter
+from bogda_console.adapters.mock_prefect import MockPrefectAdapter
+from bogda_console.adapters.mock_run_results import MockRunResultAdapter
+from bogda_console.config import Settings
+from bogda_console.contracts.models import RunFilters
+from bogda_console.services.errors import SourceUnavailable
+from bogda_console.services.queries import QueryService
+
+
+def service_for(fixture: dict[str, object]) -> QueryService:
+    settings = Settings.from_env(
+        {
+            "BOGDA_CONSOLE_ALLOWED_DEPLOYMENT_IDS": "deployment-service,deployment-dorm",
+            "BOGDA_CONSOLE_ALLOWED_SCHEDULE_IDS": "schedule-service,schedule-dorm",
+            "BOGDA_CONSOLE_ALLOWED_QUEUE_IDS": "queue-service,queue-cpu,queue-gpu",
+            "BOGDA_CONSOLE_ALLOWED_WORK_POOL_NAMES": "pi-service,dorm-x86",
+        }
+    )
+    clock = datetime.fromisoformat(str(fixture["clock"]).replace("Z", "+00:00"))
+    return QueryService(
+        settings=settings,
+        prefect=MockPrefectAdapter(fixture),
+        results=MockRunResultAdapter(fixture),
+        power=MockPowerAdapter(fixture),
+        now=lambda: clock,
+    )
+
+
+@pytest.mark.asyncio
+async def test_run_list_projects_science_without_merging_authorities(fixture_loader) -> None:
+    service = service_for(fixture_loader("normal-active"))
+    response = await service.runs(RunFilters(), None, 50)
+    completed = next(item for item in response.data.items if item.run_id == "run-completed")
+    assert completed.state.type == "COMPLETED"
+    assert completed.scientific.scientific_status == "unreviewed"
+    assert response.sources["prefect"].freshness == "fresh"
+    assert response.sources["runResult"].freshness == "fresh"
+
+
+@pytest.mark.asyncio
+async def test_prefect_failure_after_success_returns_stale_run_snapshot(fixture_loader) -> None:
+    service = service_for(fixture_loader("normal-active"))
+    first = await service.runs(RunFilters(), None, 50)
+    service.prefect._prefect["source"]["available"] = False
+    second = await service.runs(RunFilters(), None, 50)
+    assert [run.run_id for run in second.data.items] == [run.run_id for run in first.data.items]
+    assert second.sources["prefect"].freshness == "stale"
+    assert second.errors[0].code == "PREFECT_UNAVAILABLE"
+
+
+@pytest.mark.asyncio
+async def test_run_list_never_fabricates_empty_when_prefect_unavailable(fixture_loader) -> None:
+    fixture = fixture_loader("normal-active")
+    fixture["prefect"]["source"]["available"] = False
+    service = service_for(fixture)
+    with pytest.raises(SourceUnavailable) as error:
+        await service.runs(RunFilters(), None, 50)
+    assert error.value.code == "PREFECT_UNAVAILABLE"
+
+
+@pytest.mark.asyncio
+async def test_infrastructure_keeps_power_when_prefect_has_no_snapshot(fixture_loader) -> None:
+    fixture = fixture_loader("normal-active")
+    fixture["prefect"]["source"]["available"] = False
+    service = service_for(fixture)
+    response = await service.infrastructure()
+    assert response.data.pools is None
+    assert response.data.dorm_power.mode == "compute"
+    assert response.sources["prefect"].freshness == "unavailable"
+    assert response.sources["power"].freshness == "fresh"

@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -78,6 +79,15 @@ def stale_observation() -> dict[str, Any]:
         "state": {"pid": MANAGED_PID, "startTime": HEALTHY_START},
         "process": {"pid": MANAGED_PID, "running": True, "startTime": "2026-08-24T18:00:00"},
         "listener": {"port": 3101, "pid": MANAGED_PID},
+        "capabilities": {"reachable": True, "httpStatus": 200, "profile": "mock-all"},
+    }
+
+
+def bootstrap_child_observation() -> dict[str, Any]:
+    return {
+        "state": {"pid": MANAGED_PID, "startTime": HEALTHY_START},
+        "process": {"pid": MANAGED_PID, "running": True, "startTime": HEALTHY_START},
+        "listener": {"port": 3101, "pid": FOREIGN_PID},
         "capabilities": {"reachable": True, "httpStatus": 200, "profile": "mock-all"},
     }
 
@@ -351,3 +361,100 @@ def test_probe_does_not_touch_live_3101_when_observation_is_injected(tmp_path: P
     assert payload["stopDecision"] == "refuse-foreign"
     assert payload["startDecision"] == "refuse-foreign"
     assert 3100 not in {payload.get("port"), payload.get("listenerPort")}
+
+
+def test_powershell_7_live_status_handles_unreachable_capabilities(tmp_path: Path) -> None:
+    pwsh = shutil.which("pwsh.exe")
+    if pwsh is None:
+        pytest.skip("PowerShell 7 is not installed")
+
+    env = os.environ.copy()
+    env["BOGDA_CONSOLE_STATE_DIR"] = str(tmp_path / "state")
+    env["BOGDA_CONSOLE_LAUNCHER_DRY_RUN"] = "1"
+    env.pop("BOGDA_CONSOLE_LAUNCHER_OBSERVATION", None)
+    completed = subprocess.run(
+        [
+            pwsh,
+            "-NoProfile",
+            "-NonInteractive",
+            "-File",
+            str(LAUNCHER),
+            "status",
+        ],
+        cwd=str(tmp_path),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        env=env,
+        check=False,
+    )
+
+    output = _output(completed)
+    assert completed.returncode in {0, 1, 2, 3}, output
+    assert "status:" in output.lower()
+    assert "property 'response' cannot be found" not in output.lower()
+
+
+def test_probe_marks_healthy_child_listener_as_launch_ready(tmp_path: Path) -> None:
+    completed = run_launcher(
+        "probe",
+        script=LAUNCHER,
+        cwd=tmp_path,
+        state_dir=tmp_path / "state",
+        observation=bootstrap_child_observation(),
+    )
+
+    payload = parse_json(completed)
+    assert payload["launchReady"] is True
+    assert payload["launchPid"] == FOREIGN_PID
+
+
+def test_powershell_7_preserves_iso_start_time_from_saved_state(tmp_path: Path) -> None:
+    pwsh = shutil.which("pwsh.exe")
+    if pwsh is None:
+        pytest.skip("PowerShell 7 is not installed")
+
+    dummy = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+    try:
+        started = subprocess.run(
+            [
+                pwsh,
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                f"(Get-Process -Id {dummy.pid}).StartTime.ToString('o')",
+            ],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=True,
+        ).stdout.strip()
+        state_dir = tmp_path / "state"
+        state_dir.mkdir()
+        (state_dir / "state.json").write_text(
+            json.dumps({"pid": dummy.pid, "startTime": started, "host": "127.0.0.1", "port": 3101}),
+            encoding="utf-8",
+        )
+
+        env = os.environ.copy()
+        env["BOGDA_CONSOLE_STATE_DIR"] = str(state_dir)
+        env["BOGDA_CONSOLE_LAUNCHER_DRY_RUN"] = "1"
+        env.pop("BOGDA_CONSOLE_LAUNCHER_OBSERVATION", None)
+        completed = subprocess.run(
+            [pwsh, "-NoProfile", "-NonInteractive", "-File", str(LAUNCHER), "status"],
+            cwd=str(tmp_path),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=env,
+            check=False,
+        )
+
+        assert completed.returncode == 1, _output(completed)
+        assert "status: degraded" in _output(completed).lower()
+    finally:
+        dummy.terminate()
+        dummy.wait(timeout=5)

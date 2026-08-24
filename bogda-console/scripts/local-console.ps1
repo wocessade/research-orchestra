@@ -72,6 +72,12 @@ function ConvertTo-OptionalInt($Value) {
     return [int]$Value
 }
 
+function ConvertTo-StartTimeString($Value) {
+    if ($null -eq $Value) { return "" }
+    if ($Value -is [datetime]) { return $Value.ToString("o") }
+    return [string]$Value
+}
+
 function New-EnvObject {
     $envObject = New-Object psobject
     foreach ($key in @($ChildEnv.Keys | Sort-Object)) {
@@ -110,8 +116,12 @@ function Get-LiveCapabilities {
         }
     } catch {
         $status = $null
-        if ($_.Exception.Response -and $_.Exception.Response.StatusCode) {
-            $status = [int]$_.Exception.Response.StatusCode
+        $responseProperty = $_.Exception.PSObject.Properties["Response"]
+        if ($null -ne $responseProperty -and $null -ne $responseProperty.Value) {
+            $statusCodeProperty = $responseProperty.Value.PSObject.Properties["StatusCode"]
+            if ($null -ne $statusCodeProperty) {
+                $status = [int]$statusCodeProperty.Value
+            }
         }
         return @{
             reachable  = $false
@@ -144,7 +154,7 @@ function Get-SavedState {
         if ($null -eq $pidValue) { return $null }
         return @{
             pid       = $pidValue
-            startTime = [string](Read-Note $data "startTime")
+            startTime = ConvertTo-StartTimeString (Read-Note $data "startTime")
         }
     } catch {
         return $null
@@ -175,7 +185,7 @@ function Get-Snapshot {
     if ($null -ne $stateRaw) {
         $state = @{
             pid       = (ConvertTo-OptionalInt (Read-Note $stateRaw "pid"))
-            startTime = (Read-Note $stateRaw "startTime")
+            startTime = ConvertTo-StartTimeString (Read-Note $stateRaw "startTime")
         }
     }
     $processRaw = Read-Note $raw "process"
@@ -186,7 +196,7 @@ function Get-Snapshot {
         process      = @{
             pid       = (ConvertTo-OptionalInt (Read-Note $processRaw "pid"))
             running   = [bool](Read-Note $processRaw "running" $false)
-            startTime = (Read-Note $processRaw "startTime")
+            startTime = ConvertTo-StartTimeString (Read-Note $processRaw "startTime")
         }
         listener     = @{
             port = $Port
@@ -206,12 +216,16 @@ function Test-ManagedMatch($Snapshot) {
     if ($null -eq $state -or $null -eq $state.pid) { return $false }
     if (-not $process.running) { return $false }
     if ([int]$process.pid -ne [int]$state.pid) { return $false }
-    return ([string]$process.startTime -eq [string]$state.startTime)
+    return ((ConvertTo-StartTimeString $process.startTime) -eq (ConvertTo-StartTimeString $state.startTime))
 }
 
 function Test-HealthyCapabilities($Snapshot) {
     $cap = $Snapshot.capabilities
     return ($cap.reachable -and $cap.httpStatus -eq 200 -and [string]$cap.profile -eq "mock-all")
+}
+
+function Test-LaunchReady($Snapshot) {
+    return ($null -ne $Snapshot.listener.pid) -and (Test-HealthyCapabilities $Snapshot)
 }
 
 function Get-StatusName($Snapshot) {
@@ -299,6 +313,9 @@ function New-ProbeObject($Snapshot) {
     $probe | Add-Member -NotePropertyName startDecision -NotePropertyValue (Resolve-StartDecision $Snapshot)
     $probe | Add-Member -NotePropertyName stopDecision -NotePropertyValue (Resolve-StopDecision $Snapshot)
     $probe | Add-Member -NotePropertyName profile -NotePropertyValue $Snapshot.capabilities.profile
+    $launchReady = Test-LaunchReady $Snapshot
+    $probe | Add-Member -NotePropertyName launchReady -NotePropertyValue $launchReady
+    $probe | Add-Member -NotePropertyName launchPid -NotePropertyValue $(if ($launchReady) { $Snapshot.listener.pid } else { $null })
     return $probe
 }
 
@@ -382,11 +399,14 @@ function Get-LogTail([string]$Path, [int]$Lines = 40) {
 function Wait-UntilHealthy($Process) {
     $deadline = (Get-Date).AddSeconds($ReadyTimeoutSeconds)
     while ((Get-Date) -lt $deadline) {
-        if ($Process.HasExited) { return $false }
-        if ((Get-StatusName (Get-LiveSnapshot)) -eq "healthy") { return $true }
+        if ($Process.HasExited) { return $null }
+        $snapshot = Get-LiveSnapshot
+        if (Test-LaunchReady $snapshot) { return $snapshot }
         Start-Sleep -Milliseconds 500
     }
-    return ((Get-StatusName (Get-LiveSnapshot)) -eq "healthy")
+    $snapshot = Get-LiveSnapshot
+    if (Test-LaunchReady $snapshot) { return $snapshot }
+    return $null
 }
 
 function Invoke-Plan {
@@ -458,7 +478,8 @@ function Invoke-Start {
     try {
         $process = Start-ConsoleProcess
         Save-State -ProcessId $process.Id -StartTime $process.StartTime.ToString("o")
-        if (-not (Wait-UntilHealthy $process)) {
+        $readySnapshot = Wait-UntilHealthy $process
+        if ($null -eq $readySnapshot) {
             Write-HostMessage "start failed: ${BindHost}:${Port} did not become healthy within ${ReadyTimeoutSeconds}s"
             $tail = Get-LogTail $StderrLog
             if ($tail) {
@@ -471,7 +492,12 @@ function Invoke-Start {
             Clear-AttemptFiles
             return 1
         }
-        Write-HostMessage "started pid $($process.Id) on http://${BindHost}:${Port}/"
+        $listenerProcess = Get-LiveProcessView $readySnapshot.listener.pid
+        if (-not $listenerProcess.running) {
+            throw "listener PID $($readySnapshot.listener.pid) exited before it could be recorded"
+        }
+        Save-State -ProcessId $listenerProcess.pid -StartTime $listenerProcess.startTime
+        Write-HostMessage "started pid $($listenerProcess.pid) on http://${BindHost}:${Port}/"
         return 0
     } catch {
         Write-HostMessage "start failed: $($_.Exception.Message)"

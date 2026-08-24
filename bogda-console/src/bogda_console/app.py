@@ -7,9 +7,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
+from bogda_console.adapters.prefect_api import PrefectApiAdapter
 from bogda_console.adapters.mock_power import MockPowerAdapter
 from bogda_console.adapters.mock_prefect import MockPrefectAdapter
 from bogda_console.adapters.mock_run_results import MockRunResultAdapter
@@ -31,14 +33,26 @@ def load_fixture(name: str) -> dict[str, Any]:
 @dataclass(slots=True)
 class Container:
     settings: Settings
-    prefect: MockPrefectAdapter
-    results: MockRunResultAdapter
+    prefect: Any
+    results: Any
     power: MockPowerAdapter
     queries: QueryService
     commands: CommandService
 
     @classmethod
     def build(cls, settings: Settings, scenario: str | None = None) -> "Container":
+        if settings.profile != "mock-all":
+            if not settings.prefect_api_url:
+                raise ValueError("PREFECT_API_URL is required for real Prefect profiles")
+            prefect = PrefectApiAdapter(
+                api_url=settings.prefect_api_url,
+                api_key=settings.prefect_api_key,
+                allowed_deployment_ids=settings.allowed_deployment_ids,
+            )
+            power = MockPowerAdapter(load_fixture(settings.fixture_scenario))
+            queries = QueryService(settings=settings, prefect=prefect, results=prefect, power=power)
+            commands = CommandService(settings=settings, prefect=prefect, results=prefect)
+            return cls(settings, prefect, prefect, power, queries, commands)
         fixture = load_fixture(scenario or settings.fixture_scenario)
         prefect = MockPrefectAdapter(fixture)
         results = MockRunResultAdapter(fixture)
@@ -60,6 +74,8 @@ class Container:
         return cls(settings, prefect, results, power, queries, commands)
 
     def for_scenario(self, scenario: str) -> "Container":
+        if self.settings.profile != "mock-all":
+            raise ValueError("scenarios are available only in mock-all")
         return self.build(self.settings, scenario)
 
 
@@ -79,7 +95,7 @@ def _error_envelope(error: ServiceError) -> dict[str, Any]:
     ).model_dump(mode="json", by_alias=True)
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, *, frontend_dist: Path | None = None) -> FastAPI:
     resolved = settings or Settings.from_env(os.environ)
     app = FastAPI(title="Bogda Console API", version="1.0.0")
     app.state.container = Container.build(resolved)
@@ -98,5 +114,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             retryable=False,
         )
         return JSONResponse(status_code=404, content=_error_envelope(service_error))
+
+    if frontend_dist is not None:
+        index = frontend_dist / "index.html"
+        assets = frontend_dist / "assets"
+        if not index.is_file() or not assets.is_dir():
+            raise RuntimeError("frontend build missing; run npm run build before production serving")
+        app.mount("/assets", StaticFiles(directory=assets), name="frontend-assets")
+
+        @app.get("/", include_in_schema=False)
+        async def frontend_root():
+            return FileResponse(index)
+
+        @app.get("/{path:path}", include_in_schema=False)
+        async def frontend_fallback(path: str):
+            if path.startswith("api/"):
+                raise HTTPException(status_code=404)
+            return FileResponse(index)
 
     return app

@@ -1,0 +1,221 @@
+# Bogda Research Control Plane Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** 把Bogda从B-lite执行与评审控制台扩展为具有三档科研自主模式、可恢复人工检查点、按任务科研协调Agent、真实Prefect影子控制和按需唤醒宿舍Worker的科研控制面。
+
+**Architecture:** Prefect继续是唯一队列和执行状态源；Bogda只增加项目策略、冻结后的运行上下文、版本化科研决策和薄适配。Pi只常驻确定性服务，不运行通用LLM循环；科研协调Agent由Flow按任务启动，并在预算、工具和迭代上限内工作。
+
+**Tech Stack:** Python 3.11–3.13、Prefect 3.8.3、FastAPI/Pydantic、React/TypeScript/Vite、pytest、Vitest、Playwright、Windows 10 Power Agent、WSL2 Prefect Worker。
+
+**Spec:** `docs/superpowers/specs/2026-08-24-bogda-architecture-design.md`；控制台边界见 `docs/superpowers/specs/2026-08-24-bogda-console-design.md`。
+
+## Global Constraints
+
+- Gate 6的72小时窗口内不得修改Pi上的Bogda、Prefect、systemd、认证或端口。
+- Prefect是唯一执行状态源；不得增加第二套任务队列或Flow Run状态机。
+- Prefect `Completed`只表示执行与必要产物完成，不表示科研结论成立。
+- 模式修改只影响随后创建的运行；每个Run必须冻结当时的有效模式。
+- `autonomous`仍不能自行批准科研结论、对外发布、新增采购或突破预算。
+- Pi不得运行无人监督LLM agent loop；宿舍机不得因“管家常驻”而被禁止休眠。
+- 第一轮不做全文证据扫描、通用插件系统或为未知未来输入增加复杂校验。
+- 每项生产写能力必须先在mock或隔离的精确allowlist环境验收。
+
+## Delivery Map
+
+| 波次 | 交付 | 运行态影响 |
+|---|---|---|
+| W1 | 模式策略、冻结语义、3101本地切换 | 仅本地，不接Pi |
+| W2 | `manual`/`supervised`人工检查点 | 本地Prefect测试服务器 |
+| W3 | 按任务科研协调Agent | mock LLM + 本地Flow |
+| W4 | 3101真实Prefect S1/S2 | 需Gate 6和owner批准 |
+| W5 | Wake Bridge、Power Agent、笔记本Worker | 当前笔记本模拟 |
+| W6 | 宿舍机CPU接入与工作流迁移 | 硬件到位后 |
+| W7 | `autonomous`受限循环和3100切换设计 | 前六波证据齐全后 |
+
+---
+
+### Task 1: 项目自主模式策略与解析
+
+**Files:**
+- Create: `bogda/src/bogda/policy/store.py`
+- Create: `bogda/src/bogda/policy/models.py`
+- Modify: `bogda/src/bogda/contracts/models.py`
+- Test: `bogda/tests/policy/test_store.py`
+
+**Interfaces:**
+- Produces: `AutonomyPolicy(global_default, project_overrides, revision)`；`resolve_mode(project_id) -> ResolvedAutonomyMode`；原子替换的单文件JSON策略存储。
+- Constraint: 只保存策略，不保存Flow Run状态；未知项目使用全局默认；只接受`manual|supervised|autonomous`。
+
+- [ ] 写失败测试：默认模式、项目覆盖、revision冲突、损坏文件fail-closed。
+- [ ] 运行 `uv run --python 3.11 pytest tests/policy/test_store.py -v`，确认因模块不存在而失败。
+- [ ] 实现最小Pydantic模型和单机文件存储；写入采用临时文件后同卷替换，不增加数据库。
+- [ ] 重跑聚焦测试和 `uv run --python 3.11 pytest -m "not integration" -q`。
+- [ ] 提交 `feat(bogda): add autonomy policy resolution`。
+
+### Task 2: 创建运行时冻结有效模式
+
+**Files:**
+- Modify: `bogda/src/bogda/control/cli.py`
+- Modify: `bogda/src/bogda/flows/shell_job.py`
+- Modify: `bogda/src/bogda/contracts/models.py`
+- Test: `bogda/tests/integration/test_vertical_slice.py`
+- Test: `bogda/tests/control/test_cli.py`
+
+**Interfaces:**
+- Consumes: `resolve_mode(project_id)`。
+- Produces: `JobRequest.autonomy_mode`在提交前解析并冻结；Flow只读取请求中的值，不回读可变策略。
+
+- [ ] 写失败测试：提交前后修改策略不改变已创建Run；新Run采用新revision。
+- [ ] 运行聚焦测试并确认旧代码固定`supervised`导致失败。
+- [ ] 在控制层解析模式并将`policy_revision`写入参数/标签；删除demo硬编码模式。
+- [ ] 运行Bogda全量测试和本地Prefect纵向切片。
+- [ ] 提交 `feat(bogda): freeze autonomy mode per run`。
+
+### Task 3: 3101自主模式API与切换控件
+
+**Files:**
+- Modify: `bogda-console/src/bogda_console/contracts/models.py`
+- Create: `bogda-console/src/bogda_console/adapters/policy.py`
+- Modify: `bogda-console/src/bogda_console/api/routes.py`
+- Modify: `bogda-console/src/bogda_console/services/commands.py`
+- Create: `bogda-console/frontend/src/components/AutonomyModeControl.tsx`
+- Modify: `bogda-console/frontend/src/pages/OverviewPage.tsx`
+- Modify: `bogda-console/frontend/src/pages/RunDetailPage.tsx`
+- Test: `bogda-console/tests/backend/test_policy_commands.py`
+- Test: `bogda-console/tests/frontend/autonomy-mode.test.tsx`
+
+**Interfaces:**
+- Produces: `GET /api/v1/autonomy-policy`和带`expectedRevision`的`PUT /api/v1/autonomy-policy/{projectId}`；成功后返回权威快照。
+- UI copy: `手动`、`监督执行`、`范围内自主`；确认框明确“只影响后续新任务”。
+
+- [ ] 先写API和UI失败测试，包括只读profile禁用、revision冲突、作用域提示。
+- [ ] 运行pytest与Vitest聚焦测试，确认路由和控件缺失。
+- [ ] 实现适配器、命令服务和三段控件；`real-readonly`继续返回`canSetAutonomyMode=false`。
+- [ ] 导出OpenAPI并运行 `npm run check:contracts`、`npm run build`及相关测试。
+- [ ] 提交 `feat(console): add guarded autonomy controls`。
+
+### Task 4: `manual`与`supervised`人工检查点
+
+**Files:**
+- Create: `bogda/src/bogda/contracts/decisions.py`
+- Create: `bogda/src/bogda/flows/research_checkpoint.py`
+- Modify: `bogda/src/bogda/flows/shell_job.py`
+- Modify: `bogda-console/frontend/src/pages/RunDetailPage.tsx`
+- Test: `bogda/tests/flows/test_research_checkpoint.py`
+- Test: `bogda-console/tests/frontend/checkpoints.test.tsx`
+
+**Interfaces:**
+- Produces: 版本化`ResearchDecision(kind, verdict, rationale, decided_by, decided_at)` Artifact；检查点类型固定为`plan_approval|experiment_approval|scientific_review`。
+- Semantics: `manual`每一步进入检查点；`supervised`只在计划、关键实验和科学判断暂停；拒绝后Flow终止但不伪造系统失败。
+
+- [ ] 写失败测试覆盖批准恢复、拒绝终止、重复提交冲突和重启后仍可恢复。
+- [ ] 运行测试确认检查点Flow不存在。
+- [ ] 用Prefect原生暂停/恢复语义和Artifact实现，不创建本地状态机。
+- [ ] 在3101详情页展示证据、影响与批准/拒绝按钮；不得提供列表一键批准。
+- [ ] 运行Bogda集成测试、控制台backend/frontend测试和构建。
+- [ ] 提交 `feat(bogda): add human research checkpoints`。
+
+### Task 5: 按任务科研协调Agent（先实现supervised）
+
+**Files:**
+- Create: `bogda/src/bogda/agents/contracts.py`
+- Create: `bogda/src/bogda/agents/coordinator.py`
+- Create: `bogda/src/bogda/flows/research_cycle.py`
+- Create: `bogda/tests/agents/test_coordinator.py`
+- Create: `bogda/tests/flows/test_research_cycle.py`
+
+**Interfaces:**
+- Produces: `ResearchPlan`、`ExperimentProposal`、`AgentBudget(max_steps, max_model_calls, max_cost_cny)`和`CoordinatorResult`。
+- Agent可调用工具必须由任务允许列表提供；第一版只输出计划和实验建议，不自行修改代码、采购或发布。
+
+- [ ] 写mock-model失败测试：预算耗尽、未知工具、无必要产物、请求关键实验批准。
+- [ ] 运行测试确认agent包不存在。
+- [ ] 实现有限状态协调器；每一步写结构化Artifact，达到任一预算上限立即进入人工检查点。
+- [ ] 实现`supervised`研究Flow：目标→计划→人工批准→执行→结果摘要→科研评审。
+- [ ] 使用假模型和临时目录完成集成测试，确认不存在无限循环。
+- [ ] 提交 `feat(bogda): add supervised research coordinator`。
+
+### Task 6: 真实Prefect S1与精确allowlist S2
+
+**Files:**
+- Modify: `bogda-console/README.md`
+- Create: `bogda-console/docs/real-shadow-runbook.md`
+- Modify: `bogda-console/tests/integration/test_local_prefect.py`
+- Create: `docs/reports/2026-08-28-bogda-console-real-shadow.md`
+
+**Interfaces:**
+- S1只读连接Pi Prefect；S2只允许专用测试Deployment、schedule、queue和pool ID。
+- 前置条件: Gate 6通过，owner分别批准S1和S2；不得将S2 allowlist指向Orchestra或生产研究任务。
+
+- [ ] 在本地Prefect harness补充模式读取、检查点和评审追加集成测试。
+- [ ] 先运行S1，只比较3101与Prefect权威数据并保存差异。
+- [ ] owner批准S2后，创建专用测试资源并填写精确allowlist。
+- [ ] 验证提交、取消、暂停/恢复、模式修改、检查点和评审；逐项回读权威状态。
+- [ ] 保存3100前后可达、Pi资源和无生产资源变更证据。
+- [ ] 提交 `docs(bogda): record real console shadow evidence`。
+
+### Task 7: Wake Bridge、Power Agent协议和笔记本模拟
+
+**Files:**
+- Create: `bogda/src/bogda/power/protocol.py`
+- Create: `bogda/src/bogda/power/wake_bridge.py`
+- Create: `bogda-power-agent/`（独立Windows服务项目，具体语言在其子spec批准后确定）
+- Test: `bogda/tests/power/test_wake_bridge.py`
+- Create: `docs/superpowers/specs/2026-08-28-bogda-power-agent-design.md`
+
+**Interfaces:**
+- Wake Bridge只观察`dorm-x86`待领取Run、Worker在线状态和冷却时间；只发WoL，不修改Flow状态。
+- Power状态固定为`sleep|compute|gaming|maintenance`；科研模式与电源模式互不推断。
+
+- [ ] 先编写并批准Power Agent子spec，明确认证、休眠锁、游戏切换和崩溃恢复。
+- [ ] 为Wake Bridge写失败测试：离线有任务只唤醒一次、冷却期去重、在线不唤醒、失败保留Scheduled/Late。
+- [ ] 实现纯协议和mock适配，在当前笔记本验证，不要求7×24。
+- [ ] 验证gaming停止领取新任务但不强杀正在运行任务，任务结束后释放休眠锁。
+- [ ] 保存笔记本模拟证据；不得在此任务启用GPU队列。
+- [ ] 提交 `feat(bogda): add tested dorm wake protocol`。
+
+### Task 8: 宿舍CPU Worker与真实工作流迁移
+
+**Files:**
+- Create: `docs/superpowers/plans/2026-09-01-bogda-dorm-worker.md`
+- Create: `docs/reports/2026-09-01-bogda-dorm-worker-acceptance.md`
+- Modify: 每个获批迁移工作流对应的`bogda/src/bogda/flows/`文件
+- Test: 每个工作流对应的`bogda/tests/flows/`测试
+
+**Interfaces:**
+- 前置条件: 宿舍机到位；Win10/WSL2、Tailscale、直连网口和WoL分别验收。
+- CPU队列先开放且宿舍Worker总并发固定为1；GPU队列在显卡和CUDA栈验收前保持暂停。
+
+- [ ] 编写宿舍Worker独立计划并记录机器、网络和回退基线。
+- [ ] 验证离线排队、WoL、上线领取、attempt产物、结束休眠和gaming模式。
+- [ ] 选择一个低风险真实科研Flow迁移，双跑并比较RunResult，不迁移在途任务。
+- [ ] 雷达、通知、备份和其他研究Flow逐类重复“契约测试→shadow→owner批准→切换”。
+- [ ] 当3101真实shadow与回退证据齐全后，另写3100切换spec；本任务不直接改端口。
+- [ ] 提交每类工作流独立验收记录，保持可逐项回滚。
+
+### Task 9: 受限`autonomous`循环
+
+**Files:**
+- Modify: `bogda/src/bogda/agents/coordinator.py`
+- Modify: `bogda/src/bogda/flows/research_cycle.py`
+- Modify: `bogda-console/frontend/src/pages/RunDetailPage.tsx`
+- Test: `bogda/tests/agents/test_autonomous_budget.py`
+- Test: `bogda/tests/flows/test_autonomous_cycle.py`
+
+**Interfaces:**
+- Consumes: 已稳定的检查点、预算和宿舍执行链。
+- Produces: 在预设`max_steps`、`max_model_calls`、`max_cost_cny`和允许实验类型内提出并执行后续实验；越界一律暂停等待人。
+
+- [ ] 写性质测试：任意模型输出都不能突破四类人工保留权或预算上限。
+- [ ] 写确定性场景测试：阴性结果迭代、无信息增益停止、预算耗尽、采购请求和发布请求。
+- [ ] 实现最小循环，不增加长期记忆服务或通用插件框架。
+- [ ] 在隔离项目跑完整演练并由独立模型复核证据。
+- [ ] owner显式批准后才让3101开放“范围内自主”；默认仍为`supervised`。
+- [ ] 提交 `feat(bogda): add bounded autonomous research cycle`。
+
+## Review and Release Gates
+
+每个Task必须单独通过：聚焦测试、相关项目全量测试、`git diff --check`、独立代码审查。Task 3、4、6和9还必须完成浏览器交互与可访问性验收。Task 6以后任何真实设备或生产写操作都需要owner当次明确批准。
+
+不得将“计划已写”“mock通过”“Gate 6通过”描述为完整Bogda已经完成。正式产品完成要求Task 1–8完成；Task 9是全自动能力的最终开放门。

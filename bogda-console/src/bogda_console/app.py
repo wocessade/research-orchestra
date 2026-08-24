@@ -17,6 +17,7 @@ from bogda_console.api.routes import router
 from bogda_console.config import Settings
 from bogda_console.contracts.models import ApiEnvelope, ApiError, ApiErrorCode
 from bogda_console.services.errors import ServiceError
+from bogda_console.services.commands import CommandService
 from bogda_console.services.queries import QueryService
 
 
@@ -34,6 +35,7 @@ class Container:
     results: MockRunResultAdapter
     power: MockPowerAdapter
     queries: QueryService
+    commands: CommandService
 
     @classmethod
     def build(cls, settings: Settings, scenario: str | None = None) -> "Container":
@@ -49,7 +51,13 @@ class Container:
             power=power,
             now=lambda: clock,
         )
-        return cls(settings, prefect, results, power, queries)
+        commands = CommandService(
+            settings=settings,
+            prefect=prefect,
+            results=results,
+            now=lambda: clock,
+        )
+        return cls(settings, prefect, results, power, queries, commands)
 
     def for_scenario(self, scenario: str) -> "Container":
         return self.build(self.settings, scenario)
@@ -65,6 +73,7 @@ def _error_envelope(error: ServiceError) -> dict[str, Any]:
                 message=str(error),
                 source=error.source,
                 retryable=error.retryable,
+                details=error.details,
             )
         ],
     ).model_dump(mode="json", by_alias=True)
@@ -78,7 +87,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.exception_handler(ServiceError)
     async def service_error_handler(_request: Request, error: ServiceError):
-        return JSONResponse(status_code=503, content=_error_envelope(error))
+        return JSONResponse(status_code=error.status_code, content=_error_envelope(error))
 
     @app.exception_handler(KeyError)
     async def not_found_handler(_request: Request, error: KeyError):

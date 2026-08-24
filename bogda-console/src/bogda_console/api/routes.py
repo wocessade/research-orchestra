@@ -5,7 +5,13 @@ from typing import Literal
 from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, ConfigDict
 
-from bogda_console.contracts.models import RunFilters
+from bogda_console.contracts.models import (
+    ApiEnvelope,
+    ExpectedVersionRequest,
+    ReviewRequest,
+    RunFilters,
+    SubmitRequest,
+)
 
 
 router = APIRouter(prefix="/api/v1")
@@ -79,6 +85,75 @@ async def deployments(
 @router.get("/infrastructure")
 async def infrastructure(request: Request):
     return await queries(request).infrastructure()
+
+
+def commands(request: Request):
+    return request.app.state.container.commands
+
+
+def command_envelope(receipt):
+    return ApiEnvelope(data=receipt, sources={}, errors=[])
+
+
+@router.post("/deployments/{deployment_id}/runs")
+async def submit(deployment_id: str, body: SubmitRequest, request: Request):
+    return command_envelope(
+        await commands(request).submit(
+            deployment_id, body.parameters, body.idempotency_key
+        )
+    )
+
+
+@router.post("/runs/{run_id}/cancel")
+async def cancel(run_id: str, body: ExpectedVersionRequest, request: Request):
+    return command_envelope(
+        await commands(request).cancel(run_id, body.expected_command_version)
+    )
+
+
+@router.post("/deployments/{deployment_id}/schedules/{schedule_id}/pause")
+async def pause_schedule(
+    deployment_id: str, schedule_id: str, body: ExpectedVersionRequest, request: Request
+):
+    return command_envelope(
+        await commands(request).pause_schedule(
+            deployment_id, schedule_id, body.expected_command_version
+        )
+    )
+
+
+@router.post("/deployments/{deployment_id}/schedules/{schedule_id}/resume")
+async def resume_schedule(
+    deployment_id: str, schedule_id: str, body: ExpectedVersionRequest, request: Request
+):
+    return command_envelope(
+        await commands(request).resume_schedule(
+            deployment_id, schedule_id, body.expected_command_version
+        )
+    )
+
+
+@router.post("/work-queues/{queue_id}/pause")
+async def pause_queue(queue_id: str, body: ExpectedVersionRequest, request: Request):
+    return command_envelope(
+        await commands(request).pause_queue(queue_id, body.expected_command_version)
+    )
+
+
+@router.post("/work-queues/{queue_id}/resume")
+async def resume_queue(queue_id: str, body: ExpectedVersionRequest, request: Request):
+    return command_envelope(
+        await commands(request).resume_queue(queue_id, body.expected_command_version)
+    )
+
+
+@router.post("/runs/{run_id}/reviews")
+async def review(run_id: str, body: ReviewRequest, request: Request):
+    return command_envelope(
+        await commands(request).review(
+            run_id, body.base_artifact_id, body.scientific_status, body.review_summary
+        )
+    )
 
 
 class ScenarioRequest(BaseModel):

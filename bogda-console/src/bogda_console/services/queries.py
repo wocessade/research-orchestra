@@ -344,4 +344,5 @@ class QueryService:
             str(read.error or f"{source} unavailable"),
             source=source,
             retryable=True,
+            status_code=503,
         )

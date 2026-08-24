@@ -5,9 +5,9 @@
 
 ## 当前事实
 
-- `main` 当前基线为 `937dc87`，Bogda Console 已合并；3100 端口尚未切换到 Bogda。
+- `main` 当前基线为 `65303c1`，Bogda Console 及科研评审入口改进已合并；3100 端口尚未切换到 Bogda。
 - Pi shadow 部署包位于分支 `codex/bogda-pi-shadow-bundle`、工作树 `D:/pythonProject/.worktrees/bogda-pi-shadow-bundle`，尚未合并、尚未部署。
-- 该分支在 `c1e7fae` 时验证结果为 `101 passed, 1 skipped`；唯一阻塞是运行手册曾把 HTTP 401/403 误当成“公网不可达”。接班时先查看该分支最新提交，确认此项已修复并复核。
+- Pi 分支在 `6fb05ec` 时已集成当时的主线，曝光门禁在 `9eac204` 修复；合并前还需再次合入最新 `main` 的评审入口提交 `65303c1`。
 - 没有连接 Pi，没有修改 systemd，没有安装、启动或应用服务，也没有改 Orchestra。
 - 根工作树里的两份锐评删除、`.codegraph/` 和两张未跟踪任务卡属于用户现有状态，不得清理或带入 Bogda 提交。
 
@@ -19,6 +19,7 @@
 - 运行时秘密只放 `/etc/bogda/bogda.env`，不得提交到 Git。
 - Prefect API 只能通过预定的局域网/Tailscale 边界访问。任何来自非 Tailnet/非许可地址的 HTTP 响应，包括 401/403，都表示服务已经暴露，必须停止。
 - 并发仍为 1；SLC SD、宿舍 runner 唤醒桥、GPU executor、3100 正式切换均为后续事项。
+- Windows 上 `npm run build` 的契约门禁存在既有换行漂移：Git 索引中的 `frontend/src/api/generated.ts` 为 LF，`core.autocrlf` 工作树为 CRLF，而 `check_contracts.py` 逐字节比较新生成的 LF 文件。不要在无 API 变化时重生成契约；单独修复门禁的跨平台比较语义。
 
 ## Grok 的任务（高判断力阶段）
 

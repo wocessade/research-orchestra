@@ -6,7 +6,8 @@ import { vi } from "vitest";
 
 import { App } from "../../frontend/src/app/App";
 
-type JsonValue = Record<string, unknown>;
+export type JsonValue = Record<string, unknown>;
+export type RouteHandler = JsonValue | ((request: { url: URL; init?: RequestInit }) => JsonValue | Response | Promise<JsonValue | Response>);
 
 export const sourceFresh = {
   source: "prefect",
@@ -81,8 +82,9 @@ export function envelope(data: unknown, sources: JsonValue = { prefect: sourceFr
   return { data, sources, errors };
 }
 
-export function standardRoutes(): Record<string, JsonValue> {
+export function standardRoutes(): Record<string, RouteHandler> {
   return {
+    "/api/v1/capabilities": envelope({ profile: "mock-all", projectId: "bogda-main", effectiveAutonomyMode: "supervised", canSubmitRegisteredDeployment: true, canCancelRun: true, canPauseSchedule: true, canPauseWorkQueue: true, canReviewScientificResult: true, canSetAutonomyMode: false }, {}),
     "/api/v1/overview": envelope({
       execution: {
         countsByPrefectType: { RUNNING: 1, COMPLETED: 1 },
@@ -99,6 +101,11 @@ export function standardRoutes(): Record<string, JsonValue> {
       power: { host: "dorm-x86", mode: "compute", agentReachable: true, sleepInhibited: true, lastTransitionAt: "2026-08-24T08:19:30Z" },
     }, { prefect: sourceFresh, runResult: { ...sourceFresh, source: "runResult" }, power: { ...sourceFresh, source: "power", sourceMode: "mock" } }),
     "/api/v1/runs": envelope({ items: [completedRun], nextCursor: null }, { prefect: sourceFresh, runResult: { ...sourceFresh, source: "runResult" } }),
+    "/api/v1/infrastructure": envelope({ pools: [
+      { name: "pi-service", status: "READY", isPaused: false, concurrencyLimit: 1, activeSlots: 0, queues: [{ queueId: "queue-service", name: "default", status: "READY", isPaused: false, concurrencyLimit: 1, commandVersion: "queue-service-v1" }], workers: [{ workerId: "worker-pi", name: "pi-service", status: "ONLINE", lastHeartbeatTime: "2026-08-24T08:29:55Z" }] },
+      { name: "dorm-x86", status: "READY", isPaused: false, concurrencyLimit: 1, activeSlots: 1, queues: [{ queueId: "queue-cpu", name: "cpu", status: "READY", isPaused: false, concurrencyLimit: null, commandVersion: "queue-cpu-v1" }, { queueId: "queue-gpu", name: "gpu", status: "NOT_READY", isPaused: false, concurrencyLimit: null, commandVersion: "queue-gpu-v1" }], workers: [{ workerId: "worker-dorm", name: "dorm-x86", status: "ONLINE", lastHeartbeatTime: "2026-08-24T08:29:52Z" }] },
+    ], dormPower: { host: "dorm-x86", mode: "compute", agentReachable: true, sleepInhibited: true, lastTransitionAt: "2026-08-24T08:19:30Z" } }, { prefect: sourceFresh, power: { ...sourceFresh, source: "power", sourceMode: "mock" } }),
+    "/api/v1/deployments": envelope({ items: [{ deploymentId: "deployment-dorm", name: "alpine-assay", flowName: "alpine-assay", projectContext: { projectId: "bogda-main", effectiveAutonomyMode: "supervised", modeSource: "deployment-default", writable: false }, workPoolName: "dorm-x86", workQueueName: "cpu", parameterSchema: { type: "object", properties: { sample: { type: "string", title: "Sample" } }, required: ["sample"] }, allowlisted: true, schedules: [{ scheduleId: "schedule-dorm", label: "manual window", active: true, updatedAt: "2026-08-24T07:10:00Z", commandVersion: "schedule-v1" }] }], nextCursor: null }, { prefect: sourceFresh }),
     "/api/v1/runs/run-completed-unreviewed": envelope({
       run: completedRun,
       parameters: { sample: "snowline" },
@@ -115,20 +122,22 @@ export function standardRoutes(): Record<string, JsonValue> {
 
 export const requestLog: string[] = [];
 
-export function installApi(routes: Record<string, JsonValue> = standardRoutes()) {
+export function installApi(routes: Record<string, RouteHandler> = standardRoutes()) {
   requestLog.length = 0;
-  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url, "http://console.test");
     requestLog.push(`${url.pathname}${url.search}`);
     const exact = routes[`${url.pathname}${url.search}`];
     const withoutSearch = routes[url.pathname];
-    const body = exact ?? withoutSearch;
-    if (!body) return new Response(JSON.stringify(envelope(null, {}, [{ code: "NOT_FOUND", message: url.pathname, source: "console", retryable: false }])), { status: 404, headers: { "Content-Type": "application/json" } });
+    const handler = exact ?? withoutSearch;
+    if (!handler) return new Response(JSON.stringify(envelope(null, {}, [{ code: "NOT_FOUND", message: url.pathname, source: "console", retryable: false }])), { status: 404, headers: { "Content-Type": "application/json" } });
+    const body = typeof handler === "function" ? await handler({ url, init }) : handler;
+    if (body instanceof Response) return body;
     return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
   }));
 }
 
-export function renderAppAt(path: string, routes?: Record<string, JsonValue>) {
+export function renderAppAt(path: string, routes?: Record<string, RouteHandler>) {
   installApi(routes);
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(

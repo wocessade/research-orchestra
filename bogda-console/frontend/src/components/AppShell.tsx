@@ -35,7 +35,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Navigation />
         <div className="rail-foot">
           <span className="source-dot" aria-hidden="true" />
-          <span><strong>3101 影子运行</strong><small>旧控制台保持在线</small></span>
+          <span><strong>3101 影子运行</strong><small>B · 受控操作 · 旧 3100 在线</small></span>
         </div>
       </aside>
       <main id="main-content" tabIndex={-1}>{children}</main>

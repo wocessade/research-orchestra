@@ -99,8 +99,15 @@ npm run build
 
 需要运行 Python 测试时，把可编辑安装改为
 `.venv\Scripts\python.exe -m pip install -e ".[dev]"`。前端代码变更后必须重新
-执行 `npm run build` 并再次 `.\scripts\local-console.ps1 start`，否则浏览器可能
-继续显示旧页面。
+执行 `npm run build`，再重启受管进程。健康服务下 `start` 是幂等的，只再执行
+`start` 不会加载新的 `frontend\dist`：
+
+```powershell
+.\scripts\local-console.ps1 stop
+.\scripts\local-console.ps1 start
+```
+
+否则浏览器可能继续显示旧页面。
 
 ### 手动启动（故障恢复）
 
@@ -158,7 +165,7 @@ Stop-Process -Id $bogdaListener.OwningProcess
 | --- | --- |
 | 浏览器显示无法连接 | 先运行 `.\scripts\local-console.ps1 status` 或 `Get-NetTCPConnection`；没有 3101 listener 就是进程未启动或已退出。 |
 | `import bogda_console` 指向 `.worktrees` | 回到主工作目录，使用主目录 `.venv` 重新执行 `pip install -e .`。 |
-| 后端启动但页面 404、空白或缺少新功能 | 运行 `npm ci`、`npm run build`，再 `.\scripts\local-console.ps1 stop` 后 `start`，再强制刷新浏览器。 |
+| 后端启动但页面 404、空白或缺少新功能 | 运行 `npm ci`、`npm run build`，再 `.\scripts\local-console.ps1 stop` 然后 `.\scripts\local-console.ps1 start`（健康时 `start` 幂等，不会自行换上新构建），再强制刷新浏览器。 |
 | `frontend/dist` 不存在 | 前端尚未构建；运行 `npm run build`。 |
 | 3101 已被占用 | 先查看 `OwningProcess` 并确认归属；不要停止未知进程，也不要改用 3100。 |
 | 能力接口可用但 profile 不是 `mock-all` | 当前进程使用了别的配置；用启动器 `stop`（仅当它是受管进程）或按“手动启动”重新设置环境变量。 |

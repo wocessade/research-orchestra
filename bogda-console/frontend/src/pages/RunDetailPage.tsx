@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 
 import { api, ApiClientError } from "../api/client";
 import type { CapabilitySnapshot, CommandReceipt, Page, RunDetail, RunResultVersion, RunResultView, RunSummary } from "../api/types";
 import { ConfirmDialog } from "../components/Dialogs";
 import { EnvelopeErrors, QueryFailure, QueryLoading, SourceStrip } from "../components/EnvelopeState";
 import { ExecutionMark, ScientificMark } from "../components/StatusMark";
+import { SCIENTIFIC_REVIEW_ID } from "../scientificReview";
 
 function formatAbsolute(value: string | null | undefined) {
   return value ? new Date(value).toLocaleString("zh-CN", { hour12: false }) : "—";
@@ -24,7 +25,7 @@ function ResultPanel({ view, executionType }: { view: RunResultView; executionTy
   </>;
 }
 
-function ReviewControl({ runId, view, enabled, onReviewed }: { runId: string; view: RunResultView; enabled: boolean; onReviewed: (view: RunResultView) => void }) {
+function ReviewControl({ runId, view, enabled, profile, onReviewed }: { runId: string; view: RunResultView; enabled: boolean; profile?: string; onReviewed: (view: RunResultView) => void }) {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState("accepted");
   const [summary, setSummary] = useState("");
@@ -48,14 +49,14 @@ function ReviewControl({ runId, view, enabled, onReviewed }: { runId: string; vi
     await queryClient.invalidateQueries({ queryKey: ["reviews"] });
   }
 
-  return <section className="review-control detail-section" aria-labelledby="review-form-title">
+  return <section id={SCIENTIFIC_REVIEW_ID} className="review-control detail-section" aria-labelledby="review-form-title">
     <div className="detail-heading"><div><p className="page-kicker">Append only</p><h2 id="review-form-title">追加科研评审</h2></div><p>提交会创建新的 RunResult Artifact 版本，不改写 Prefect 执行历史。</p></div>
     <form onSubmit={(event) => { event.preventDefault(); void submit(); }}>
       <label>科研判断<select value={status} onChange={(event) => setStatus(event.target.value)} disabled={!enabled || mutation.isPending}><option value="accepted">accepted / 接受</option><option value="rejected">rejected / 拒绝</option><option value="inconclusive">inconclusive / 无定论</option></select></label>
       <label>评审说明<textarea rows={4} value={summary} onChange={(event) => setSummary(event.target.value)} disabled={!enabled || mutation.isPending} /></label>
       <button type="submit" className="primary-action" disabled={!enabled || mutation.isPending}>{mutation.isPending ? "等待 RunResult 回执…" : "提交评审"}</button>
     </form>
-    {!enabled && <p className="readonly-note">当前 profile 只读，评审控件已禁用。</p>}
+    {!enabled && <p className="readonly-note">当前 profile 为 {profile ?? "unknown"}，只读，不能提交科研评审。</p>}
     {conflict && <div className="command-conflict" role="alert"><strong>结果已被其他评审更新</strong><span>表单内容已保留。请先检查最新 Artifact：</span><code>{conflict.artifactId}</code><button type="button" className="quiet-action" onClick={() => { if (!conflict.artifactId) return; setBaseArtifactId(conflict.artifactId); setAdoptedArtifactId(conflict.artifactId); mutation.reset(); }}>确认采用最新版本</button></div>}
     {adoptedArtifactId && <p className="command-notice" role="status">已确认采用最新 Artifact {adoptedArtifactId}；再次提交将创建新版本。</p>}
     {mutation.isError && !conflict && <div className="command-error" role="alert">评审未获得权威回执；没有自动重试。</div>}
@@ -64,6 +65,7 @@ function ReviewControl({ runId, view, enabled, onReviewed }: { runId: string; vi
 
 export function RunDetailPage() {
   const { runId = "" } = useParams();
+  const location = useLocation();
   const detailQuery = useQuery({ queryKey: ["run", runId], queryFn: () => api.get<RunDetail>(`/api/v1/runs/${runId}`) });
   const resultQuery = useQuery({ queryKey: ["result", runId], queryFn: () => api.get<RunResultView>(`/api/v1/runs/${runId}/result`) });
   const versionsQuery = useQuery({ queryKey: ["result-versions", runId], queryFn: () => api.get<Page<RunResultVersion>>(`/api/v1/runs/${runId}/result/versions`) });
@@ -72,6 +74,12 @@ export function RunDetailPage() {
   const [cancelSnapshot, setCancelSnapshot] = useState<RunSummary | null>(null);
   const [reviewSnapshot, setReviewSnapshot] = useState<RunResultView | null>(null);
   const cancelMutation = useMutation({ mutationFn: (run: RunSummary) => api.command<CommandReceipt<RunSummary>>(`/api/v1/runs/${run.runId}/cancel`, { expectedCommandVersion: run.commandVersion }) });
+  const resultView = reviewSnapshot ?? resultQuery.data?.data;
+
+  useEffect(() => {
+    if (location.hash !== `#${SCIENTIFIC_REVIEW_ID}`) return;
+    document.getElementById(SCIENTIFIC_REVIEW_ID)?.scrollIntoView();
+  }, [location.hash, resultView?.availability]);
 
   if (detailQuery.isPending) return <section className="page"><QueryLoading /></section>;
   if (detailQuery.isError || !detailQuery.data.data) return <section className="page"><QueryFailure title="运行详情暂不可用" /></section>;
@@ -79,7 +87,6 @@ export function RunDetailPage() {
   const detail = envelope.data!;
   const run = cancelSnapshot ?? detail.run;
   const science = reviewSnapshot?.result ? { availability: "available", artifactId: reviewSnapshot.artifactId, artifactCreatedAt: reviewSnapshot.artifactCreatedAt, scientificStatus: reviewSnapshot.result.scientific_status, reviewSummary: reviewSnapshot.result.review_summary, validationIssues: [] } : run.scientific;
-  const resultView = reviewSnapshot ?? resultQuery.data?.data;
   const capabilities = capabilitiesQuery.data?.data;
 
   async function cancelRun() {
@@ -102,7 +109,7 @@ export function RunDetailPage() {
     {resultQuery.isPending && <QueryLoading />}
     {resultQuery.isError && <QueryFailure title="RunResult 暂不可用" />}
     {resultView && <ResultPanel view={resultView} executionType={run.state.type} />}
-    {resultView?.availability === "available" && resultView.result && <ReviewControl runId={runId} view={resultView} enabled={Boolean(capabilities?.canReviewScientificResult)} onReviewed={setReviewSnapshot} />}
+    {resultView?.availability === "available" && resultView.result && <ReviewControl runId={runId} view={resultView} enabled={Boolean(capabilities?.canReviewScientificResult)} profile={capabilities?.profile} onReviewed={setReviewSnapshot} />}
     <section className="detail-section" aria-labelledby="versions-title"><div className="detail-heading"><h2 id="versions-title">RunResult 版本</h2><p>由新到旧；第一条是当前科研权威版本。</p></div>{versionsQuery.data?.data?.items.length ? <ol className="version-list">{versionsQuery.data.data.items.map((version, index) => <li key={version.artifactId}><span>{index === 0 ? "当前" : `历史 ${index}`}</span><strong>{version.artifactId}</strong><time dateTime={version.createdAt}>{formatAbsolute(version.createdAt)}</time><em>{version.availability}</em></li>)}</ol> : versionsQuery.isPending ? <QueryLoading /> : <p className="muted">没有可显示的版本。</p>}</section>
     <section className="detail-section" aria-labelledby="request-title"><div className="detail-heading"><h2 id="request-title">运行请求</h2><p>Prefect 参数与标签，只读展示。</p></div><pre className="request-code">{JSON.stringify({ parameters: detail.parameters, tags: detail.tags }, null, 2)}</pre></section>
     {cancelMutation.isError && <div className="command-error persistent-command-error" role="alert">取消请求未获得权威回执；运行状态保持原样，没有自动重试。</div>}

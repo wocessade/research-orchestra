@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 
 import type { RunSummary } from "../api/types";
+import { scientificReviewPath } from "../scientificReview";
 import { ExecutionMark, ScientificMark } from "./StatusMark";
 
 function formatAbsolute(value: string | null | undefined) {
@@ -19,13 +20,13 @@ function RunIdentity({ run }: { run: RunSummary }) {
   return <span className="run-identity"><Link to={`/runs/${run.runId}`}>{run.name}</Link><small>{run.deploymentName ?? "未注册 Deployment"} · {run.runId}</small></span>;
 }
 
-export function RunLedger({ runs, emptyText = "没有符合条件的运行" }: { runs: RunSummary[]; emptyText?: string }) {
+export function RunLedger({ runs, emptyText = "没有符合条件的运行", reviewEntry = false }: { runs: RunSummary[]; emptyText?: string; reviewEntry?: boolean }) {
   if (!runs.length) return <div className="empty-state"><strong>{emptyText}</strong><span>筛选条件没有匹配权威来源中的记录。</span></div>;
   return (
     <div className="run-ledger">
       <div className="run-ledger__table">
         <table aria-label="运行账簿">
-          <thead><tr><th>运行</th><th>Prefect 状态</th><th>科研状态</th><th>执行位置</th><th>状态时间</th></tr></thead>
+          <thead><tr><th>运行</th><th>Prefect 状态</th><th>科研状态</th><th>执行位置</th><th>状态时间</th>{reviewEntry && <th>评审</th>}</tr></thead>
           <tbody>{runs.map((run) => (
             <tr key={run.runId}>
               <td><RunIdentity run={run} /></td>
@@ -33,6 +34,7 @@ export function RunLedger({ runs, emptyText = "没有符合条件的运行" }: {
               <td><ScientificCell run={run} /></td>
               <td><span className="route-cell"><strong>{run.workPoolName ?? "—"}</strong><small>{run.workQueueName ?? "—"}</small></span></td>
               <td><time dateTime={run.state.timestamp}>{formatAbsolute(run.state.timestamp)}</time></td>
+              {reviewEntry && <td><Link className="text-action" to={scientificReviewPath(run.runId)}>查看证据并判断</Link></td>}
             </tr>
           ))}</tbody>
         </table>
@@ -47,6 +49,7 @@ export function RunLedger({ runs, emptyText = "没有符合条件的运行" }: {
               <div><dt>执行位置</dt><dd>{run.workPoolName ?? "—"} / {run.workQueueName ?? "—"}</dd></div>
               <div><dt>状态时间</dt><dd><time dateTime={run.state.timestamp}>{formatAbsolute(run.state.timestamp)}</time></dd></div>
             </dl>
+            {reviewEntry && <Link className="primary-action" to={scientificReviewPath(run.runId)}>查看证据并判断</Link>}
           </article>
         ))}
       </div>

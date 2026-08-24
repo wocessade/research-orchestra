@@ -185,7 +185,7 @@ printf 'verify_exit=%s\n' "$rc"
 
 07:44:15Z：`bash deploy/pi/rollback.sh --dry-run`，**`rollback_dry_after_exit=0`**。未 `--apply`。
 
-dry-run 打印 `CHECK backup pointer /etc/bogda/last-backup absent`。安装脚本写入的是 `/etc/bogda/last-backup`。这是 dry-run 检查名与真实指针不一致，**未改脚本**。真实指针存在且有效。
+首次 dry-run 未使用任务要求的 `sudo`，普通用户不能穿过 mode 750 的 `/etc/bogda`，因此误打印 `CHECK backup pointer /etc/bogda/last-backup absent`。这不是检查名不一致。Codex 验收时以 `sudo -n bash .../rollback.sh --dry-run` 复跑，得到 `present`、exit 0；真实指针存在且有效。后续必须用 runbook 指定的 sudo 形式执行该 dry-run。
 
 ---
 
@@ -206,6 +206,8 @@ dry-run 打印 `CHECK backup pointer /etc/bogda/last-backup absent`。安装脚�
 4. `/mnt/nas/.bogda` 与 `.venv` 所有权观察项：是否要在启动前 chown。
 5. 已提交 shell 脚本 CRLF：下次从 Windows `git archive` 仍需 LF 化才能在 Pi 上跑。
 6. 主机新增 `/usr/local/bin/uv` 0.12.5。
+
+Codex 复核补充：六个 unit 仍为 inactive，四个可启用单元仍为 disabled，TCP 4200 未监听，Orchestra active，安装后 verify exit 0，sudo rollback dry-run 正确识别指针 present。现场状态满足“已安装、未启动”。
 
 **未进入 Gate 4。未启动 Prefect。**
 

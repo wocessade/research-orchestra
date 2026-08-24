@@ -57,6 +57,91 @@ npm run build
 
 所有入口都会拒绝 3100。3100 保留给旧控制台；不要停止、覆盖或反向代理它。
 
+## 3101 本地运行手册
+
+3101 当前是 Windows 主机上的手动进程，不是 Windows 服务，也不会随开机自动
+启动。实际运行应以 `D:\pythonProject\bogda-console` 主工作目录为准，不要依赖
+`.worktrees` 中残留的虚拟环境、前端产物或 Python import 路径。
+
+### 首次安装或重建依赖
+
+```powershell
+Set-Location D:\pythonProject\bogda-console
+py -3.11 -m venv .venv
+.venv\Scripts\python.exe -m pip install -e .
+npm ci
+npm run build
+```
+
+需要运行 Python 测试时，把可编辑安装改为
+`.venv\Scripts\python.exe -m pip install -e ".[dev]"`。前端代码变更后必须重新
+执行 `npm run build` 并重启后端，否则浏览器可能继续显示旧页面。
+
+### 启动完整页面
+
+当前本地演示使用 `mock-all`。它可以验证完整 UI 和写入交互，但数据来自内存中
+的 fixture，不代表 Pi、真实 Prefect 或生产状态。
+
+```powershell
+Set-Location D:\pythonProject\bogda-console
+$env:BOGDA_CONSOLE_PROFILE = "mock-all"
+$env:BOGDA_CONSOLE_TEST_MODE = "0"
+$env:BOGDA_CONSOLE_PUBLIC_HOST = "127.0.0.1"
+$env:BOGDA_CONSOLE_PUBLIC_PORT = "3101"
+$env:BOGDA_CONSOLE_ALLOWED_DEPLOYMENT_IDS = "deployment-service,deployment-dorm"
+$env:BOGDA_CONSOLE_ALLOWED_SCHEDULE_IDS = "schedule-service,schedule-dorm"
+$env:BOGDA_CONSOLE_ALLOWED_QUEUE_IDS = "queue-service,queue-cpu,queue-gpu"
+$env:BOGDA_CONSOLE_ALLOWED_WORK_POOL_NAMES = "pi-service,dorm-x86"
+.venv\Scripts\python.exe -m bogda_console
+```
+
+保持该 PowerShell 窗口开启。看到 Uvicorn 启动日志后访问
+<http://127.0.0.1:3101/>。
+
+### 状态确认
+
+先确认 3101 确实有监听者，再读取能力接口：
+
+```powershell
+Get-NetTCPConnection -LocalAddress 127.0.0.1 -LocalPort 3101 -State Listen |
+    Select-Object LocalAddress, LocalPort, OwningProcess
+
+Invoke-RestMethod http://127.0.0.1:3101/api/v1/capabilities |
+    Select-Object profile, canSetAutonomyMode
+```
+
+本地演示的预期结果是 `profile=mock-all`、`canSetAutonomyMode=True`。只有端口
+监听而能力接口失败时，不应把页面视为可用。
+
+### 停止
+
+优先在启动进程所属的 PowerShell 窗口按 `Ctrl+C`。如果原窗口已经丢失，先查明
+3101 的确切 PID，再停止该 PID：
+
+```powershell
+$bogdaListener = Get-NetTCPConnection -LocalAddress 127.0.0.1 -LocalPort 3101 -State Listen
+$bogdaListener | Select-Object LocalAddress, LocalPort, OwningProcess
+Stop-Process -Id $bogdaListener.OwningProcess
+```
+
+不要按进程名批量停止 Python，也不要对 3100 执行同样操作。PID 是临时状态，
+不应抄进文档或长期记录。
+
+### 故障定位
+
+| 现象 | 判断与处理 |
+| --- | --- |
+| 浏览器显示无法连接 | 先运行 `Get-NetTCPConnection`；没有 3101 listener 就是进程未启动或已退出。 |
+| `import bogda_console` 指向 `.worktrees` | 回到主工作目录，使用主目录 `.venv` 重新执行 `pip install -e .`。 |
+| 后端启动但页面 404、空白或缺少新功能 | 运行 `npm ci`、`npm run build`，重启后端，再强制刷新浏览器。 |
+| `frontend/dist` 不存在 | 前端尚未构建；运行 `npm run build`。 |
+| 3101 已被占用 | 先查看 `OwningProcess` 并确认归属；不要停止未知进程，也不要改用 3100。 |
+| 能力接口可用但 profile 不是 `mock-all` | 当前进程使用了别的配置；停止它并按“启动完整页面”重新设置环境变量。 |
+
+这套流程只保证本机可重复运行，不包含开机自启、托盘常驻或后台进程管理。后续
+本地启动器应封装 `start/status/stop`、PID 和日志管理；在它交付前，本节命令是
+权威操作方式。
+
 ## 配置
 
 | 环境变量 | 默认值 | 说明 |

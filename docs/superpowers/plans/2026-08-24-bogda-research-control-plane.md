@@ -35,7 +35,7 @@
 
 ---
 
-### Task 1: 项目自主模式策略与解析
+### Task 1: 项目自主模式策略与解析（✅ `codex/bogda-autonomy-policy`）
 
 **Files:**
 - Create: `bogda/src/bogda/policy/store.py`
@@ -47,13 +47,13 @@
 - Produces: `AutonomyPolicy(global_default, project_overrides, revision)`；`resolve_mode(project_id) -> ResolvedAutonomyMode`；原子替换的单文件JSON策略存储。
 - Constraint: 只保存策略，不保存Flow Run状态；未知项目使用全局默认；只接受`manual|supervised|autonomous`。
 
-- [ ] 写失败测试：默认模式、项目覆盖、revision冲突、损坏文件fail-closed。
-- [ ] 运行 `uv run --python 3.11 pytest tests/policy/test_store.py -v`，确认因模块不存在而失败。
-- [ ] 实现最小Pydantic模型和单机文件存储；写入采用临时文件后同卷替换，不增加数据库。
-- [ ] 重跑聚焦测试和 `uv run --python 3.11 pytest -m "not integration" -q`。
-- [ ] 提交 `feat(bogda): add autonomy policy resolution`。
+- [x] 写失败测试：默认模式、项目覆盖、revision冲突、损坏文件fail-closed。
+- [x] 运行 `uv run --python 3.11 pytest tests/policy/test_store.py -v`，确认因模块不存在而失败。
+- [x] 实现最小Pydantic模型和单机文件存储；写入采用临时文件后同卷替换，不增加数据库。
+- [x] 重跑聚焦测试和 `uv run --python 3.11 pytest -m "not integration" -q`。
+- [x] 提交 `feat(bogda): add autonomy policy resolution`。
 
-### Task 2: 创建运行时冻结有效模式
+### Task 2: 创建运行时冻结有效模式（✅ 合并于Task 1原子提交）
 
 **Files:**
 - Modify: `bogda/src/bogda/control/cli.py`
@@ -66,11 +66,11 @@
 - Consumes: `resolve_mode(project_id)`。
 - Produces: `JobRequest.autonomy_mode`在提交前解析并冻结；Flow只读取请求中的值，不回读可变策略。
 
-- [ ] 写失败测试：提交前后修改策略不改变已创建Run；新Run采用新revision。
-- [ ] 运行聚焦测试并确认旧代码固定`supervised`导致失败。
-- [ ] 在控制层解析模式并将`policy_revision`写入参数/标签；删除demo硬编码模式。
-- [ ] 运行Bogda全量测试和本地Prefect纵向切片。
-- [ ] 提交 `feat(bogda): freeze autonomy mode per run`。
+- [x] 写失败测试：提交前后修改策略不改变已创建Run；新Run采用新revision。
+- [x] 运行聚焦测试并确认旧代码固定`supervised`导致失败。
+- [x] 在控制层解析模式并将`policy_revision`写入请求；删除demo硬编码模式。标签投影留给真实Deployment提交接口，当前纵向切片没有Deployment标签写入点。
+- [x] 运行Bogda全量测试和本地Prefect纵向切片。
+- [x] 以一个原子提交交付策略与冻结语义，避免中间提交产生“有策略但运行不冻结”的状态。
 
 ### Task 3: 3101自主模式API与切换控件
 

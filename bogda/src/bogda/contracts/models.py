@@ -54,6 +54,7 @@ class JobRequest(BaseModel):
     task_type: str
     resource_class: ResourceClass
     autonomy_mode: AutonomyMode
+    policy_revision: int = Field(default=0, ge=0)
     parameters: dict[str, Any] = Field(default_factory=dict)
     retryable: bool = False
     expected_artifacts: tuple[ArtifactSpec, ...] = ()

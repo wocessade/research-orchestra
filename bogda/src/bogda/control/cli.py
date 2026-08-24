@@ -8,13 +8,13 @@ from uuid import uuid4
 from bogda.artifacts import load_run_result
 from bogda.contracts import (
     ArtifactSpec,
-    AutonomyMode,
     JobRequest,
     ResourceClass,
     RunResult,
     ScientificStatus,
 )
 from bogda.flows import review_run_result, run_shell_job
+from bogda.policy import PolicyStore
 
 
 def parser() -> argparse.ArgumentParser:
@@ -23,6 +23,8 @@ def parser() -> argparse.ArgumentParser:
 
     demo = commands.add_parser("demo")
     demo.add_argument("--attempts-root", default=".bogda-runs")
+    demo.add_argument("--policy-path", default=".bogda-policy.json")
+    demo.add_argument("--project-id", default="bogda")
 
     result = commands.add_parser("result")
     result.add_argument("run_id")
@@ -45,13 +47,19 @@ def print_result(result: RunResult) -> None:
     print(json.dumps(result.model_dump(mode="json"), ensure_ascii=False, indent=2))
 
 
-def demo_request() -> JobRequest:
+def demo_request(
+    policy_store: PolicyStore | None = None,
+    project_id: str = "bogda",
+) -> JobRequest:
+    store = policy_store or PolicyStore(".bogda-policy.json")
+    resolved = store.resolve_mode(project_id)
     return JobRequest(
         job_id=f"demo-{uuid4()}",
-        project_id="bogda",
+        project_id=project_id,
         task_type="shell",
         resource_class=ResourceClass.CPU,
-        autonomy_mode=AutonomyMode.SUPERVISED,
+        autonomy_mode=resolved.effective_mode,
+        policy_revision=resolved.policy_revision,
         parameters={
             "argv": [
                 sys.executable,
@@ -66,9 +74,13 @@ def demo_request() -> JobRequest:
 def main(argv: Sequence[str] | None = None) -> int:
     args = parser().parse_args(argv)
     if args.command == "demo":
+        request = demo_request(
+            PolicyStore(args.policy_path),
+            project_id=args.project_id,
+        )
         result = RunResult.model_validate(
             run_shell_job(
-                demo_request().model_dump(mode="json"),
+                request.model_dump(mode="json"),
                 str(Path(args.attempts_root).resolve()),
             )
         )

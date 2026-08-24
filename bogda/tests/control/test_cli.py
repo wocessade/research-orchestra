@@ -1,6 +1,8 @@
 import json
 
+from bogda.contracts import AutonomyMode
 from bogda.control import cli
+from bogda.policy import PolicyStore
 
 
 def test_result_command_prints_stored_result(monkeypatch, capsys) -> None:
@@ -38,3 +40,15 @@ def test_result_command_returns_one_when_result_is_absent(monkeypatch, capsys) -
 
     assert exit_code == 1
     assert "not found" in capsys.readouterr().err
+
+
+def test_demo_request_freezes_resolved_mode_and_policy_revision(tmp_path) -> None:
+    store = PolicyStore(tmp_path / "autonomy.json")
+    store.set_mode("bogda", AutonomyMode.MANUAL, expected_revision=0)
+
+    request = cli.demo_request(store)
+    store.set_mode("bogda", AutonomyMode.AUTONOMOUS, expected_revision=1)
+
+    assert request.autonomy_mode is AutonomyMode.MANUAL
+    assert request.policy_revision == 1
+    assert store.resolve_mode("bogda").effective_mode is AutonomyMode.AUTONOMOUS

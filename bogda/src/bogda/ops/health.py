@@ -113,8 +113,7 @@ def append_sample(path: Path, sample: Mapping[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     encoded = json.dumps(dict(sample), sort_keys=True, separators=(",", ":"))
     with path.open("a", encoding="utf-8", newline="\n") as output:
-        output.write(encoded)
-        output.write("\n")
+        output.write(encoded + "\n")
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -144,6 +143,10 @@ def _numeric_values(samples: Sequence[Mapping[str, object]], key: str) -> list[f
     return [float(value) for sample in samples if (value := sample.get(key)) is not None]
 
 
+def _is_number(value: object) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
 def summarize_samples(
     samples: Sequence[Mapping[str, object]], expected_interval_seconds: int = 300
 ) -> dict[str, object]:
@@ -157,8 +160,10 @@ def summarize_samples(
     latency = _numeric_values(ordered, "api_latency_ms")
     memory = _numeric_values(ordered, "mem_available_bytes")
     disk = _numeric_values(ordered, "disk_free_bytes")
-    swap = _numeric_values(ordered, "swap_used_bytes")
-    oom = _numeric_values(ordered, "oom_kill_count")
+    first_swap = ordered[0].get("swap_used_bytes") if ordered else None
+    last_swap = ordered[-1].get("swap_used_bytes") if ordered else None
+    first_oom = ordered[0].get("oom_kill_count") if ordered else None
+    last_oom = ordered[-1].get("oom_kill_count") if ordered else None
     return {
         "started_at": _format_timestamp(timestamps[0]) if timestamps else None,
         "ended_at": _format_timestamp(timestamps[-1]) if timestamps else None,
@@ -167,8 +172,8 @@ def summarize_samples(
         "api_failure_count": sum(1 for sample in ordered if sample.get("api_ok") is False),
         "api_latency_p95_ms": nearest_rank_p95(latency),
         "min_mem_available_bytes": min(memory) if memory else None,
-        "swap_growth_bytes": swap[-1] - swap[0] if swap else None,
-        "oom_kill_delta": oom[-1] - oom[0] if oom else None,
+        "swap_growth_bytes": last_swap - first_swap if _is_number(first_swap) and _is_number(last_swap) else None,
+        "oom_kill_delta": last_oom - first_oom if _is_number(first_oom) and _is_number(last_oom) else None,
         "database_integrity_failure_count": sum(
             1 for sample in ordered if sample.get("database_integrity") not in (None, "ok")
         ),
@@ -198,22 +203,26 @@ def sample_health(
     api_ok, api_latency = api_probe(api_url)
     database = Path(database)
     try:
-        database_bytes = database.stat().st_size
+        database_bytes: int | None = database.stat().st_size
     except OSError:
-        database_bytes = 0
+        database_bytes = None
     try:
         database_integrity = integrity_check(database)
     except Exception:
-        database_integrity = "error"
+        database_integrity = "unavailable" if not database.exists() else "error"
+    mem_available = meminfo.get("MemAvailable")
+    swap_total = meminfo.get("SwapTotal")
+    swap_free = meminfo.get("SwapFree")
+    swap_used = swap_total - swap_free if swap_total is not None and swap_free is not None else None
     timestamp = _format_timestamp(_as_utc(now or datetime.now(UTC)))
     return {
         "timestamp": timestamp,
         "api_ok": api_ok,
         "api_latency_ms": api_latency,
-        "mem_available_bytes": meminfo.get("MemAvailable", 0),
-        "swap_total_bytes": meminfo.get("SwapTotal", 0),
-        "swap_used_bytes": meminfo.get("SwapTotal", 0) - meminfo.get("SwapFree", 0),
-        "oom_kill_count": vmstat.get("oom_kill", 0),
+        "mem_available_bytes": mem_available,
+        "swap_total_bytes": swap_total,
+        "swap_used_bytes": swap_used,
+        "oom_kill_count": vmstat.get("oom_kill"),
         "disk_free_bytes": disk_free(Path(disk_root)),
         "database_bytes": database_bytes,
         "database_integrity": database_integrity,
@@ -230,13 +239,23 @@ def wait_for_api(
 ) -> bool:
     if timeout < 0 or interval <= 0:
         raise ValueError("timeout must be non-negative and interval must be positive")
-    attempts = max(1, math.ceil(timeout / interval))
-    for attempt in range(attempts):
-        if probe(url)[0]:
+    if timeout == 0:
+        return False
+    deadline = time.monotonic() + timeout
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return False
+        if probe is probe_api:
+            healthy = probe(url, timeout=remaining)[0]
+        else:
+            healthy = probe(url)[0]
+        if healthy:
             return True
-        if attempt < attempts - 1:
-            sleep(interval)
-    return False
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return False
+        sleep(min(interval, remaining))
 
 
 def _read_samples(path: Path) -> list[dict[str, object]]:

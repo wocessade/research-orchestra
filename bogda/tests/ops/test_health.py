@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 import json
 from pathlib import Path
 import sqlite3
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -77,6 +78,25 @@ def test_sample_records_unavailable_api_without_inventing_latency(tmp_path: Path
     assert sample["api_latency_ms"] is None
 
 
+def test_sample_marks_missing_proc_fields_and_database_as_unavailable(tmp_path: Path) -> None:
+    sample = sample_health(
+        meminfo_text="MemAvailable: 1 kB\n",
+        vmstat_text="",
+        api_probe=lambda _: (False, None),
+        units_probe=lambda _: {},
+        disk_free=lambda _: 1,
+        database=tmp_path / "missing.db",
+    )
+
+    assert sample["mem_available_bytes"] == 1024
+    assert sample["swap_total_bytes"] is None
+    assert sample["swap_used_bytes"] is None
+    assert sample["oom_kill_count"] is None
+    assert sample["database_bytes"] is None
+    assert sample["database_integrity"] == "unavailable"
+    json.dumps(sample)
+
+
 def test_probe_api_adds_basic_auth_without_returning_or_logging_secret(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, object] = {}
 
@@ -133,6 +153,18 @@ def test_append_sample_writes_one_compact_json_line(tmp_path: Path) -> None:
     assert path.read_text(encoding="utf-8") == '{"api_ok":true,"timestamp":"2026-08-24T12:00:00Z"}\n'
 
 
+def test_append_sample_uses_one_write_for_json_and_newline(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output = MagicMock()
+    output.__enter__.return_value = output
+    monkeypatch.setattr(Path, "open", lambda *args, **kwargs: output)
+
+    append_sample(tmp_path / "health.jsonl", {"api_ok": True})
+
+    output.write.assert_called_once_with('{"api_ok":true}\n')
+
+
 def test_summary_reports_72_hour_window_evidence() -> None:
     started = datetime(2026, 8, 21, tzinfo=UTC)
     timestamps = [started, started + timedelta(minutes=5), started + timedelta(minutes=10), started + timedelta(minutes=25)]
@@ -183,6 +215,28 @@ def test_summary_sorts_samples_and_handles_empty_metrics() -> None:
     assert nearest_rank_p95([]) is None
 
 
+@pytest.mark.parametrize(
+    ("first", "last"),
+    [
+        ({"swap_used_bytes": None, "oom_kill_count": None}, {"swap_used_bytes": 20, "oom_kill_count": 3}),
+        ({"swap_used_bytes": 10, "oom_kill_count": 2}, {"swap_used_bytes": None, "oom_kill_count": None}),
+    ],
+)
+def test_summary_requires_numeric_window_endpoints_for_growth_and_delta(
+    first: dict[str, object], last: dict[str, object]
+) -> None:
+    samples = [
+        {"timestamp": "2026-08-24T00:00:00Z", "api_ok": True, **first},
+        {"timestamp": "2026-08-24T00:05:00Z", "api_ok": True, "swap_used_bytes": 15, "oom_kill_count": 2},
+        {"timestamp": "2026-08-24T00:10:00Z", "api_ok": True, **last},
+    ]
+
+    summary = summarize_samples(samples)
+
+    assert summary["swap_growth_bytes"] is None
+    assert summary["oom_kill_delta"] is None
+
+
 def test_wait_for_api_stops_after_first_success() -> None:
     results = iter([(False, None), (True, 12.0), (True, 8.0)])
     sleeps: list[float] = []
@@ -191,15 +245,79 @@ def test_wait_for_api_stops_after_first_success() -> None:
     assert sleeps == [0.25]
 
 
-def test_wait_for_api_returns_false_after_bounded_attempts() -> None:
+def test_wait_for_api_returns_false_at_elapsed_deadline() -> None:
+    clock = [0.0]
     calls: list[str] = []
 
     def probe(url: str) -> tuple[bool, float | None]:
         calls.append(url)
         return False, None
 
-    assert not wait_for_api("http://api", timeout=2.0, interval=0.5, probe=probe, sleep=lambda _: None)
+    def monotonic() -> float:
+        return clock[0]
+
+    def sleep(duration: float) -> None:
+        clock[0] += duration
+
+    original_monotonic = health.time.monotonic
+    health.time.monotonic = monotonic
+    try:
+        assert not wait_for_api("http://api", timeout=2.0, interval=0.5, probe=probe, sleep=sleep)
+    finally:
+        health.time.monotonic = original_monotonic
     assert len(calls) == 4
+
+
+def test_wait_for_api_uses_elapsed_deadline_and_caps_sleep() -> None:
+    clock = [0.0]
+    calls = 0
+    sleeps: list[float] = []
+
+    def monotonic() -> float:
+        return clock[0]
+
+    def probe(_: str) -> tuple[bool, float | None]:
+        nonlocal calls
+        calls += 1
+        return False, None
+
+    def sleep(duration: float) -> None:
+        sleeps.append(duration)
+        clock[0] += duration
+
+    original_monotonic = health.time.monotonic
+    health.time.monotonic = monotonic
+    try:
+        assert not wait_for_api("http://api", timeout=1.0, interval=0.6, probe=probe, sleep=sleep)
+    finally:
+        health.time.monotonic = original_monotonic
+
+    assert calls == 2
+    assert sleeps == [0.6, 0.4]
+
+
+def test_wait_for_api_caps_production_probe_timeout_to_remaining_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clock = [0.0]
+    timeouts: list[float] = []
+
+    def monotonic() -> float:
+        return clock[0]
+
+    def production_probe(_: str, timeout: float = 2.0) -> tuple[bool, float | None]:
+        timeouts.append(timeout)
+        if len(timeouts) == 1:
+            clock[0] = 0.75
+        else:
+            clock[0] = 1.0
+        return False, None
+
+    monkeypatch.setattr(health.time, "monotonic", monotonic)
+    monkeypatch.setattr(health, "probe_api", production_probe)
+
+    assert not wait_for_api("http://api", timeout=1.0, interval=0.5, probe=health.probe_api, sleep=lambda _: None)
+    assert timeouts == [1.0, 0.25]
 
 
 def test_health_cli_summarize_reads_nonblank_jsonl(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

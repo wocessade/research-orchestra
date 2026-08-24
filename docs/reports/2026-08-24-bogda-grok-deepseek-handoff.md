@@ -5,9 +5,9 @@
 
 ## 当前事实
 
-- `main` 当前基线为 `65303c1`，Bogda Console 及科研评审入口改进已合并；3100 端口尚未切换到 Bogda。
-- Pi shadow 部署包位于分支 `codex/bogda-pi-shadow-bundle`、工作树 `D:/pythonProject/.worktrees/bogda-pi-shadow-bundle`，尚未合并、尚未部署。
-- Pi 分支在 `6fb05ec` 时已集成当时的主线，曝光门禁在 `9eac204` 修复；合并前还需再次合入最新 `main` 的评审入口提交 `65303c1`。
+- `main` 当前基线为 `61d2eb6`，Bogda Console、科研评审入口、跨平台契约门禁和 Pi shadow 部署包均已合并；3100 端口尚未切换到 Bogda。
+- Pi shadow 部署包已通过本地最终验收但尚未部署：101 passed、1 项因 Windows 符号链接权限跳过；bundle、Bash 语法、install/rollback dry-run 和禁区扫描通过。
+- 曝光门禁修复 `9eac204` 已包含在主线：非许可网络得到任何 HTTP 响应均为失败，只有传输失败且 HTTP 000 才通过。
 - 没有连接 Pi，没有修改 systemd，没有安装、启动或应用服务，也没有改 Orchestra。
 - 根工作树里的两份锐评删除、`.codegraph/` 和两张未跟踪任务卡属于用户现有状态，不得清理或带入 Bogda 提交。
 

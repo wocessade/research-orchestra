@@ -106,7 +106,7 @@ $env:BOGDA_CONSOLE_ALLOWED_WORK_POOL_NAMES = "pi-service,dorm-x86"
 Get-NetTCPConnection -LocalAddress 127.0.0.1 -LocalPort 3101 -State Listen |
     Select-Object LocalAddress, LocalPort, OwningProcess
 
-Invoke-RestMethod http://127.0.0.1:3101/api/v1/capabilities |
+(Invoke-RestMethod http://127.0.0.1:3101/api/v1/capabilities).data |
     Select-Object profile, canSetAutonomyMode
 ```
 

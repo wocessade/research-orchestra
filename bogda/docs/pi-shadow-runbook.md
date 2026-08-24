@@ -118,7 +118,9 @@ curl --fail --silent --show-error --user "$AUTH_PAIR" "http://$PI_TAILNET_IP:420
 unset AUTH_PAIR
 ```
 
-The tailnet request must succeed. From a client that is not on the tailnet, run the reachability-negative test; any HTTP response is a hard failure, while transport failure with no response is expected:
+The authenticated health request must succeed, but `/api/health` may be intentionally anonymous and therefore does not prove that API authentication is enforced. Verify authentication separately against a protected endpoint such as `POST /api/flows/count`: the authenticated request must return 200 and the same request without credentials must return 401 or 403.
+
+From a client that is not on the tailnet, run the reachability-negative test; any HTTP response is a hard failure, while transport failure with no response is expected:
 
 ```sh
 http_code="$(curl --connect-timeout 5 --max-time 10 --silent --show-error \

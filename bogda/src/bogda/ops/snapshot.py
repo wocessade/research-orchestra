@@ -15,6 +15,7 @@ import tempfile
 from typing import Any
 
 
+_SNAPSHOT_STEM = re.compile(r"^prefect-\d{8}T\d{6}Z$")
 _SNAPSHOT_NAME = re.compile(r"^prefect-\d{8}T\d{6}Z\.db$")
 
 
@@ -69,6 +70,16 @@ def _utc_now(value: datetime | None) -> datetime:
     return current.astimezone(UTC)
 
 
+def _timestamped_stems(destination: Path) -> tuple[str, ...]:
+    stems: set[str] = set()
+    for path in destination.iterdir():
+        if path.suffix in {".db", ".json"}:
+            stem = path.stem
+            if _SNAPSHOT_STEM.match(stem):
+                stems.add(stem)
+    return tuple(sorted(stems))
+
+
 def create_snapshot(
     source: Path,
     destination: Path,
@@ -89,6 +100,12 @@ def create_snapshot(
     temporary_db: Path | None = None
 
     try:
+        if os.path.lexists(snapshot) or os.path.lexists(manifest):
+            raise ValueError(f"snapshot timestamp already exists: {timestamp}")
+        existing_timestamps = _timestamped_stems(destination)
+        if existing_timestamps and f"prefect-{timestamp}" <= existing_timestamps[-1]:
+            raise ValueError("snapshot timestamp must be newer than existing snapshots")
+
         source_integrity = integrity_check(source)
         if source_integrity != "ok":
             raise sqlite3.DatabaseError(f"source integrity check failed: {source_integrity}")
@@ -163,7 +180,10 @@ def verify_snapshot(
 
     restore_dir.mkdir(parents=True, exist_ok=True)
     restored = restore_dir / "prefect-restored.db"
-    shutil.copyfile(snapshot, restored)
+    if os.path.lexists(restored):
+        raise FileExistsError(f"restore target already exists: {restored}")
+    with snapshot.open("rb") as source_file, restored.open("xb") as restored_file:
+        shutil.copyfileobj(source_file, restored_file)
     checked = integrity_check(restored)
     if checked != "ok":
         raise sqlite3.DatabaseError(f"restored snapshot integrity check failed: {checked}")
@@ -183,7 +203,11 @@ def prune_snapshots(destination: Path, keep: int) -> tuple[Path, ...]:
         raise ValueError("keep must be at least 1")
     destination = Path(destination)
     snapshots = sorted(
-        (path for path in destination.glob("prefect-*.db") if _SNAPSHOT_NAME.match(path.name)),
+        (
+            path
+            for path in destination.glob("prefect-*.db")
+            if _SNAPSHOT_NAME.match(path.name) and path.with_suffix(".json").is_file()
+        ),
         key=lambda path: path.name,
     )
     removed: list[Path] = []

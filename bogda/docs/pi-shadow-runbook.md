@@ -49,11 +49,13 @@ systemd-analyze verify \
   deploy/pi/systemd/bogda-prefect-snapshot.timer \
   deploy/pi/systemd/bogda-shadow-health.service \
   deploy/pi/systemd/bogda-shadow-health.timer
+rc=$?
+printf 'verify_exit=%s\n' "$rc"
 ```
 
 Expected facts: uname -m is aarch64; Python is 3.11 or newer; /mnt/nas is an approved local SSD partition with FSTYPE ext4; its UUID/PARTUUID and source match the approved SSD and /etc/fstab; and the available-byte value has capacity for the approved 72-hour evidence plus seven snapshots. Record the Tailscale identity, tailnet IPv4 address, and netcheck output; it must show the approved tailnet rather than an unreviewed public exposure. A missing mount, wrong source/identity, non-ext4 filesystem, or inadequate capacity is a hard failure.
 
-systemd-analyze verify must accept all six reviewed unit files. The units are statically checked locally, but this command is the future Pi gate for actual systemd parsing and command resolution. Check available memory as an observation threshold: less than 400 MB available requires investigation, but is not by itself a hard failure.
+systemd-analyze verify must still run on all six reviewed unit files. Record the command, the time, and verify_exit. The units are statically checked locally; this command is the Pi gate for actual systemd parsing. Before installation, command resolution may fail only because /opt/bogda/.venv/bin/python does not exist and/or /opt/bogda/.venv/bin/prefect does not exist. Those expected absences may make verify_exit=1 and are not a Gate 2 hard failure. Unknown keys, illegal sections, or any other command errors on Bogda units remain hard failures. Timezone ignoring warnings from already-installed non-bogda units are recorded and are not Bogda failures. Do not treat Gate 2 as the command-resolution acceptance gate. Check available memory as an observation threshold: less than 400 MB available requires investigation, but is not by itself a hard failure.
 
 ## Gate 3 — Install without start
 
@@ -69,12 +71,16 @@ systemd-analyze verify \
   /etc/systemd/system/bogda-prefect-snapshot.timer \
   /etc/systemd/system/bogda-shadow-health.service \
   /etc/systemd/system/bogda-shadow-health.timer
+rc=$?
+printf 'verify_exit=%s\n' "$rc"
 stat -c '%a %U %G %n' /etc/bogda/bogda.env
 cat /etc/bogda/last-backup
 cat "$(cat /etc/bogda/last-backup)/inventory.tsv"
 ```
 
 The installer rejects a symlinked managed unit target, environment target, or last-backup pointer before it changes the host. It saves the prior managed files in /etc/bogda/backups/<UTC timestamp>/inventory.tsv and records that directory in /etc/bogda/last-backup. Confirm every one of the six unit paths and /etc/bogda/bogda.env has an accurate present or absent inventory row. An existing runtime environment file is preserved; the sentinel example is installed only when the file is absent. Verify the resulting env-file mode is 640 and its owner/group are root bogda before a new installation proceeds.
+
+After --install and before any --start* flag, re-run systemd-analyze verify on the installed unit paths and record verify_exit. This run must exit 0. The output must not report /opt/bogda/.venv/bin/python or /opt/bogda/.venv/bin/prefect as not executable. If either command is still missing, or verify_exit is not 0, stop. Do not enter Gate 4 and do not run --start-server or --start-services. Command resolution is accepted here, not at Gate 2. Timezone ignoring warnings from already-installed non-bogda units are still recorded and are not Bogda failures.
 
 ## Gate 4 — Configure auth, check static exposure, then start only the server
 

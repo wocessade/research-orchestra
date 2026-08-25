@@ -11,12 +11,14 @@ from bogda_console.contracts.models import (
     PrefectStateSnapshot,
     ProjectContext,
     QueueSnapshot,
+    ResearchCheckpointView,
     RunDetail,
     RunFilters,
     RunSummary,
     ScheduleSummary,
     WorkerSnapshot,
     command_version,
+    checkpoint_impact,
 )
 
 
@@ -30,6 +32,7 @@ class MockPrefectAdapter:
         self._submit_counter = 0
         self.cancel_calls: list[str] = []
         self.submit_calls: list[str] = []
+        self.resume_calls: list[str] = []
 
     @property
     def observed_at(self) -> datetime:
@@ -68,6 +71,7 @@ class MockPrefectAdapter:
             parameters=raw.get("parameters", {}),
             tags=raw.get("tags", []),
             projectContext=self._project_context(raw),
+            checkpoint=self._checkpoint(raw),
         )
 
     async def list_registered_deployments(
@@ -149,6 +153,39 @@ class MockPrefectAdapter:
         }
         self.cancel_calls.append(run_id)
         return self._run(raw)
+
+    async def resume_run(self, run_id: str, run_input: dict[str, Any]) -> None:
+        self._require_available()
+        raw = self._find_run(run_id)
+        state = raw["state"]
+        if state.get("type") != "PAUSED" and state.get("name") != "Paused":
+            raise RuntimeError("Cannot resume a run that isn't paused")
+        checkpoint = raw.get("checkpoint")
+        if not isinstance(checkpoint, dict) or checkpoint.get("verdict"):
+            raise RuntimeError("no open checkpoint")
+        verdict = run_input["verdict"]
+        checkpoint["verdict"] = verdict
+        checkpoint["rationale"] = run_input.get("rationale")
+        checkpoint["decidedBy"] = run_input.get("decided_by") or "human"
+        checkpoint["stage"] = "accepted" if verdict == "approved" else "done"
+        checkpoint["commandVersion"] = f"{checkpoint['commandVersion']}-decided"
+        if verdict == "rejected":
+            raw["state"] = {
+                "type": "CANCELLED",
+                "name": "Cancelled",
+                "timestamp": self._clock.isoformat(),
+                "terminal": True,
+                "message": f"{checkpoint['kind']} rejected",
+            }
+        else:
+            raw["state"] = {
+                "type": "RUNNING",
+                "name": "Running",
+                "timestamp": self._clock.isoformat(),
+                "terminal": False,
+                "message": None,
+            }
+        self.resume_calls.append(run_id)
 
     async def pause_schedule(
         self, deployment_id: str, schedule_id: str
@@ -279,6 +316,14 @@ class MockPrefectAdapter:
             modeSource="frozen-run-request" if mode else "unavailable",
             writable=False,
         )
+
+    def _checkpoint(self, raw: dict[str, Any]) -> ResearchCheckpointView | None:
+        payload = raw.get("checkpoint")
+        if not isinstance(payload, dict):
+            return None
+        data = dict(payload)
+        data.setdefault("impact", checkpoint_impact(str(data.get("kind", ""))))
+        return ResearchCheckpointView.model_validate(data)
 
     def _pool(self, raw: dict[str, Any]) -> PoolSnapshot:
         return PoolSnapshot(

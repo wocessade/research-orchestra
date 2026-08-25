@@ -181,6 +181,81 @@ async def test_rejection_and_failed_post_read_are_distinct(
     assert (unknown.value.code, unknown.value.status_code) == ("COMMAND_OUTCOME_UNKNOWN", 503)
 
 
+def _paused_checkpoint_run() -> dict[str, object]:
+    return {
+        "runId": "run-checkpoint",
+        "name": "ridge experiment gate",
+        "deploymentId": "deployment-dorm",
+        "deploymentName": "alpine-assay",
+        "projectId": "bogda-main",
+        "workPoolName": "dorm-x86",
+        "workQueueName": "cpu",
+        "state": {
+            "type": "PAUSED",
+            "name": "Paused",
+            "timestamp": "2026-08-24T08:21:00Z",
+            "terminal": False,
+            "message": "waiting for experiment_approval",
+        },
+        "scheduledAt": "2026-08-24T08:18:00Z",
+        "startedAt": "2026-08-24T08:20:00Z",
+        "endedAt": None,
+        "parameters": {"sample": "ridge-a"},
+        "tags": ["cpu"],
+        "checkpoint": {
+            "kind": "experiment_approval",
+            "stage": "done",
+            "verdict": None,
+            "rationale": None,
+            "decidedBy": None,
+            "commandVersion": "checkpoint-v1",
+            "impact": "批准后继续执行实验；拒绝将以 Cancelled 结束，不会记成系统失败。",
+        },
+    }
+
+
+@pytest.mark.asyncio
+async def test_checkpoint_approve_resumes_paused_run(fixture_loader) -> None:
+    fixture = fixture_loader("normal-active")
+    fixture["prefect"]["runs"].insert(0, _paused_checkpoint_run())
+    fixture["runResults"]["artifactsByRun"]["run-checkpoint"] = []
+    service, prefect, _ = harness(fixture)
+    receipt = await service.decide_checkpoint(
+        "run-checkpoint", "checkpoint-v1", "approved", "可以做"
+    )
+    assert receipt.snapshot.run.state.name == "Running"
+    assert receipt.snapshot.checkpoint.verdict == "approved"
+    assert receipt.snapshot.checkpoint.stage == "accepted"
+    assert prefect.resume_calls == ["run-checkpoint"]
+
+
+@pytest.mark.asyncio
+async def test_checkpoint_reject_cancels_instead_of_failing(fixture_loader) -> None:
+    fixture = fixture_loader("normal-active")
+    fixture["prefect"]["runs"].insert(0, _paused_checkpoint_run())
+    fixture["runResults"]["artifactsByRun"]["run-checkpoint"] = []
+    service, _, _ = harness(fixture)
+    receipt = await service.decide_checkpoint(
+        "run-checkpoint", "checkpoint-v1", "rejected", "unsafe"
+    )
+    assert receipt.snapshot.run.state.type == "CANCELLED"
+    assert receipt.snapshot.run.state.name == "Cancelled"
+    assert receipt.snapshot.checkpoint.verdict == "rejected"
+    assert receipt.snapshot.checkpoint.stage == "done"
+
+
+@pytest.mark.asyncio
+async def test_stale_checkpoint_version_stops_before_resume(fixture_loader) -> None:
+    fixture = fixture_loader("normal-active")
+    fixture["prefect"]["runs"].insert(0, _paused_checkpoint_run())
+    fixture["runResults"]["artifactsByRun"]["run-checkpoint"] = []
+    service, prefect, _ = harness(fixture)
+    with pytest.raises(ServiceError) as error:
+        await service.decide_checkpoint("run-checkpoint", "stale", "approved", "no")
+    assert error.value.code == "RESOURCE_CHANGED"
+    assert prefect.resume_calls == []
+
+
 @pytest.mark.asyncio
 async def test_run_result_pre_read_unavailable_is_source_scoped(fixture_loader) -> None:
     service, _, results = harness(fixture_loader("result-missing-invalid-conflict"))

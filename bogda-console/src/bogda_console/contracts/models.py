@@ -225,11 +225,30 @@ class RunSummary(WireModel):
     command_version: str
 
 
+class ResearchCheckpointView(WireModel):
+    kind: str
+    stage: str
+    verdict: str | None = None
+    rationale: str | None = None
+    decided_by: str | None = None
+    command_version: str
+    impact: str | None = None
+
+
+def checkpoint_impact(kind: str) -> str:
+    return {
+        "plan_approval": "批准后进入实验；拒绝将以 Cancelled 结束，不会记成系统失败。",
+        "experiment_approval": "批准后继续执行实验；拒绝将以 Cancelled 结束，不会记成系统失败。",
+        "scientific_review": "批准后结束本检查点，不把科研状态标为 accepted；拒绝将以 Cancelled 结束，不会记成系统失败。",
+    }.get(kind, "批准后继续；拒绝将以 Cancelled 结束，不会记成系统失败。")
+
+
 class RunDetail(WireModel):
     run: RunSummary
     parameters: dict[str, Any] = Field(default_factory=dict)
     tags: list[str] = Field(default_factory=list)
     project_context: ProjectContext | None = None
+    checkpoint: ResearchCheckpointView | None = None
 
 
 class ScheduleSummary(WireModel):
@@ -330,6 +349,12 @@ class ReviewRequest(WireModel):
     base_artifact_id: str = Field(min_length=1)
     scientific_status: ScientificStatus
     review_summary: str | None = None
+
+
+class CheckpointDecisionRequest(WireModel):
+    expected_command_version: str = Field(min_length=1)
+    verdict: Literal["approved", "rejected"]
+    rationale: str | None = None
 
 
 class AutonomyPolicySnapshot(WireModel):

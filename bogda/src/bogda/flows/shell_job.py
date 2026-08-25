@@ -3,6 +3,7 @@ from typing import Any
 
 from prefect import flow, task
 from prefect.context import get_run_context
+from prefect.states import Cancelled
 
 from bogda.artifacts import load_run_result, save_run_result
 from bogda.contracts import (
@@ -12,6 +13,11 @@ from bogda.contracts import (
     ScientificStatus,
 )
 from bogda.executors import run_shell
+from bogda.flows.research_checkpoint import (
+    CheckpointRejected,
+    shell_checkpoints,
+    wait_for_decision,
+)
 
 
 class JobExecutionError(RuntimeError):
@@ -58,17 +64,24 @@ def run_shell_job(
     run_id = str(get_run_context().flow_run.id)
     configured_task = execute_shell_task.with_options(retries=retry_count(parsed))
     try:
-        result_data = configured_task(
-            parsed.model_dump(mode="json"),
-            attempts_root,
-            run_id,
-        )
-        result = RunResult.model_validate(result_data)
-    except JobExecutionError as error:
-        save_run_result(error.result)
-        raise
-    save_run_result(result)
-    return result.model_dump(mode="json")
+        for kind in shell_checkpoints(parsed.autonomy_mode, "before"):
+            wait_for_decision(run_id, kind)
+        try:
+            result_data = configured_task(
+                parsed.model_dump(mode="json"),
+                attempts_root,
+                run_id,
+            )
+            result = RunResult.model_validate(result_data)
+        except JobExecutionError as error:
+            save_run_result(error.result)
+            raise
+        save_run_result(result)
+        for kind in shell_checkpoints(parsed.autonomy_mode, "after"):
+            wait_for_decision(run_id, kind)
+        return result.model_dump(mode="json")
+    except CheckpointRejected as error:
+        return Cancelled(message=f"{error.decision.kind} rejected")
 
 
 @flow(name="bogda-review-result")

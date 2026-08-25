@@ -13,6 +13,11 @@ from bogda.contracts import (
 from bogda.flows import shell_job
 
 
+@pytest.fixture(autouse=True)
+def auto_approve_checkpoints(monkeypatch) -> None:
+    monkeypatch.setattr(shell_job, "wait_for_decision", lambda *_args, **_kwargs: None)
+
+
 def request(retryable: bool = False) -> JobRequest:
     return JobRequest(
         job_id="job-1",

@@ -19,6 +19,7 @@ def test_openapi_contains_every_canonical_wire_schema() -> None:
         "RunResultVersionSummary",
         "RunResultView",
         "RunSummary",
+        "ResearchCheckpointView",
         "SourceMeta",
     }
     assert required <= set(schemas)
@@ -29,3 +30,4 @@ def test_openapi_keeps_command_and_review_request_bodies_closed() -> None:
     paths = schema["paths"]
     assert paths["/api/v1/runs/{run_id}/cancel"]["post"]["requestBody"]
     assert paths["/api/v1/runs/{run_id}/reviews"]["post"]["requestBody"]
+    assert paths["/api/v1/runs/{run_id}/checkpoints"]["post"]["requestBody"]

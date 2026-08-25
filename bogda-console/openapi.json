@@ -171,6 +171,40 @@
         "title": "ApiEnvelope[CommandReceipt[QueueSnapshot]]",
         "type": "object"
       },
+      "ApiEnvelope_CommandReceipt_RunDetail__": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CommandReceipt_RunDetail_"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SourceMeta"
+            },
+            "title": "Sources",
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiEnvelope[CommandReceipt[RunDetail]]",
+        "type": "object"
+      },
       "ApiEnvelope_CommandReceipt_RunResultView__": {
         "additionalProperties": false,
         "properties": {
@@ -725,6 +759,41 @@
         "title": "CapabilitySnapshot",
         "type": "object"
       },
+      "CheckpointDecisionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedCommandVersion": {
+            "minLength": 1,
+            "title": "Expectedcommandversion",
+            "type": "string"
+          },
+          "rationale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rationale"
+          },
+          "verdict": {
+            "enum": [
+              "approved",
+              "rejected"
+            ],
+            "title": "Verdict",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expectedCommandVersion",
+          "verdict"
+        ],
+        "title": "CheckpointDecisionRequest",
+        "type": "object"
+      },
       "CommandReceipt_AutonomyPolicySnapshot_": {
         "additionalProperties": false,
         "properties": {
@@ -810,6 +879,35 @@
           "snapshot"
         ],
         "title": "CommandReceipt[QueueSnapshot]",
+        "type": "object"
+      },
+      "CommandReceipt_RunDetail_": {
+        "additionalProperties": false,
+        "properties": {
+          "acceptedAt": {
+            "format": "date-time",
+            "title": "Acceptedat",
+            "type": "string"
+          },
+          "command": {
+            "title": "Command",
+            "type": "string"
+          },
+          "resourceId": {
+            "title": "Resourceid",
+            "type": "string"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/RunDetail"
+          }
+        },
+        "required": [
+          "command",
+          "resourceId",
+          "acceptedAt",
+          "snapshot"
+        ],
+        "title": "CommandReceipt[RunDetail]",
         "type": "object"
       },
       "CommandReceipt_RunResultView_": {
@@ -1408,6 +1506,74 @@
         "title": "QueueSnapshot",
         "type": "object"
       },
+      "ResearchCheckpointView": {
+        "additionalProperties": false,
+        "properties": {
+          "commandVersion": {
+            "title": "Commandversion",
+            "type": "string"
+          },
+          "decidedBy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decidedby"
+          },
+          "impact": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Impact"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "rationale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rationale"
+          },
+          "stage": {
+            "title": "Stage",
+            "type": "string"
+          },
+          "verdict": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verdict"
+          }
+        },
+        "required": [
+          "kind",
+          "stage",
+          "commandVersion"
+        ],
+        "title": "ResearchCheckpointView",
+        "type": "object"
+      },
       "ReviewRequest": {
         "additionalProperties": false,
         "properties": {
@@ -1441,6 +1607,16 @@
       "RunDetail": {
         "additionalProperties": false,
         "properties": {
+          "checkpoint": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResearchCheckpointView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "parameters": {
             "additionalProperties": true,
             "title": "Parameters",
@@ -2723,6 +2899,55 @@
           }
         },
         "summary": "Cancel"
+      }
+    },
+    "/api/v1/runs/{run_id}/checkpoints": {
+      "post": {
+        "operationId": "decide_checkpoint_api_v1_runs__run_id__checkpoints_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckpointDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_CommandReceipt_RunDetail__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Decide Checkpoint"
       }
     },
     "/api/v1/runs/{run_id}/result": {

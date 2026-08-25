@@ -9,6 +9,7 @@ from bogda_console.contracts.models import (
     ApiEnvelope,
     AutonomyPolicySnapshot,
     CapabilitySnapshot,
+    CheckpointDecisionRequest,
     CommandReceipt,
     DeploymentSummary,
     ExpectedVersionRequest,
@@ -195,6 +196,20 @@ async def review(run_id: str, body: ReviewRequest, request: Request):
     return command_envelope(
         await commands(request).review(
             run_id, body.base_artifact_id, body.scientific_status, body.review_summary
+        )
+    )
+
+
+@router.post(
+    "/runs/{run_id}/checkpoints",
+    response_model=ApiEnvelope[CommandReceipt[RunDetail]],
+)
+async def decide_checkpoint(
+    run_id: str, body: CheckpointDecisionRequest, request: Request
+):
+    return command_envelope(
+        await commands(request).decide_checkpoint(
+            run_id, body.expected_command_version, body.verdict, body.rationale
         )
     )
 

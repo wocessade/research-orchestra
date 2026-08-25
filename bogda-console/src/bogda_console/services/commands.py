@@ -16,6 +16,7 @@ from bogda_console.contracts.models import (
     CommandReceipt,
     DeploymentSummary,
     QueueSnapshot,
+    RunDetail,
     RunResultView,
     RunSummary,
     ScientificStatus,
@@ -174,6 +175,43 @@ class CommandService:
                 )
             post = await self._post_read("runResult", lambda: self.results.get_latest(run_id))
             return self._receipt("review", run_id, post)
+
+    async def decide_checkpoint(
+        self,
+        run_id: str,
+        expected_command_version: str,
+        verdict: str,
+        rationale: str | None,
+    ) -> CommandReceipt[RunDetail]:
+        async with self._lock(f"checkpoint:{run_id}"):
+            self._require_commands()
+            detail = await self._pre_read("prefect", lambda: self.prefect.get_run(run_id))
+            self._authorize_run(detail.run)
+            checkpoint = detail.checkpoint
+            if checkpoint is None or checkpoint.verdict is not None:
+                self._raise(
+                    ApiErrorCode.COMMAND_NOT_APPLICABLE,
+                    409,
+                    "run has no open research checkpoint",
+                    detail,
+                )
+            self._check_version(
+                checkpoint.command_version, expected_command_version, checkpoint
+            )
+            await self._mutate(
+                "prefect",
+                lambda: self.prefect.resume_run(
+                    run_id,
+                    {
+                        "verdict": verdict,
+                        "rationale": rationale,
+                        "decided_by": "human",
+                        "command_version": checkpoint.command_version,
+                    },
+                ),
+            )
+            post = await self._post_read("prefect", lambda: self.prefect.get_run(run_id))
+            return self._receipt("decideCheckpoint", run_id, post)
 
     async def _schedule(
         self,

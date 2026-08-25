@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from contextlib import AbstractAsyncContextManager
 from datetime import datetime
@@ -32,6 +33,7 @@ from bogda_console.contracts.models import (
     PrefectStateSnapshot,
     ProjectContext,
     QueueSnapshot,
+    ResearchCheckpointView,
     RunDetail,
     RunFilters,
     RunResultVersionSummary,
@@ -41,12 +43,15 @@ from bogda_console.contracts.models import (
     ScientificStatus,
     ValidRunResult,
     WorkerSnapshot,
+    checkpoint_impact,
     command_version,
 )
 
 
 ClientFactory = Callable[[], AbstractAsyncContextManager[Any]]
 RUN_RESULT_TYPE = "bogda.run-result"
+DECISION_TYPE = "bogda.research-decision"
+DECISION_KINDS = ("plan_approval", "experiment_approval", "scientific_review")
 
 
 def _value(value: Any) -> str:
@@ -104,12 +109,14 @@ class PrefectApiAdapter:
         async with self._client_factory() as client:
             raw = await client.read_flow_run(UUID(run_id))
             run = await self._run_summary(client, raw)
+            checkpoint = await self._checkpoint(client, run_id)
         parameters = dict(raw.parameters or {})
         return RunDetail(
             run=run,
             parameters=parameters,
             tags=list(raw.tags or []),
             projectContext=self._run_context(parameters),
+            checkpoint=checkpoint,
         )
 
     async def list_registered_deployments(self, cursor: str | None, limit: int) -> Page[DeploymentSummary]:
@@ -193,6 +200,10 @@ class PrefectApiAdapter:
             await client.set_flow_run_state(UUID(run_id), Cancelling(message="Cancellation requested from Bogda Console"))
             raw = await client.read_flow_run(UUID(run_id))
             return await self._run_summary(client, raw)
+
+    async def resume_run(self, run_id: str, run_input: dict[str, Any]) -> None:
+        async with self._client_factory() as client:
+            await client.resume_flow_run(UUID(run_id), run_input=run_input)
 
     async def pause_schedule(self, deployment_id: str, schedule_id: str) -> DeploymentSummary:
         return await self._set_schedule(deployment_id, schedule_id, False)
@@ -321,6 +332,40 @@ class PrefectApiAdapter:
             flow_run_id=ArtifactFilterFlowRunId(any_=[UUID(run_id)]),
         )
         return await client.read_artifacts(artifact_filter=artifact_filter, sort=ArtifactSort.CREATED_DESC, offset=offset, limit=limit)
+
+    @staticmethod
+    async def _checkpoint(client: Any, run_id: str) -> ResearchCheckpointView | None:
+        for kind in DECISION_KINDS:
+            artifacts = await client.read_artifacts(
+                artifact_filter=ArtifactFilter(
+                    key=ArtifactFilterKey(any_=[f"bogda-decision-{kind}-{run_id}"]),
+                    type=ArtifactFilterType(any_=[DECISION_TYPE]),
+                ),
+                sort=ArtifactSort.CREATED_DESC,
+                limit=1,
+            )
+            if not artifacts:
+                continue
+            data = artifacts[0].data
+            if isinstance(data, str):
+                data = json.loads(data)
+            if not isinstance(data, dict) or data.get("kind") != kind:
+                continue
+            if data.get("verdict"):
+                continue
+            version = data.get("command_version")
+            if not version:
+                continue
+            return ResearchCheckpointView(
+                kind=kind,
+                stage=data.get("stage", "done"),
+                verdict=None,
+                rationale=data.get("rationale"),
+                decidedBy=data.get("decided_by"),
+                commandVersion=version,
+                impact=checkpoint_impact(kind),
+            )
+        return None
 
     @staticmethod
     def _artifact_view(artifact: Any) -> RunResultView:

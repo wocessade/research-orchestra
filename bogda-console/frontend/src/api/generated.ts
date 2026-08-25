@@ -225,6 +225,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/runs/{run_id}/checkpoints": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decide Checkpoint */
+        post: operations["decide_checkpoint_api_v1_runs__run_id__checkpoints_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/runs/{run_id}/result": {
         parameters: {
             query?: never;
@@ -374,6 +391,16 @@ export interface components {
         /** ApiEnvelope[CommandReceipt[QueueSnapshot]] */
         ApiEnvelope_CommandReceipt_QueueSnapshot__: {
             data: components["schemas"]["CommandReceipt_QueueSnapshot_"] | null;
+            /** Errors */
+            errors?: components["schemas"]["ApiError"][];
+            /** Sources */
+            sources?: {
+                [key: string]: components["schemas"]["SourceMeta"];
+            };
+        };
+        /** ApiEnvelope[CommandReceipt[RunDetail]] */
+        ApiEnvelope_CommandReceipt_RunDetail__: {
+            data: components["schemas"]["CommandReceipt_RunDetail_"] | null;
             /** Errors */
             errors?: components["schemas"]["ApiError"][];
             /** Sources */
@@ -553,6 +580,18 @@ export interface components {
             /** Projectid */
             projectId: string;
         };
+        /** CheckpointDecisionRequest */
+        CheckpointDecisionRequest: {
+            /** Expectedcommandversion */
+            expectedCommandVersion: string;
+            /** Rationale */
+            rationale?: string | null;
+            /**
+             * Verdict
+             * @enum {string}
+             */
+            verdict: "approved" | "rejected";
+        };
         /** CommandReceipt[AutonomyPolicySnapshot] */
         CommandReceipt_AutonomyPolicySnapshot_: {
             /**
@@ -591,6 +630,19 @@ export interface components {
             /** Resourceid */
             resourceId: string;
             snapshot: components["schemas"]["QueueSnapshot"];
+        };
+        /** CommandReceipt[RunDetail] */
+        CommandReceipt_RunDetail_: {
+            /**
+             * Acceptedat
+             * Format: date-time
+             */
+            acceptedAt: string;
+            /** Command */
+            command: string;
+            /** Resourceid */
+            resourceId: string;
+            snapshot: components["schemas"]["RunDetail"];
         };
         /** CommandReceipt[RunResultView] */
         CommandReceipt_RunResultView_: {
@@ -788,6 +840,23 @@ export interface components {
             /** Status */
             status: string;
         };
+        /** ResearchCheckpointView */
+        ResearchCheckpointView: {
+            /** Commandversion */
+            commandVersion: string;
+            /** Decidedby */
+            decidedBy?: string | null;
+            /** Impact */
+            impact?: string | null;
+            /** Kind */
+            kind: string;
+            /** Rationale */
+            rationale?: string | null;
+            /** Stage */
+            stage: string;
+            /** Verdict */
+            verdict?: string | null;
+        };
         /** ReviewRequest */
         ReviewRequest: {
             /** Baseartifactid */
@@ -798,6 +867,7 @@ export interface components {
         };
         /** RunDetail */
         RunDetail: {
+            checkpoint?: components["schemas"]["ResearchCheckpointView"] | null;
             /** Parameters */
             parameters?: {
                 [key: string]: unknown;
@@ -1387,6 +1457,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiEnvelope_CommandReceipt_RunSummary__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_checkpoint_api_v1_runs__run_id__checkpoints_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckpointDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiEnvelope_CommandReceipt_RunDetail__"];
                 };
             };
             /** @description Validation Error */

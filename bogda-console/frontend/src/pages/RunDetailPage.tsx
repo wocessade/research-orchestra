@@ -63,6 +63,71 @@ function ReviewControl({ runId, view, enabled, profile, onReviewed }: { runId: s
   </section>;
 }
 
+function CheckpointControl({
+  runId,
+  checkpoint,
+  enabled,
+  profile,
+  onDecided,
+}: {
+  runId: string;
+  checkpoint: NonNullable<RunDetail["checkpoint"]>;
+  enabled: boolean;
+  profile?: string;
+  onDecided: (detail: RunDetail) => void;
+}) {
+  const [rationale, setRationale] = useState("");
+  const [commandVersion, setCommandVersion] = useState(checkpoint.commandVersion);
+  const [adoptedVersion, setAdoptedVersion] = useState<string | null>(null);
+  const mutation = useMutation({
+    mutationFn: (verdict: "approved" | "rejected") => api.command<CommandReceipt<RunDetail>>(`/api/v1/runs/${runId}/checkpoints`, {
+      expectedCommandVersion: commandVersion,
+      verdict,
+      rationale: rationale || null,
+    }),
+  });
+  const conflict = mutation.error instanceof ApiClientError && mutation.error.errors[0]?.code === "RESOURCE_CHANGED"
+    ? mutation.error.errors[0].details?.currentResource as NonNullable<RunDetail["checkpoint"]> | undefined
+    : undefined;
+
+  useEffect(() => {
+    setCommandVersion(checkpoint.commandVersion);
+    setAdoptedVersion(null);
+  }, [checkpoint.commandVersion]);
+
+  async function decide(verdict: "approved" | "rejected") {
+    const response = await mutation.mutateAsync(verdict).catch(() => null);
+    if (!response?.data) return;
+    onDecided(response.data.snapshot);
+  }
+
+  if (checkpoint.verdict) return null;
+
+  return <section className="checkpoint-control detail-section" aria-labelledby="checkpoint-title">
+    <div className="detail-heading">
+      <div>
+        <p className="page-kicker">Type-B / {checkpoint.stage}</p>
+        <h2 id="checkpoint-title">人工检查点</h2>
+      </div>
+      <p>证据在本页；批准或拒绝只作用这一次检查点，不会从列表一键代劳。</p>
+    </div>
+    <dl className="fact-grid">
+      <div><dt>类型</dt><dd>{checkpoint.kind}</dd></div>
+      <div><dt>阶段</dt><dd>{checkpoint.stage}</dd></div>
+      <div><dt>影响</dt><dd>{checkpoint.impact}</dd></div>
+    </dl>
+    <label>判断说明<textarea rows={3} value={rationale} onChange={(event) => setRationale(event.target.value)} disabled={!enabled || mutation.isPending} /></label>
+    <div className="checkpoint-actions">
+      <button type="button" className="primary-action" disabled={!enabled || mutation.isPending} onClick={() => void decide("approved")}>{mutation.isPending ? "等待回执…" : "批准"}</button>
+      <button type="button" className="danger-outline-action" disabled={!enabled || mutation.isPending} onClick={() => void decide("rejected")}>拒绝</button>
+    </div>
+    {!enabled && <p className="readonly-note">当前 profile 为 {profile ?? "unknown"}，只读，不能决定人工检查点。</p>}
+    {conflict && <div className="command-conflict" role="alert"><strong>检查点已被更新</strong><span>说明已保留。请先采用当前版本后再提交。</span><code>{conflict.commandVersion}</code><button type="button" className="quiet-action" onClick={() => { if (!conflict.commandVersion) return; setCommandVersion(conflict.commandVersion); setAdoptedVersion(conflict.commandVersion); mutation.reset(); }}>采用当前版本</button></div>}
+    {adoptedVersion && <p className="command-notice" role="status">已采用当前检查点版本 {adoptedVersion}。</p>}
+    {mutation.isError && !conflict && <div className="command-error" role="alert">检查点未获得权威回执；没有自动重试。</div>}
+  </section>;
+}
+
 export function RunDetailPage() {
   const { runId = "" } = useParams();
   const location = useLocation();
@@ -73,6 +138,7 @@ export function RunDetailPage() {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelSnapshot, setCancelSnapshot] = useState<RunSummary | null>(null);
   const [reviewSnapshot, setReviewSnapshot] = useState<RunResultView | null>(null);
+  const [detailSnapshot, setDetailSnapshot] = useState<RunDetail | null>(null);
   const cancelMutation = useMutation({ mutationFn: (run: RunSummary) => api.command<CommandReceipt<RunSummary>>(`/api/v1/runs/${run.runId}/cancel`, { expectedCommandVersion: run.commandVersion }) });
   const resultView = reviewSnapshot ?? resultQuery.data?.data;
 
@@ -84,7 +150,7 @@ export function RunDetailPage() {
   if (detailQuery.isPending) return <section className="page"><QueryLoading /></section>;
   if (detailQuery.isError || !detailQuery.data.data) return <section className="page"><QueryFailure title="运行详情暂不可用" /></section>;
   const envelope = detailQuery.data;
-  const detail = envelope.data!;
+  const detail = detailSnapshot ?? envelope.data!;
   const run = cancelSnapshot ?? detail.run;
   const science = reviewSnapshot?.result ? { availability: "available", artifactId: reviewSnapshot.artifactId, artifactCreatedAt: reviewSnapshot.artifactCreatedAt, scientificStatus: reviewSnapshot.result.scientific_status, reviewSummary: reviewSnapshot.result.review_summary, validationIssues: [] } : run.scientific;
   const capabilities = capabilitiesQuery.data?.data;
@@ -105,7 +171,8 @@ export function RunDetailPage() {
       <div><p>Prefect 执行状态</p><ExecutionMark type={run.state.type} name={run.state.name} /><time dateTime={run.state.timestamp}>{formatAbsolute(run.state.timestamp)}</time></div>
       <div><p>科研判断状态</p>{science?.availability === "available" ? <ScientificMark status={science.scientificStatus} /> : <span className={`availability availability--${science?.availability ?? "none"}`}>{science?.availability === "invalid" ? "RunResult 无效" : science?.availability === "missing" ? "RunResult 缺失" : "科研状态不可用"}</span>}<span>{science?.artifactId ?? "无权威 Artifact"}</span></div>
     </section>
-    <section className="detail-section context-section" aria-labelledby="context-title"><div className="detail-heading"><h2 id="context-title">Project Context</h2><p>只读上下文，为未来 C 模式预留契约，不在此修改。</p></div>{detail.projectContext ? <dl className="fact-grid"><div><dt>Project</dt><dd>{detail.projectContext.projectId}</dd></div><div><dt>有效自主模式</dt><dd>{detail.projectContext.effectiveAutonomyMode}</dd></div><div><dt>模式来源</dt><dd>{detail.projectContext.modeSource}</dd></div><div><dt>可写</dt><dd>否</dd></div></dl> : <p className="muted">Project Context 不可用。</p>}</section>
+    <section className="detail-section context-section" aria-labelledby="context-title"><div className="detail-heading"><h2 id="context-title">项目上下文</h2><p>只读上下文。有效自主模式在创建时冻结，不在此修改。</p></div>{detail.projectContext ? <dl className="fact-grid"><div><dt>项目</dt><dd>{detail.projectContext.projectId}</dd></div><div><dt>冻结模式</dt><dd>{detail.projectContext.effectiveAutonomyMode}</dd></div><div><dt>模式来源</dt><dd>{detail.projectContext.modeSource}</dd></div><div><dt>可写</dt><dd>否</dd></div></dl> : <p className="muted">项目上下文不可用。</p>}</section>
+    {detail.checkpoint && !detail.checkpoint.verdict && <CheckpointControl runId={runId} checkpoint={detail.checkpoint} enabled={Boolean(capabilities?.canReviewScientificResult)} profile={capabilities?.profile} onDecided={setDetailSnapshot} />}
     {resultQuery.isPending && <QueryLoading />}
     {resultQuery.isError && <QueryFailure title="RunResult 暂不可用" />}
     {resultView && <ResultPanel view={resultView} executionType={run.state.type} />}

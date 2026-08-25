@@ -78,6 +78,56 @@ async def test_schedule_and_queue_pause_resume(client) -> None:
 
 
 @pytest.mark.asyncio
+async def test_checkpoint_decision_uses_closed_request_body(client) -> None:
+    prefect = client.app.state.container.prefect
+    prefect._prefect["runs"].insert(
+        0,
+        {
+            "runId": "run-checkpoint",
+            "name": "ridge experiment gate",
+            "deploymentId": "deployment-dorm",
+            "deploymentName": "alpine-assay",
+            "projectId": "bogda-main",
+            "workPoolName": "dorm-x86",
+            "workQueueName": "cpu",
+            "state": {
+                "type": "PAUSED",
+                "name": "Paused",
+                "timestamp": "2026-08-24T08:21:00Z",
+                "terminal": False,
+            },
+            "scheduledAt": "2026-08-24T08:18:00Z",
+            "startedAt": "2026-08-24T08:20:00Z",
+            "endedAt": None,
+            "parameters": {"sample": "ridge-a"},
+            "tags": ["cpu"],
+            "checkpoint": {
+                "kind": "experiment_approval",
+                "stage": "done",
+                "verdict": None,
+                "rationale": None,
+                "decidedBy": None,
+                "commandVersion": "checkpoint-v1",
+                "impact": "批准后继续执行实验；拒绝将以 Cancelled 结束，不会记成系统失败。",
+            },
+        },
+    )
+    prefect._fixture["runResults"]["artifactsByRun"]["run-checkpoint"] = []
+    response = await client.post(
+        "/api/v1/runs/run-checkpoint/checkpoints",
+        json={
+            "expectedCommandVersion": "checkpoint-v1",
+            "verdict": "approved",
+            "rationale": "可以做",
+        },
+    )
+    assert response.status_code == 200
+    snapshot = response.json()["data"]["snapshot"]
+    assert snapshot["checkpoint"]["verdict"] == "approved"
+    assert snapshot["run"]["state"]["name"] == "Running"
+
+
+@pytest.mark.asyncio
 async def test_request_validation_uses_the_closed_error_envelope(client) -> None:
     response = await client.post(
         "/api/v1/runs/run-active/cancel",

@@ -21,6 +21,43 @@
 - 第一轮不做全文证据扫描、通用插件系统或为未知未来输入增加复杂校验。
 - 每项生产写能力必须先在mock或隔离的精确allowlist环境验收。
 
+## 停机权与节奏契约
+
+控制面可以推进任务，不能给科研工作定罪。本契约约束 Task 4、5、7、9；不新开 ARIS 依赖或 skill 搬运任务。硬件换箱、网口和供电由 owner 处理，不进入本计划的代码任务。
+
+### 门类型
+
+每个停机/验收条件必须标成恰好一类。复合条件拆开，禁止把 B 收成 A 后自称安全。
+
+| 类型 | 判据 | 谁可以判 |
+|---|---|---|
+| Type-A（执行/客观） | 无品味的脚本也能给出同一答案：exit code、文件存在、队列抽干、预算计数触顶、审查器**被调用过** | Flow / 确定性校验器；执行器可自检 |
+| Type-B（质量/正确/接受） | 需要领域判断：计划是否够、claim 是否成立、能否当结论、能否投稿 | 只能进入人工检查点。跨模型意见可当证据 Artifact，**不得**把 `scientific_status` 写成 `accepted` |
+
+Type-A 通过只允许把 Prefect 执行态标为 `Completed`（且必要产物存在）。`scientific_status` 的 `accepted` / `rejected` / `inconclusive` 全是 Type-B。
+
+### 恢复态
+
+运行与阶段状态拆成 `done` 与 `accepted`：executor 写完产物是 `done`；对应 Type-B 门通过才是 `accepted`。resume 必须重开任何 `done` 但未接受的阶段，不得把中断当成已经审过。
+
+### 预算与白名单（Task 5 骨架，Task 9 强制）
+
+协调器与 `autonomous` 循环受四墙约束：`max_steps`、`max_model_calls`、`max_cost_cny`、允许实验类型。Task 9 另加路径 `edit-whitelist`：循环只能改名单内路径。任一越界只许暂停等待人，不许自批、不许破四类人工保留权（结论、对外发布、新增采购、破预算）。
+
+### 时钟不当陪审团
+
+Wake Bridge、健康/快照 timer、雷达调度只看 Type-A 外部事实（Worker 在线、队列非空、文件新鲜、预算剩余）。禁止用 interval / `/loop` 重跑 Type-B 技能。心跳可以 nudge 卡住的执行，不能 acquit。
+
+### 本计划不列入
+
+- 接入 ARIS 仓库或搬运其 skill 集
+- overnight 全自动写论文流水线、默认 `AUTO_PROCEED`
+- 控制面 NPU 推理、把 NPU 写成 `resource_class`
+- OpenClaw / 7×24 管家 Agent / GPU watchdog / 多卡 wave 队列
+- 为换箱或双网口编写采购/驱动任务（owner 硬件线）
+
+待决（只记账，不开 Task 10）：控制面主机从 2GB Pi 换成更大内存盒子之后，瘦协调器仍按任务由 Flow 拉起，还是允许常驻控制面、宿舍机照睡。现 spec 维持前者，箱子到位后再拍。
+
 ## Delivery Map
 
 | 波次 | 交付 | 运行态影响 |
@@ -108,12 +145,14 @@
 **Interfaces:**
 - Produces: 版本化`ResearchDecision(kind, verdict, rationale, decided_by, decided_at)` Artifact；检查点类型固定为`plan_approval|experiment_approval|scientific_review`。
 - Semantics: `manual`每一步进入检查点；`supervised`只在计划、关键实验和科学判断暂停；拒绝后Flow终止但不伪造系统失败。
+- Gate contract: `plan_approval`、`experiment_approval`、`scientific_review` 均为 Type-B；产物存在与命令成功是 Type-A，不得单独结束科学判断。阶段恢复区分 `done` / `accepted`。跨模型评语若写入 Artifact，不能把科研状态标为 `accepted`。
 
-- [ ] 写失败测试覆盖批准恢复、拒绝终止、重复提交冲突和重启后仍可恢复。
-- [ ] 运行测试确认检查点Flow不存在。
-- [ ] 用Prefect原生暂停/恢复语义和Artifact实现，不创建本地状态机。
-- [ ] 在3101详情页展示证据、影响与批准/拒绝按钮；不得提供列表一键批准。
-- [ ] 运行Bogda集成测试、控制台backend/frontend测试和构建。
+- [x] 写失败测试覆盖批准恢复、拒绝终止、重复提交冲突和重启后仍可恢复。
+- [x] 写失败测试：Type-A 完成不能把 `scientific_status` 从 `unreviewed` 改成 `accepted`；resume 时 `done` 未接受的检查点仍暂停。
+- [x] 运行测试确认检查点Flow不存在。
+- [x] 用Prefect原生暂停/恢复语义和Artifact实现，不创建本地状态机。
+- [x] 在3101详情页展示证据、影响与批准/拒绝按钮；不得提供列表一键批准。
+- [x] 运行Bogda集成测试、控制台backend/frontend测试和构建。
 - [ ] 提交 `feat(bogda): add human research checkpoints`。
 
 ### Task 5: 按任务科研协调Agent（先实现supervised）
@@ -128,8 +167,10 @@
 **Interfaces:**
 - Produces: `ResearchPlan`、`ExperimentProposal`、`AgentBudget(max_steps, max_model_calls, max_cost_cny)`和`CoordinatorResult`。
 - Agent可调用工具必须由任务允许列表提供；第一版只输出计划和实验建议，不自行修改代码、采购或发布。
+- Gate contract: 协调器可 DRIVE（写计划、提实验、耗预算）；Type-B 一律变成检查点。预算四墙任一触顶进入人工检查点，不进入自批循环。
 
 - [ ] 写mock-model失败测试：预算耗尽、未知工具、无必要产物、请求关键实验批准。
+- [ ] 写失败测试：模型输出“计划已足够/结果支持结论”不能跳过 Type-B 检查点或改写 `scientific_status`。
 - [ ] 运行测试确认agent包不存在。
 - [ ] 实现有限状态协调器；每一步写结构化Artifact，达到任一预算上限立即进入人工检查点。
 - [ ] 实现`supervised`研究Flow：目标→计划→人工批准→执行→结果摘要→科研评审。
@@ -167,6 +208,7 @@
 **Interfaces:**
 - Wake Bridge只观察`dorm-x86`待领取Run、Worker在线状态和冷却时间；只发WoL，不修改Flow状态。
 - Power状态固定为`sleep|compute|gaming|maintenance`；科研模式与电源模式互不推断。
+- Gate contract: Wake Bridge 与健康探测只做 Type-A（在线、待领取、冷却）。直连网段与 Wi-Fi 上路由 owner 准备；软件只假设两条通路可达，不把双 RJ45 写成硬依赖。timer 不得对科研结论或审查技能开火。
 
 - [ ] 先编写并批准Power Agent子spec，明确认证、休眠锁、游戏切换和崩溃恢复。
 - [ ] 为Wake Bridge写失败测试：离线有任务只唤醒一次、冷却期去重、在线不唤醒、失败保留Scheduled/Late。
@@ -206,8 +248,10 @@
 **Interfaces:**
 - Consumes: 已稳定的检查点、预算和宿舍执行链。
 - Produces: 在预设`max_steps`、`max_model_calls`、`max_cost_cny`和允许实验类型内提出并执行后续实验；越界一律暂停等待人。
+- Gate contract: 强制 `edit-whitelist`；循环可在四墙内 enqueue 下一枪（Type-A 完成即可继续），不可把 Type-B 门判成通过。默认全局模式仍为 `supervised`；3101 开放“范围内自主”需 owner 显式批准。
 
 - [ ] 写性质测试：任意模型输出都不能突破四类人工保留权或预算上限。
+- [ ] 写失败测试：白名单外写盘被拒；timer/heartbeat 触发不能把 `scientific_status` 标为 `accepted`。
 - [ ] 写确定性场景测试：阴性结果迭代、无信息增益停止、预算耗尽、采购请求和发布请求。
 - [ ] 实现最小循环，不增加长期记忆服务或通用插件框架。
 - [ ] 在隔离项目跑完整演练并由独立模型复核证据。

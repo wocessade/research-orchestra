@@ -28,7 +28,7 @@ def test_local_vertical_slice(tmp_path) -> None:
             project_id="bogda",
             task_type="shell",
             resource_class=ResourceClass.CPU,
-            autonomy_mode=AutonomyMode.SUPERVISED,
+            autonomy_mode=AutonomyMode.AUTONOMOUS,
             parameters={
                 "argv": [
                     sys.executable,

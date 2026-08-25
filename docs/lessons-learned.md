@@ -92,3 +92,15 @@
 ## K. 门禁诚实（2026-08-22）
 
 43. **软 schema / 未接线配置 / 仍被跟踪的 ignored 目录比缺文档更危险**：`jsonschema` 或 `metrics.schema.json` 缺失时若跳过校验，digest 仍显示锁定；`rules.yaml` 从未被 Broker 读取却写得像控制面；`orchestra/results/` 已 gitignore 但仍可能留在索引里（含嵌套 `results/results/`）。规则：结论层校验 fail-closed；配置文件要么有消费代码要么标明人工约定；红线目录 `git ls-files` 交叉检查后 `git rm --cached`。
+
+## L. Bogda 检查点（2026-08-26）
+
+44. **Type-A 完成不能 acquit 科研结论**：命令成功、产物存在、检查点「批准继续」都只推进 Flow；`scientific_status=accepted` 仍只能由人工科研评审写入。规则：不要把检查点批准映射成 accepted；跨模型评语最多当 Artifact 证据。
+
+45. **人拒绝 Type-B 门 = Cancelled，不是 Failed**：伪造系统失败会把「实验不该做」记成基础设施事故。规则：`CheckpointRejected` 返回 Prefect `Cancelled`。
+
+46. **Prefect resume 不要叠 `COMMAND_OUTCOME_MISMATCH` 回读**：pause→Running 是 worker 续跑，控制台回读仍可能看到 Paused。规则：检查点命令做到 allowlist + `command_version` 即可；取消/暂停队列上已有的四层回读不要往新命令上复制。
+
+47. **给 supervised 加暂停会挂死旧的 Type-A 切片**：垂直切片若仍用 supervised 会在 `pause_flow_run` 上等一个永远不来的人。规则：纯执行/产物测试改用 `autonomous` 或测试内自动 resume；shell 没有计划产物就不要暂停 `plan_approval`。
+
+48. **协调器可以开车，不能当陪审团**：`supervised` 协调器可写计划、提实验、耗预算；`wait_for_decision` 留在 Flow 里。模型说「计划已足够 / 结果支持结论」只是 Artifact 内容，不能跳过 Type-B，也不能把 `scientific_status` 写成 `accepted`。未知工具直接拒绝；不在允许列表里的实验类型停在 `experiment_approval`，仍是 `unreviewed`。

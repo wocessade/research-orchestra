@@ -153,7 +153,7 @@ Wake Bridge、健康/快照 timer、雷达调度只看 Type-A 外部事实（Wor
 - [x] 用Prefect原生暂停/恢复语义和Artifact实现，不创建本地状态机。
 - [x] 在3101详情页展示证据、影响与批准/拒绝按钮；不得提供列表一键批准。
 - [x] 运行Bogda集成测试、控制台backend/frontend测试和构建。
-- [ ] 提交 `feat(bogda): add human research checkpoints`。
+- [x] 提交 `feat(bogda): add human research checkpoints`。
 
 ### Task 5: 按任务科研协调Agent（先实现supervised）
 
@@ -169,13 +169,13 @@ Wake Bridge、健康/快照 timer、雷达调度只看 Type-A 外部事实（Wor
 - Agent可调用工具必须由任务允许列表提供；第一版只输出计划和实验建议，不自行修改代码、采购或发布。
 - Gate contract: 协调器可 DRIVE（写计划、提实验、耗预算）；Type-B 一律变成检查点。预算四墙任一触顶进入人工检查点，不进入自批循环。
 
-- [ ] 写mock-model失败测试：预算耗尽、未知工具、无必要产物、请求关键实验批准。
-- [ ] 写失败测试：模型输出“计划已足够/结果支持结论”不能跳过 Type-B 检查点或改写 `scientific_status`。
-- [ ] 运行测试确认agent包不存在。
-- [ ] 实现有限状态协调器；每一步写结构化Artifact，达到任一预算上限立即进入人工检查点。
-- [ ] 实现`supervised`研究Flow：目标→计划→人工批准→执行→结果摘要→科研评审。
-- [ ] 使用假模型和临时目录完成集成测试，确认不存在无限循环。
-- [ ] 提交 `feat(bogda): add supervised research coordinator`。
+- [x] 写mock-model失败测试：预算耗尽、未知工具、无必要产物、请求关键实验批准。
+- [x] 写失败测试：模型输出“计划已足够/结果支持结论”不能跳过 Type-B 检查点或改写 `scientific_status`。
+- [x] 运行测试确认agent包不存在。
+- [x] 实现有限状态协调器；每一步写结构化Artifact，达到任一预算上限立即进入人工检查点。
+- [x] 实现`supervised`研究Flow：目标→计划→人工批准→执行→结果摘要→科研评审。
+- [x] 使用假模型和临时目录完成集成测试，确认不存在无限循环。
+- [x] 提交 `feat(bogda): add supervised research coordinator`。
 
 ### Task 6: 真实Prefect S1与精确allowlist S2
 

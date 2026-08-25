@@ -5,9 +5,9 @@
 
 ## 当前事实
 
-- `main` 当前基线为 `151fd96`，已推送。Bogda Console、科研评审入口、三档模式
-  mock 控制、跨平台契约门禁、Pi shadow 部署包和 Windows 本地启动器均已合并；
-  3100 尚未切换到 Bogda。
+- `main` 当前基线为 `4d8e470`（Task 4–5 已提交，尚未 push）。Bogda Console、科研评审入口、三档模式
+  mock 控制、跨平台契约门禁、Pi shadow 部署包、Windows 本地启动器、人工检查点和
+  supervised 协调器均已在本地主线；3100 尚未切换到 Bogda。
 - Pi 已完成 Gate 1–5：安装、鉴权、server、单并发 worker、快照 timer 和健康
   timer 已启动。Gate 6 的 72 小时自动采样最后确认仍在运行；尚未做受控重启、
   独立 restore 演练、确定性复核或 Gate 7 裁决。
@@ -25,8 +25,9 @@
    SQLite integrity、SSD、快照和 Orchestra。
 3. 受控重启与独立 restore 演练仍需 owner 明确批准。没有批准就停在只读证据收集。
 4. 证据完成后由 DeepSeek 做确定性复核，再交 owner/强模型做 Gate 7 裁决。
-5. 软件线下一项是 `manual / supervised` 的可恢复 Prefect 人工检查点。不要先做
-   自主规划循环、常驻管家 Agent、真实 Prefect 写入、宿舍 runner 或 GPU。
+5. 软件线下一项是控制面计划 **Task 6**：3101 真实 Prefect S1/S2，阻塞在
+   Gate 6 与 owner 批准。不要先做 `autonomous` 循环、常驻管家 Agent、宿舍
+   runner 或 GPU。Task 4=`41c0e17`，Task 5=`4d8e470`。
 
 ## 已确定的架构边界
 

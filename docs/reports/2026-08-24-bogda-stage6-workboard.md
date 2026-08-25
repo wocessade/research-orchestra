@@ -9,14 +9,16 @@
 本节记录 2026-08-24 晚间最终状态；与下方较早快照冲突时，以本节和后续正式
 Gate 报告为准。
 
-- Git `main` 为 `151fd96`，已推送到 `origin/main`；当前没有辅助 worktree。
+- Git `main` 为 `4d8e470`（Task 5 已提交，尚未 push）；当前没有辅助 worktree。
 - 3101 已完成 Windows 启动器真实 `start → status → stop → start → status`
   验收，当前由启动器托管且为 `healthy / mock-all`。它不是开机服务，电脑重启或
   睡眠后先运行 `bogda-console/scripts/local-console.ps1 status`。
 - 3100 在真实启停验收前后保持不变；3101 仍未连接真实 Prefect。
 - Pi 最后确认仍处于 Gate 6 自动观察期；晚间没有为本地软件工作连接或修改 Pi。
-- 三档科研模式的权威本地策略和 mock UI 已完成；下一项软件难题仍是
-  `manual / supervised` 的可恢复 Prefect 人工检查点，不是自主规划循环。
+- 三档科研模式、`manual` / `supervised` 人工检查点，以及按任务
+  `supervised` 科研协调器均已提交。下一项软件难题是 **Task 6：3101
+  真实 Prefect S1/S2**，阻塞在 Gate 6 与 owner 批准，不是
+  `autonomous` 循环、宿舍机或 3100 切换。
 
 下周恢复顺序：
 
@@ -27,8 +29,9 @@ Gate 报告为准。
 3. 保存 `bogda.ops.health summarize` 原始 JSON。受控重启和独立 restore 演练仍需
    owner 明确批准；未批准时只读，不改 systemd 或运行状态。
 4. Gate 6 证据齐全后交给确定性复核，再由 owner/强模型做 Gate 7 裁决。
-5. 软件线可继续人工检查点 Task 4，但与 Pi 观察隔离；真实 Prefect 写入、宿舍机、
-   GPU 和 3100 切换仍不得顺带开启。
+5. 软件线停在 Task 6 前门：Gate 6 证据 + owner 分别批准 S1/S2 之前，不接
+   真实 Prefect、不写 Pi、不开宿舍机/GPU/3100。Task 4=`41c0e17`，
+   Task 5=`4d8e470`。
 
 本地仓库留意事项：根工作树的 `.gitignore`、两份锐评删除、`.codegraph/`、天气
 项目和 Orchestra 任务卡是既有用户状态，不得顺手清理或带入 Bogda 提交。
@@ -37,7 +40,7 @@ Gate 报告为准。
 
 ## 当前快照
 
-Git `main`：`151fd96`，已推送到 `origin/main`。
+Git `main`：`4d8e470` 本地领先 `origin/main`（含 Task 4–5，尚未 push）。
 
 Pi 快照时间：2026-08-24T08:56:05Z（北京时间16:56）。
 
@@ -59,18 +62,18 @@ Pi 快照时间：2026-08-24T08:56:05Z（北京时间16:56）。
 
 ## 产品完成度校正（2026-08-24）
 
-此前“软件主体约90%–95%”只适用于Pi控制面和影子部署，不适用于完整科研产品。当前更准确的口径是：Pi控制面/影子部署约90%，Bogda最小执行内核约80%，完整科研产品约55%–65%。Gate 6通过只证明B-lite控制面适合继续使用，不代表三档科研模式、科研协调Agent、宿舍机执行链或3100切换已经完成。
+此前“软件主体约90%–95%”只适用于Pi控制面和影子部署，不适用于完整科研产品。当前更准确的口径是：Pi控制面/影子部署约90%，Bogda最小执行内核约85%，完整科研产品约60%–70%。Gate 6通过只证明B-lite控制面适合继续使用，不代表真实 Prefect 写入、宿舍机执行链或3100切换已经完成。
 
 3101当前是B-lite影子控制台，不是完整科研驾驶舱。以下是已批准但尚未实现的产品能力：
 
 | 能力 | 当前事实 | 进入条件 |
 |---|---|---|
-| `manual` / `supervised` / `autonomous`切换 | 仅有枚举、冻结字段和只读展示；`canSetAutonomyMode=false` | Gate 6期间可本地开发；真实写入须单独S2批准 |
-| 全局默认与项目覆盖策略 | 没有权威策略存储或写API | 先完成模式解析契约 |
-| 模式驱动Flow行为 | 当前shell纵向切片固定为`supervised`，没有人工检查点或规划循环 | 策略契约完成后实施 |
-| 研究计划/关键实验人工批准 | 只有运行后的科研评审 | 先实现可恢复的Prefect人工检查点 |
-| 科研协调Agent | 未实现 | 先只做按任务启动的`supervised`协调器 |
-| 自主预算与迭代上限 | 未实现 | 在协调器稳定后单独开放`autonomous` |
+| `manual` / `supervised` / `autonomous`切换 | 本地 mock 可改全局/项目策略；真实 profile 仍 `canSetAutonomyMode=false` | 真实写入须单独S2批准 |
+| 全局默认与项目覆盖策略 | 单文件 JSON 策略存储 + 创建时冻结 | 已落地；Run 不回读可变策略 |
+| 模式驱动Flow行为 | shell 暂停 experiment/science；research cycle 另加 plan_approval。autonomous 本波不暂停 | 真实 Prefect 写入仍要 S2 |
+| 研究计划/关键实验人工批准 | 3101 详情页可批准/拒绝；列表无一键批准。协调 Flow 会停在三道 Type-B 门 | 真实 profile 写操作仍禁 |
+| 科研协调Agent | 已提交 `4d8e470`：按任务 `supervised`，mock 模型，只写计划/提实验 | 不是 7×24 管家；`autonomous` 仍是 Task 9 |
+| 自主预算与迭代上限 | `supervised` 四墙已落地；无 edit-whitelist、无自批循环 | Task 9 才开放 `autonomous` |
 | 真实Prefect上的3101写操作 | `real-readonly`禁写；写操作只在mock/隔离allowlist | Gate 6通过并批准S2 |
 | Wake Bridge / WoL | 未实现 | Gate 6通过；可先用当前笔记本模拟 |
 | Windows Power Agent与四档电源控制 | UI数据仍是mock | Win10/WSL测试节点可用 |
@@ -153,12 +156,19 @@ Pi 快照时间：2026-08-24T08:56:05Z（北京时间16:56）。
 2. **已完成（2026-08-24）**：3101模式查询/命令契约、mock三档切换、项目继承全局、revision冲突、确认文案、只读降级和320/360px验收；真实profile仍禁写且不回退mock。
 3. **已完成（2026-08-24）**：3101 Windows 本地启动器、PID/日志管理与真实
    `start/status/stop` 闭环；仍为 `mock-all`，不是开机服务。
-4. **下一项（强模型优先）**：`manual`与`supervised`人工检查点；先不实现自主规划循环。
-5. **再后可做**：按任务启动的科研协调Agent，限制工具、预算、步骤数和产物。
-6. **Gate 6通过且owner批准S2后**：3101连接真实Prefect并仅对测试资源开放精确allowlist写操作。
+4. **已完成（2026-08-26，`41c0e17`）**：`manual`/`supervised` 人工检查点。
+   Prefect 原生 pause/resume + `ResearchDecision` Artifact；拒绝为
+   `Cancelled` 而非 `Failed`；Type-A 完成不能把 `scientific_status` 写成
+   `accepted`。3101 仅详情页批准/拒绝。
+5. **已完成（2026-08-26，`4d8e470`）**：按任务 `supervised` 科研协调器。
+   目标→计划→`plan_approval`→实验建议→`experiment_approval`→执行→科研评审；
+   四墙触顶停给人；模型不能把 `scientific_status` 写成 `accepted`。
+6. **下一项（阻塞）**：Gate 6 通过且 owner 分别批准 S1/S2 后，3101 连接真实
+   Prefect；S2 仅对测试资源开放精确 allowlist 写操作。
 7. **笔记本模拟阶段**：Wake Bridge、Power Agent协议、CPU Worker、睡眠/游戏模式；不承担7×24职责。
 8. **宿舍机到位后**：真实WoL、WSL Worker和CPU队列；GPU不作为接入前置条件。
 9. **最后**：逐类迁移科研工作流、完成3101 shadow证据，再单独设计3100切换。
+10. **更后**：`autonomous` 受限循环（计划 Task 9），四墙 + edit-whitelist。
 
 ## 停止条件
 

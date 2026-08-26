@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal, Mapping
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from bogda.agents.coordinator import UnknownTool
+
 QAFormat = Literal["single", "multi", "judge"]
 QAConfidence = Literal["high", "medium", "low"]
+
+TOOL_SUBMIT_ANSWERS = "submit_answers"
 
 _JUDGE_TRUE = frozenset({"对", "正确", "true", "t", "yes"})
 _JUDGE_FALSE = frozenset({"错", "错误", "false", "f", "no"})
@@ -67,3 +71,11 @@ class QAOutput(BaseModel):
         if len(qnos) != len(set(qnos)):
             raise ValueError("duplicate qno")
         return self
+
+
+def parse_qa_reply(reply: Mapping[str, Any]) -> QAOutput:
+    tool = reply.get("tool")
+    if tool != TOOL_SUBMIT_ANSWERS:
+        raise UnknownTool(tool)
+    payload = {key: value for key, value in reply.items() if key != "tool"}
+    return QAOutput.model_validate(payload)

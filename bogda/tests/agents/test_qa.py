@@ -1,3 +1,7 @@
+import json
+from pathlib import Path
+
+import bogda.agents as agents
 import pytest
 from pydantic import ValidationError
 
@@ -13,6 +17,8 @@ from bogda.agents.qa import (
     merge_qa_outputs,
     normalize_answer,
     parse_qa_reply,
+    write_merge_result,
+    write_runner_answers,
 )
 
 
@@ -196,3 +202,25 @@ def test_merge_rejects_incomplete_or_format_conflict() -> None:
     c = _output("h2", [_q(1, "judge", "对"), _q(2, "judge", "对")])
     with pytest.raises(FormatConflict):
         merge_qa_outputs((a, c), task_id="T-1", revision=1)
+
+
+def test_write_runner_and_merge_json(tmp_path: Path) -> None:
+    out = _output("h1", [_q(1, "single", "A")])
+    other = _output("h2", [_q(1, "single", "B")])
+    ans_path = write_runner_answers(tmp_path, out)
+    assert ans_path == tmp_path / "answers" / "h1.json"
+    dumped = json.loads(ans_path.read_text(encoding="utf-8"))
+    assert dumped["runner"] == "h1"
+    assert dumped["answers"][0]["answer"] == "A"
+    merged = merge_qa_outputs((out, other), task_id="T-1", revision=1)
+    merge_path = write_merge_result(tmp_path, merged)
+    assert merge_path == tmp_path / "merge.json"
+    body = json.loads(merge_path.read_text(encoding="utf-8"))
+    assert body["pending"][0]["qno"] == 1
+    assert body["agreed"] == []
+
+
+def test_public_exports() -> None:
+    assert hasattr(agents, "parse_qa_reply")
+    assert hasattr(agents, "merge_qa_outputs")
+    assert hasattr(agents, "TOOL_SUBMIT_ANSWERS")

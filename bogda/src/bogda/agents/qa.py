@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Literal, Mapping, Sequence
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -184,3 +185,17 @@ def parse_qa_reply(reply: Mapping[str, Any]) -> QAOutput:
         raise UnknownTool(tool)
     payload = {key: value for key, value in reply.items() if key != "tool"}
     return QAOutput.model_validate(payload)
+
+
+def write_runner_answers(root: Path, output: QAOutput) -> Path:
+    dest = root / "answers" / f"{output.runner}.json"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(output.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    return dest
+
+
+def write_merge_result(root: Path, merged: QAMergeResult) -> Path:
+    dest = root / "merge.json"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(merged.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    return dest

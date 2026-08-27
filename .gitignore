@@ -1,6 +1,9 @@
 *.pyc
 __pycache__/
 
+# 本地可再生成索引
+.codegraph/
+
 # 红线：以下目录/文件不入库（见 CLAUDE.md 硬约束）
 orchestra/logs/
 orchestra/results/
@@ -12,3 +15,20 @@ pm3-mcp-server/
 .worktrees/
 FCC_IDE_v2.bat
 fcc_inner.cmd
+
+# 独立仓库（remotes 各自 GitHub 私有），勿作为 gitlink 嵌套
+xju-desktop/
+
+# 会话调试产物（已移 D:\Temp\.codex-session）
+--full-page
+bogda-console/ai_ask.cjs
+bogda-console/cdp_dump.cjs
+bogda-console/exam_diag.cjs
+bogda-console/exam_dom.cjs
+bogda-console/exam_fill.cjs
+bogda-console/exam_fill2.cjs
+bogda-console/exam_probe.cjs
+bogda-console/exam_status.cjs
+
+# ESP32 weather WiFi credentials
+esp32c3-weather/secrets.py

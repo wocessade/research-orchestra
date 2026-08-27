@@ -46,10 +46,10 @@ trap recover_broker EXIT
 
 # 3) 预检通过后才传在役代码、模板和 unit
 ssh "$SSH_USER@$SSH_HOST" 'mkdir -p /home/liuxfs/broker /home/liuxfs/broker/templates'
-scp -q "$ROOT"/broker/{db.py,taskfile.py,executor.py,dispatcher.py,artifact_validators.py,radar_render.py,radar_notify.py,migration_guard.py,__init__.py,inject_daily.sh,housekeeping.sh,send_email.py,config.example.json} "$SSH_USER@$SSH_HOST:/home/liuxfs/broker/"
+scp -q "$ROOT"/broker/{db.py,taskfile.py,executor.py,dispatcher.py,artifact_validators.py,radar_render.py,radar_notify.py,migration_guard.py,exam_watch.py,__init__.py,inject_daily.sh,housekeeping.sh,send_email.py,config.example.json} "$SSH_USER@$SSH_HOST:/home/liuxfs/broker/"
 scp -q "$ROOT"/scripts/backup_to_nas.sh "$SSH_USER@$SSH_HOST:/home/liuxfs/broker/"  # 审计 CONCERN-1：备份脚本本体此前从未随 deploy 传载
 scp -q "$ROOT"/templates/nightly-radar-*.md "$SSH_USER@$SSH_HOST:/home/liuxfs/broker/templates/"
-scp -q "$ROOT"/broker/orchestra-broker.service "$ROOT"/broker/orchestra-timer.timer "$ROOT"/broker/orchestra-timer.service "$ROOT"/broker/orchestra-backup.service "$ROOT"/broker/orchestra-backup.timer "$ROOT"/broker/orchestra-backup-alert.service "$ROOT"/broker/orchestra-housekeeping.service "$ROOT"/broker/orchestra-housekeeping.timer "$ROOT"/broker/logrotate-orchestra.conf "$SSH_USER@$SSH_HOST:/tmp/"
+scp -q "$ROOT"/broker/orchestra-broker.service "$ROOT"/broker/orchestra-timer.timer "$ROOT"/broker/orchestra-timer.service "$ROOT"/broker/orchestra-backup.service "$ROOT"/broker/orchestra-backup.timer "$ROOT"/broker/orchestra-backup-alert.service "$ROOT"/broker/orchestra-housekeeping.service "$ROOT"/broker/orchestra-housekeeping.timer "$ROOT"/broker/orchestra-exam-watch.service "$ROOT"/broker/orchestra-exam-watch.timer "$ROOT"/broker/logrotate-orchestra.conf "$SSH_USER@$SSH_HOST:/tmp/"
 # Windows scp 可能带 CRLF；远端立刻剥 CR，避免 inject_daily 因 pipefail\r 退出
 ssh "$SSH_USER@$SSH_HOST" "sed -i 's/\r$//' /home/liuxfs/broker/*.sh /home/liuxfs/broker/templates/*.md"
 
@@ -64,13 +64,14 @@ if [ ! -f config.json ]; then
 fi
 # 四阶段模板替代旧单体模板；删除远端遗留，避免旧定时脚本或人工误注入。
 rm -f templates/nightly-radar.md
-sudo mv /tmp/orchestra-broker.service /tmp/orchestra-timer.timer /tmp/orchestra-timer.service /tmp/orchestra-backup.service /tmp/orchestra-backup.timer /tmp/orchestra-backup-alert.service /tmp/orchestra-housekeeping.service /tmp/orchestra-housekeeping.timer /etc/systemd/system/
+sudo mv /tmp/orchestra-broker.service /tmp/orchestra-timer.timer /tmp/orchestra-timer.service /tmp/orchestra-backup.service /tmp/orchestra-backup.timer /tmp/orchestra-backup-alert.service /tmp/orchestra-housekeeping.service /tmp/orchestra-housekeeping.timer /tmp/orchestra-exam-watch.service /tmp/orchestra-exam-watch.timer /etc/systemd/system/
 sudo mv /tmp/logrotate-orchestra.conf /etc/logrotate.d/orchestra-broker
 sudo cp /home/liuxfs/broker/send_email.py /usr/local/bin/ && sudo chmod 755 /usr/local/bin/send_email.py
 # service 内日志路径按 REMOTE_ROOT 改写（避免日志落到未挂载点）
 sudo sed -i "s|/mnt/broker/logs|$REMOTE_ROOT/logs|g" /etc/systemd/system/orchestra-broker.service
 # 审计 CONCERN-1：备份告警 unit 与备份脚本的源路径也必须随 REMOTE_ROOT 改写，否则迁移后静默备份旧副本
 sudo sed -i "s|/mnt/broker/logs|$REMOTE_ROOT/logs|g" /etc/systemd/system/orchestra-backup-alert.service
+sudo sed -i "s|/mnt/broker|$REMOTE_ROOT|g" /etc/systemd/system/orchestra-exam-watch.service
 sed -i "s|/mnt/broker|$REMOTE_ROOT|g" /home/liuxfs/broker/backup_to_nas.sh
 # inject_daily.sh / housekeeping.sh / logrotate 中的路径按 REMOTE_ROOT 改写
 sed -i "s|/mnt/broker/tasks|$REMOTE_ROOT/tasks|g; s|/mnt/broker/results|$REMOTE_ROOT/results|g; s|/mnt/broker/logs|$REMOTE_ROOT/logs|g" /home/liuxfs/broker/inject_daily.sh /home/liuxfs/broker/housekeeping.sh
@@ -79,11 +80,16 @@ sudo sed -i "s|/mnt/broker/logs|$REMOTE_ROOT/logs|g" /etc/logrotate.d/orchestra-
 if [ ! -f /etc/systemd/system/orchestra-broker.service.d/env.conf ]; then
   echo "WARN: env.conf 缺失！DEEPSEEK_API_KEY / SMTP 凭据未配置，dsh 任务与邮件会失败。"
 fi
+# exam-watch 邮件同样需要 SMTP 凭据；它用与 broker 相同的 drop-in 机制（EnvironmentFile 复用 broker 文件会因格式不兼容注入失败）
+if [ ! -f /etc/systemd/system/orchestra-exam-watch.service.d/env.conf ]; then
+  echo "WARN: exam-watch 的 env.conf 缺失！请从 orchestra-broker.service.d/env.conf 复制到 orchestra-exam-watch.service.d/ 并 chmod 600，否则考试邮件通知会失败。"
+fi
 sudo systemctl daemon-reload
 sudo systemctl enable --now orchestra-broker.service
 sudo systemctl enable --now orchestra-timer.timer
 sudo systemctl enable --now orchestra-backup.timer
 sudo systemctl enable --now orchestra-housekeeping.timer
+sudo systemctl enable --now orchestra-exam-watch.timer
 # 审计 CONCERN-2：enable --now 对已 active 的 service 是 no-op，必须显式重启使新代码生效
 sudo systemctl restart orchestra-broker.service
 sudo systemctl status orchestra-broker.service --no-pager | head -5

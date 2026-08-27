@@ -27,10 +27,23 @@ class FeedHandler(SimpleHTTPRequestHandler):
         return data if isinstance(data, dict) else {}
 
     def _compose_board(self, human: dict) -> dict:
+        from feed_exam import exam_beat_ops, merge_exam_alert, parse_exam_alert, parse_exam_beat
         from feed_messages import merge_board
         status = self._read_out_json("status.json")
         radar = self._read_out_json("radar.json")
-        return merge_board(human, status, radar, status.get("sync_note"))
+        board = merge_board(human, status, radar, status.get("sync_note"))
+        root = getattr(self.server, "results_root", None) or Path(self.directory)
+        exam_alert = parse_exam_alert(Path(root) / "exam_alert.json")
+        board = merge_exam_alert(board, exam_alert, "")
+        beat_path = Path(root) / "exam_watch_beat.json"
+        beat_ops = exam_beat_ops(parse_exam_beat(beat_path), beat_path=beat_path)
+        key = beat_ops["item_type"]
+        beat_items = [i for i in (beat_ops.get("items") or [])
+                      if (i.get("title"), i.get("text")) not in
+                      {(x.get("title"), x.get("text")) for x in board.get(key) or []}]
+        if beat_items:
+            board[key] = list(beat_items) + (board.get(key) or [])
+        return board
 
     def _refresh_messages(self) -> bytes:
         empty = {"latest": [], "pending": [], "alerts": []}

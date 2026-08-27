@@ -175,6 +175,27 @@ class RefreshTest(unittest.TestCase):
                 call.kwargs.get("creationflags"),
                 subprocess.CREATE_NO_WINDOW)
 
+    def test_refresh_appends_exam_alert_once(self):
+        alert = {
+            "exam_found": True,
+            "exam_names": ["入学考试"],
+            "leaf_count": 1,
+            "use_count": 1,
+            "found_at": "2026-08-25T09:00:00+00:00",
+            "source": "chapter",
+            "alerted": True,
+        }
+        (self.results / "exam_alert.json").write_text(
+            json.dumps(alert, ensure_ascii=False), encoding="utf-8")
+        with mock.patch("console_feed.fetch_dashboard", side_effect=_fresh_monitor):
+            self.assertEqual(cmd_refresh(self._args()), 0)
+            self.assertEqual(cmd_refresh(self._args()), 0)
+        md = (self.console / "messages.md").read_text(encoding="utf-8")
+        self.assertEqual(md.count("- 考试："), 1)
+        msgs = json.loads((self.out / "messages.json").read_text(encoding="utf-8"))
+        self.assertTrue(
+            any("雨课堂：考试已放出" in (m.get("title") or "") for m in msgs["latest"]))
+
 
 if __name__ == "__main__":
     unittest.main()

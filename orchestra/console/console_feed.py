@@ -15,6 +15,13 @@ import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from feed_exam import (
+    append_exam_marker,
+    exam_beat_ops,
+    merge_exam_alert,
+    parse_exam_alert,
+    parse_exam_beat,
+)
 from feed_messages import (
     append_alert,
     build_messages_html,
@@ -161,13 +168,29 @@ def cmd_refresh(args) -> int:
         json.dumps(radar, ensure_ascii=False, indent=2), encoding="utf-8")
     (out / "digest.html").write_text(build_digest_html(radar), encoding="utf-8")
 
+    exam_alert = parse_exam_alert(results_root / "exam_alert.json")
+    if exam_alert is not None:
+        try:
+            append_exam_marker(console / "messages.md", exam_alert)
+        except OSError as exc:
+            notes.append(f"exam marker 写入失败: {exc}")
+    messages_text = ""
     try:
-        human = parse_messages(
-            (console / "messages.md").read_text(encoding="utf-8"))
+        messages_text = (console / "messages.md").read_text(encoding="utf-8")
+        human = parse_messages(messages_text)
     except (OSError, ValueError) as exc:
         human = {"latest": [], "pending": [], "alerts": []}
         notes.append(f"messages 读取失败: {exc}")
     msgs = merge_board(human, status, radar, status.get("sync_note"))
+    msgs = merge_exam_alert(msgs, exam_alert, messages_text)
+    beat_path = results_root / "exam_watch_beat.json"
+    beat_ops = exam_beat_ops(parse_exam_beat(beat_path), beat_path=beat_path)
+    key = beat_ops["item_type"]
+    beat_items = [i for i in (beat_ops.get("items") or [])
+                  if (i.get("title"), i.get("text")) not in
+                  {(x.get("title"), x.get("text")) for x in msgs.get(key) or []}]
+    if beat_items:
+        msgs[key] = list(beat_items) + (msgs.get(key) or [])
     (out / "messages.json").write_text(
         json.dumps(msgs, ensure_ascii=False, indent=2), encoding="utf-8")
     (out / "messages.html").write_text(build_messages_html(msgs), encoding="utf-8")

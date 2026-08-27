@@ -23,9 +23,15 @@ class DeployBrokerContractTest(unittest.TestCase):
             "radar_render.py",
             "radar_notify.py",
             "migration_guard.py",
+            "exam_watch.py",
         ):
             with self.subTest(name=name):
                 self.assertIn(name, self.text)
+
+    def test_enables_exam_watch_timer(self):
+        self.assertIn("orchestra-exam-watch.timer", self.text)
+        self.assertIn("orchestra-exam-watch.service", self.text)
+        self.assertIn("sudo systemctl enable --now orchestra-exam-watch.timer", self.text)
 
     def test_uploads_staged_templates_and_removes_legacy_template(self):
         self.assertIn('templates/nightly-radar-*.md', self.text)

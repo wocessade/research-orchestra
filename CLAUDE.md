@@ -4,6 +4,8 @@
 
 科研**任务调度器**（不是自主科研体）：CC 编排 + 树莓派 4B Broker（7×24 队列，dsh/shell）+ 核桃派墨水屏/冷备 + Codex 副脑 + Tailscale + 4B 兼职 NAS + 夜间文献雷达（23:30）。对外叙事与锐评回复见根 `README.md`、`docs/reports/2026-08-22-critique-replies.md`。
 
+**bogda（`bogda/`）是 Prefect 继任者**：本地纵向切片可通过，受监督协调器在 batched 分支演进；现网执行仍是 `orchestra/`。`bogda-console/` 是 Bogda 控制台影子重写（跑 `codex/bogda-console` 分支，不动旧 3100 数据）。xju-desktop 是独立仓库，勿当作 submodule/gitlink 纳入本仓库。
+
 ## 新会话接手规则（重要）
 
 接到本项目任何任务前，先读：
@@ -43,13 +45,16 @@
   - 个人日程：控制台首页可增删改，或改 `orchestra/console/console-schedule.toml` 的 `[[personal]]`；系统层（雷达/备份）只读。用法见 `orchestra/console/README.md`
   - **日程将近提醒**：读 `console-schedule.toml` 或 `status.json` 的 `upcoming_personal`（未来 14 天未完成个人事项）。会话开头或收束时：48 小时内必须口头提醒，7 天内顺带一句，8–14 天轻提一次。不要每 10 分钟往 `messages.md` 刷提醒。
 
-## 当前挂账（更新日期 2026-08-22）
+## 当前挂账（更新日期 2026-08-28）
 
 - **阶段定位（用户定调）**：【术】已足够，转入【道】——新任务优先论文/研究实体，纯基建只记挂账
 - **Skill digest：owner 暂不锁**（2026-08-22 起）。`academic-shared` 为 required 且 `expected_digest` 未写；engine 契约已改过。`check_skills --strict` / 真实 `run_card.py ingest` 会 HARD。需要入账时再开口锁定，agent 不得自行 `--lock-current`
-- Pi / 核桃派部署窗口：taskfile 收紧、artifact 校验、taskkill 树杀等与仓库对齐仍挂
+- **exam-watch 已上线**（4B timer 轮询雨课堂 → console 告警融合，2026-08-26 首条告警）。缺口：4B 上 `orchestra-exam-watch.service.d/env.conf` 需手工从 broker 的复制（deploy 脚本只 WARN）
+- Pi 部署窗口：deploy_broker.sh 已含 exam-watch；taskfile 收紧、artifact 校验、taskkill 树杀等与仓库对齐仍挂
+- Bogda Gate 6 复测：trial `20260827T124429Z` 至 2026-08-30T12:44Z；USB `Requires=mnt-nas.mount` 已知缺口；Gate 7 未进
 - 入学前（2026-09-08）：宿舍–实验室 Tailscale 实测；4B 弱密码已改（2026-08-20），核桃派 pi 密码待上线后同步
 - 雷达→Zotero 直连推迟到开学后再设计（`docs/superpowers/plans/2026-08-20-radar-digest-reading-note.md`）
 - **GUI 控制台 v2 主入口 3100**（Homepage v1 仅回退）；留言=`orchestra/console/messages.md`；`ORCHESTRA_MONITOR_TOKEN` 已配用户环境变量（值绝不入库/入对话）。v1.5 tailnet 手机访问仍挂账
 - 锐评有意不做：全文证据扫描器、原子 `releases/<sha>` 发布、Hermes / OpenClaw
 - 待用户拍板：SD 旧副本删除、512G SSD 用途、宿舍 NAS、QQ bot、宿舍 runner 预算三档
+- 注释惯例：xju-desktop（以及未来的独立仓库）只以文档引用，不 gitlink 嵌入；会话调试产物统一 D:\Temp\.codex-session

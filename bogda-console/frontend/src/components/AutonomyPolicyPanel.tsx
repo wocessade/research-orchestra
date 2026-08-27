@@ -15,6 +15,7 @@ const MODE_LABELS: Record<AutonomyMode, string> = {
   supervised: "监督执行",
   autonomous: "范围内自主",
 };
+const MODE_ORDER: AutonomyMode[] = ["manual", "supervised", "autonomous"];
 
 const FUTURE_RUNS_COPY = "只影响之后创建的运行；正在运行和已经创建的任务继续使用其冻结模式。";
 const AUTONOMOUS_GUARD_COPY = "科研结论、对外发布、新增支出和超预算实验仍需人工批准。";
@@ -25,6 +26,49 @@ type PendingChange =
 
 function effectiveMode(snapshot: AutonomyPolicySnapshot, projectId: string): AutonomyMode {
   return snapshot.projectOverrides[projectId] ?? snapshot.globalDefault;
+}
+
+function ModeBand({
+  name,
+  ariaLabel,
+  value,
+  disabled,
+  namePrefix,
+  onSelect,
+}: {
+  name: string;
+  ariaLabel: string;
+  value: AutonomyMode | null;
+  disabled: boolean;
+  namePrefix?: string;
+  onSelect: (mode: AutonomyMode) => void;
+}) {
+  return (
+    <div role="radiogroup" aria-label={ariaLabel} className="mode-band wrap">
+      {MODE_ORDER.map((mode) => {
+        const set = value === mode;
+        const label = MODE_LABELS[mode];
+        return (
+          <label
+            key={mode}
+            className={`mode-detent mode-detent--${mode}${set ? " is-set" : ""}`}
+          >
+            <input
+              type="radio"
+              name={name}
+              value={mode}
+              checked={set}
+              disabled={disabled}
+              aria-label={namePrefix ? `${namePrefix}${label}` : label}
+              onChange={() => onSelect(mode)}
+            />
+            <span className="mode-detent__tick" aria-hidden="true" />
+            <span className="mode-detent__label">{label}</span>
+          </label>
+        );
+      })}
+    </div>
+  );
 }
 
 export function AutonomyPolicyPanel() {
@@ -44,10 +88,12 @@ export function AutonomyPolicyPanel() {
   const [pending, setPending] = useState<PendingChange | null>(null);
   const [busy, setBusy] = useState(false);
   const [conflict, setConflict] = useState(false);
+  const [latchOpen, setLatchOpen] = useState(false);
 
   const policy = snapshot ?? policyQuery.data?.data;
   const projectId = capabilities?.projectId ?? "bogda-main";
   const projectOverride = policy?.projectOverrides[projectId];
+  const covering = Boolean(projectOverride) || latchOpen;
   const effective = policy
     ? effectiveMode(policy, projectId)
     : capabilities?.effectiveAutonomyMode ?? null;
@@ -66,6 +112,7 @@ export function AutonomyPolicyPanel() {
       if (response.data?.snapshot) {
         setSnapshot(response.data.snapshot);
         queryClient.setQueryData(["autonomy-policy"], { data: response.data.snapshot, sources: {}, errors: [] });
+        if (pending.scope === "project" && pending.mode === null) setLatchOpen(false);
       }
       setConflict(false);
       setPending(null);
@@ -100,52 +147,54 @@ export function AutonomyPolicyPanel() {
 
       <div className="mode-choice">
         <p>全局默认模式</p>
-        <div role="radiogroup" aria-label="全局默认模式" className="mode-choice-row wrap">
-          {(Object.keys(MODE_LABELS) as AutonomyMode[]).map((mode) => (
-            <label key={`global-${mode}`}>
-              <input
-                type="radio"
-                name="global-autonomy"
-                value={mode}
-                checked={policy?.globalDefault === mode}
-                disabled={!canSet}
-                onChange={() => setPending({ scope: "global", mode })}
-              />
-              {MODE_LABELS[mode]}
-            </label>
-          ))}
-        </div>
+        <ModeBand
+          name="global-autonomy"
+          ariaLabel="全局默认模式"
+          value={policy?.globalDefault ?? null}
+          disabled={!canSet}
+          onSelect={(mode) => setPending({ scope: "global", mode })}
+        />
       </div>
 
       <div className="mode-choice">
-        <p>当前项目模式</p>
-        <div role="radiogroup" aria-label="当前项目模式" className="mode-choice-row wrap">
-          <label>
+        <p>项目策略</p>
+        <div role="radiogroup" aria-label="项目策略" className="mode-latch">
+          <label className={`mode-latch__cell${!covering ? " is-set" : ""}`}>
             <input
               type="radio"
-              name="project-autonomy"
+              name="project-latch"
               value="inherit"
-              checked={!projectOverride}
+              checked={!covering}
               disabled={!canSet}
-              onChange={() => setPending({ scope: "project", mode: null })}
+              onChange={() => {
+                if (projectOverride) setPending({ scope: "project", mode: null });
+                else setLatchOpen(false);
+              }}
             />
             继承全局
           </label>
-          {(Object.keys(MODE_LABELS) as AutonomyMode[]).map((mode) => (
-            <label key={`project-${mode}`}>
-              <input
-                type="radio"
-                name="project-autonomy"
-                value={mode}
-                aria-label={`项目${MODE_LABELS[mode]}`}
-                checked={projectOverride === mode}
-                disabled={!canSet}
-                onChange={() => setPending({ scope: "project", mode })}
-              />
-              {MODE_LABELS[mode]}
-            </label>
-          ))}
+          <label className={`mode-latch__cell${covering ? " is-set" : ""}`}>
+            <input
+              type="radio"
+              name="project-latch"
+              value="override"
+              checked={covering}
+              disabled={!canSet}
+              onChange={() => setLatchOpen(true)}
+            />
+            本项目覆盖
+          </label>
         </div>
+        {covering && (
+          <ModeBand
+            name="project-autonomy"
+            ariaLabel="当前项目模式"
+            value={projectOverride ?? null}
+            disabled={!canSet}
+            namePrefix="项目"
+            onSelect={(mode) => setPending({ scope: "project", mode })}
+          />
+        )}
       </div>
 
       {!canSet && (

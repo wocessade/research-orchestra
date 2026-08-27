@@ -70,8 +70,21 @@ describe("research autonomy controls", () => {
     expect(within(region).getByRole("radio", { name: "监督执行" })).toBeVisible();
     expect(within(region).getByRole("radio", { name: "范围内自主" })).toBeVisible();
     expect(within(region).getByRole("radio", { name: "继承全局" })).toBeVisible();
+    expect(within(region).getByRole("radio", { name: "本项目覆盖" })).toBeVisible();
     expect(within(region).getByText("全局默认模式")).toBeVisible();
-    expect(within(region).getByText("当前项目模式")).toBeVisible();
+    expect(within(region).getByText("项目策略")).toBeVisible();
+    expect(within(region).queryByRole("radiogroup", { name: "当前项目模式" })).not.toBeInTheDocument();
+  });
+
+  it("reveals the project mode band only after unlatching inheritance", async () => {
+    const user = userEvent.setup();
+    renderAppAt("/", writableRoutes());
+    const region = await screen.findByRole("region", { name: "科研自主模式" });
+    expect(within(region).queryByRole("radio", { name: "项目范围内自主" })).not.toBeInTheDocument();
+    await user.click(within(region).getByRole("radio", { name: "本项目覆盖" }));
+    expect(within(region).getByRole("radiogroup", { name: "当前项目模式" })).toBeVisible();
+    await user.click(within(region).getByRole("radio", { name: "项目范围内自主" }));
+    expect(screen.getByText(AUTONOMOUS_GUARD_COPY)).toBeVisible();
   });
 
   it("asks for confirmation before changing the global mode", async () => {
@@ -180,6 +193,7 @@ describe("research autonomy controls", () => {
     expect(within(region).getByRole("radio", { name: "监督执行" })).toBeDisabled();
     expect(within(region).getByRole("radio", { name: "范围内自主" })).toBeDisabled();
     expect(within(region).getByRole("radio", { name: "继承全局" })).toBeDisabled();
+    expect(within(region).getByRole("radio", { name: "本项目覆盖" })).toBeDisabled();
   });
 
   it("keeps the readonly panel visible when the real policy backend is unavailable", async () => {

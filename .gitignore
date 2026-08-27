@@ -19,6 +19,9 @@ fcc_inner.cmd
 # 独立仓库（remotes 各自 GitHub 私有），勿作为 gitlink 嵌套
 xju-desktop/
 
+# 个人学业规划（不入库）
+xju-masters/
+
 # 会话调试产物（已移 D:\Temp\.codex-session）
 --full-page
 bogda-console/ai_ask.cjs

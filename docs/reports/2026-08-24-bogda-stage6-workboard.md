@@ -4,10 +4,18 @@
 
 目的：在模型额度和执行者切换后，以本文件作为当前唯一工作入口。不要从聊天记录重新拼装状态。
 
-## 收班补记：下周从这里恢复
+## 收班补记：2026-08-27 Gate 6 收口与新 trial
 
-本节记录 2026-08-24 晚间最终状态；与下方较早快照冲突时，以本节和后续正式
-Gate 报告为准。
+- 失败轮报告：`docs/reports/2026-08-27-bogda-pi-gate6-acceptance.md`（编号 `20260824T083454Z`，未通过）。
+- 已归档 jsonl，并启动新 trial **`20260827T124429Z`**：`docs/reports/2026-08-27-bogda-pi-gate6-retrial-start.md`。
+- 首样本 `2026-08-27T12:45:22Z`，`api_ok=true`；server/worker active，`--limit 1`。满 72h：**2026-08-30T12:44:29Z**（北京时间 20:44:29）。
+- 未改 unit，未 reboot，未进 Gate 7。USB `Requires=mnt-nas.mount` 仍是已知缺口。
+
+## 收班补记：下周从这里恢复（2026-08-24，部分过时）
+
+本节记录 2026-08-24 晚间状态。与 2026-08-27 报告冲突时，以
+`docs/reports/2026-08-27-bogda-pi-gate6-acceptance.md` 和
+`docs/reports/2026-08-27-bogda-pi-gate6-retrial-start.md` 为准。
 
 - Git `main` 为 `4d8e470`（Task 5 已提交，尚未 push）；当前没有辅助 worktree。
 - 3101 已完成 Windows 启动器真实 `start → status → stop → start → status`

@@ -1,6 +1,14 @@
-import pytest
+from decimal import Decimal
 
-from bogda.agents.contracts import AgentBudget, ExperimentProposal, ResearchPlan
+import pytest
+from pydantic import ValidationError
+
+from bogda.agents.contracts import (
+    AgentBudget,
+    CoordinatorResult,
+    ExperimentProposal,
+    ResearchPlan,
+)
 from bogda.agents.coordinator import (
     Coordinator,
     TOOL_PROPOSE_EXPERIMENT,
@@ -27,14 +35,14 @@ def make_coordinator(model: ScriptedModel, **budget_fields) -> Coordinator:
     budget = AgentBudget(
         max_steps=budget_fields.get("max_steps", 8),
         max_model_calls=budget_fields.get("max_model_calls", 8),
-        max_cost_cny=budget_fields.get("max_cost_cny", 10.0),
+        max_cost_cny=budget_fields.get("max_cost_cny", "10.0"),
         allowed_experiment_types=("shell",),
     )
     return Coordinator(
         budget=budget,
         allowed_tools=(TOOL_WRITE_PLAN, TOOL_PROPOSE_EXPERIMENT),
         model=model,
-        cost_per_call=budget_fields.get("cost_per_call", 0.5),
+        cost_per_call=budget_fields.get("cost_per_call", "0.5"),
     )
 
 
@@ -134,3 +142,37 @@ def test_model_claiming_results_support_conclusion_cannot_set_accepted() -> None
         ResearchPlan(goal="g", steps=("s",), rationale="r"),
         proposal,
     )
+
+
+def test_agent_cost_accounting_uses_decimal() -> None:
+    model = ScriptedModel(
+        [
+            {
+                "tool": TOOL_WRITE_PLAN,
+                "plan": {"goal": "g", "steps": ["s"], "rationale": "r"},
+            }
+        ]
+    )
+    result = make_coordinator(
+        model,
+        max_steps=1,
+        max_model_calls=1,
+        max_cost_cny="0.30",
+        cost_per_call="0.10",
+    ).run("g")
+    assert result.cost_cny_used == Decimal("0.10")
+    assert isinstance(result.cost_cny_used, Decimal)
+
+
+def test_public_money_boundaries_reject_float_input() -> None:
+    with pytest.raises(ValidationError, match="money values must not be floats"):
+        AgentBudget(max_steps=1, max_model_calls=1, max_cost_cny=0.1)
+    with pytest.raises(ValidationError, match="money values must not be floats"):
+        CoordinatorResult(cost_cny_used=0.1)
+    with pytest.raises(ValueError, match="money values must not be floats"):
+        Coordinator(
+            budget=AgentBudget(max_steps=1, max_model_calls=1, max_cost_cny="1"),
+            allowed_tools=(TOOL_WRITE_PLAN,),
+            model=ScriptedModel([]),
+            cost_per_call=0.1,
+        )

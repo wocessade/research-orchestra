@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any, Mapping, Protocol
 
 from bogda.agents.contracts import (
@@ -13,6 +14,12 @@ from bogda.contracts.decisions import CheckpointKind
 
 TOOL_WRITE_PLAN = "write_plan"
 TOOL_PROPOSE_EXPERIMENT = "propose_experiment"
+
+
+def _money(value: Decimal | str | int) -> Decimal:
+    if isinstance(value, float):
+        raise ValueError("money values must not be floats")
+    return value if isinstance(value, Decimal) else Decimal(str(value))
 
 
 class ModelClient(Protocol):
@@ -31,15 +38,15 @@ class Coordinator:
         budget: AgentBudget,
         allowed_tools: tuple[str, ...],
         model: ModelClient,
-        cost_per_call: float = 0.5,
+        cost_per_call: Decimal | str | int = Decimal("0.5"),
     ) -> None:
         self.budget = budget
         self.allowed_tools = allowed_tools
         self.model = model
-        self.cost_per_call = cost_per_call
+        self.cost_per_call = _money(cost_per_call)
         self.steps_used = 0
         self.model_calls_used = 0
-        self.cost_cny_used = 0.0
+        self.cost_cny_used = Decimal("0")
 
     @property
     def exhausted(self) -> bool:

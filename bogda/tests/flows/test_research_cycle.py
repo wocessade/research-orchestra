@@ -30,7 +30,7 @@ def cycle_request(tmp_path: Path, argv: list[str], artifacts: tuple[str, ...] = 
         "budget": AgentBudget(
             max_steps=8,
             max_model_calls=8,
-            max_cost_cny=10.0,
+            max_cost_cny="10.0",
             allowed_experiment_types=("shell",),
         ).model_dump(mode="json"),
         "allowed_tools": [TOOL_WRITE_PLAN, TOOL_PROPOSE_EXPERIMENT],

@@ -15,6 +15,7 @@ from bogda.contracts.tasks import (
     SchedulePolicy,
     TaskIntent,
 )
+from bogda.contracts.budgets import BudgetSource, RunBudgetEnvelope
 
 __all__ = [
     "ArtifactRecord",
@@ -30,4 +31,6 @@ __all__ = [
     "PricePreference",
     "SchedulePolicy",
     "TaskIntent",
+    "BudgetSource",
+    "RunBudgetEnvelope",
 ]

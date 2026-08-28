@@ -67,6 +67,20 @@ def _validate_existing_lines(path: Path) -> None:
         raise ValueError("existing event log is invalid") from None
 
 
+def _file_state(path: Path) -> tuple[tuple[int, int] | None, int, int | None]:
+    try:
+        file_stat = path.stat()
+    except FileNotFoundError:
+        return None, 0, None
+    except OSError:
+        raise ValueError("event log could not be inspected safely") from None
+    return (
+        (file_stat.st_dev, file_stat.st_ino),
+        file_stat.st_size,
+        file_stat.st_mtime_ns,
+    )
+
+
 def _needs_line_separator(path: Path) -> bool:
     try:
         with path.open("rb") as handle:
@@ -98,9 +112,11 @@ class JsonlRunEventSink:
         if isinstance(raw_path, bytes) or not raw_path:
             raise ValueError("event log path is invalid")
         self._path = Path(raw_path)
-        _reject_unsafe_path(self._path)
-        _validate_existing_lines(self._path)
         self._lock = RLock()
+        with self._lock:
+            _reject_unsafe_path(self._path)
+            _validate_existing_lines(self._path)
+            self._expected_file_state = _file_state(self._path)
 
     def append(self, event: RunEventV1) -> None:
         if not isinstance(event, RunEventV1):
@@ -113,8 +129,14 @@ class JsonlRunEventSink:
 
         with self._lock:
             _reject_unsafe_path(self._path)
-            _validate_existing_lines(self._path)
-            needs_separator = self._path.exists() and _needs_line_separator(self._path)
+            current_state = _file_state(self._path)
+            if current_state != self._expected_file_state:
+                raise ValueError("event log changed externally")
+            current_size = current_state[1]
+            needs_separator = current_size > 0 and _needs_line_separator(self._path)
+            expected_size = current_size + (1 if needs_separator else 0) + len(
+                line.encode("utf-8")
+            )
             flags = os.O_APPEND | os.O_CREAT | os.O_WRONLY
             flags |= getattr(os, "O_BINARY", 0)
             flags |= getattr(os, "O_NOFOLLOW", 0)
@@ -137,6 +159,12 @@ class JsonlRunEventSink:
                 except OSError:
                     pass
                 raise ValueError("event log append failed") from None
+            updated_state = _file_state(self._path)
+            if updated_state[1] != expected_size:
+                raise ValueError("event log changed during append")
+            if current_state[0] is not None and updated_state[0] != current_state[0]:
+                raise ValueError("event log changed during append")
+            self._expected_file_state = updated_state
 
 
 __all__ = ["JsonlRunEventSink", "RunEventSink"]

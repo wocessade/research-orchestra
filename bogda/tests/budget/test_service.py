@@ -18,6 +18,7 @@ from bogda.budget import (
     UsageSourceStatus,
 )
 from bogda.budget.ledger import LedgerRevisionConflictError
+from bogda.budget.pricing import DEEPSEEK_CN_2026_08_28
 from bogda.contracts import BudgetSource, ModelTier, RunBudgetEnvelope, RunEventType
 from bogda.events.jsonl import JsonlRunEventSink
 
@@ -155,13 +156,17 @@ def test_release_and_reconcile_emit_terminal_facts_once() -> None:
     assert admitted.reservation is not None
 
     released = service.release(
-        admitted.reservation.id, intent="explore", requested_tier="flash"
+        admitted.reservation.id, intent="explore", requested_tier="flash",
+        pricing_version=PRICING,
     )
     repeated = service.release(
-        admitted.reservation.id, intent="explore", requested_tier="flash"
+        admitted.reservation.id, intent="explore", requested_tier="flash",
+        pricing_version=PRICING,
     )
     assert released == repeated
-    assert len([event for event in sink.events if event.event is RunEventType.BUDGET_RELEASED]) == 1
+    release_events = [event for event in sink.events if event.event is RunEventType.BUDGET_RELEASED]
+    assert len(release_events) == 1
+    assert release_events[0].pricing_version == PRICING
 
     sink2 = MemorySink()
     service2, _ = make_service(FakeUsage(snapshot()), sink2)
@@ -172,12 +177,14 @@ def test_release_and_reconcile_emit_terminal_facts_once() -> None:
         Decimal("1.25"),
         intent="explore",
         requested_tier="flash",
+        pricing_version=PRICING,
     )
     repeated_reconcile = service2.reconcile(
         admitted2.reservation.id,
         Decimal("1.25"),
         intent="explore",
         requested_tier="flash",
+        pricing_version=PRICING,
     )
     assert reconciled == repeated_reconcile
     terminal = [event for event in sink2.events if event.event is RunEventType.BUDGET_RELEASED]
@@ -188,6 +195,7 @@ def test_release_and_reconcile_emit_terminal_facts_once() -> None:
     assert terminal[0].budget_decision is None
     assert terminal[0].intent.value == "explore"
     assert terminal[0].requested_tier.value == "flash"
+    assert terminal[0].pricing_version == PRICING
 
 
 def test_event_failure_before_reserve_does_not_mutate_ledger() -> None:
@@ -256,7 +264,8 @@ def test_terminal_mutation_survives_terminal_event_write_failure(operation: str)
     with pytest.raises(BudgetEventWriteError):
         if operation == "release":
             service.release(
-                admitted.reservation.id, intent="explore", requested_tier="flash"
+                admitted.reservation.id, intent="explore", requested_tier="flash",
+                pricing_version=PRICING,
             )
         else:
             service.reconcile(
@@ -264,6 +273,7 @@ def test_terminal_mutation_survives_terminal_event_write_failure(operation: str)
                 Decimal("1"),
                 intent="explore",
                 requested_tier="flash",
+                pricing_version=PRICING,
             )
 
     terminal = ledger.lookup(admitted.reservation.id)
@@ -284,6 +294,33 @@ def test_raised_stale_monitor_outcomes_are_not_reported_as_unavailable(
     assert sink.events[0].budget_decision == "stale_usage_snapshot"
     assert sink.events[1].budget_decision == "stale_usage_snapshot"
     assert ledger.active_total == Decimal("0")
+
+
+def test_raised_stale_monitor_does_not_override_invalid_pricing() -> None:
+    expired = DEEPSEEK_CN_2026_08_28.model_copy(
+        update={"review_by": NOW - timedelta(seconds=1)}
+    )
+    ledger = SingleFlightBudgetLedger(clock=lambda: NOW, id_factory=lambda: "reservation-1")
+    sink = MemorySink()
+    service = BudgetAdmissionService(
+        usage=FakeUsage(UsageSnapshotStaleError()),
+        guard=BudgetGuard(ledger, pricing_catalogs=(expired,), now=NOW),
+        ledger=ledger,
+        event_sink=sink,
+        clock=lambda: NOW,
+    )
+
+    result = service.admit("run-1", "explore", envelope())
+
+    assert result.decision.kind.value == "invalid_pricing"
+    assert [event.budget_decision for event in sink.events] == [
+        "invalid_pricing",
+        "invalid_pricing",
+    ]
+    assert [event.reason for event in sink.events] == [
+        "pricing_or_reservation_invalid",
+        "pricing_or_reservation_invalid",
+    ]
 
 
 def test_snapshot_and_pause_do_not_overload_reserved_amount() -> None:
@@ -312,6 +349,22 @@ def test_release_and_reconcile_require_truthful_context() -> None:
         service.release(admitted.reservation.id)
     with pytest.raises(TypeError):
         service.reconcile(admitted.reservation.id, Decimal("1"))
+    with pytest.raises(TypeError):
+        service.release(admitted.reservation.id, intent="explore", requested_tier="flash")
+    with pytest.raises(TypeError):
+        service.reconcile(
+            admitted.reservation.id,
+            Decimal("1"),
+            intent="explore",
+            requested_tier="flash",
+        )
+    with pytest.raises(BudgetAdmissionError, match="pricing version"):
+        service.release(
+            admitted.reservation.id,
+            intent="explore",
+            requested_tier="flash",
+            pricing_version="",
+        )
 
 
 def test_terminal_event_failure_is_retried_once_on_replay() -> None:
@@ -321,11 +374,20 @@ def test_terminal_event_failure_is_retried_once_on_replay() -> None:
     assert admitted.reservation is not None
 
     with pytest.raises(BudgetEventWriteError):
-        service.release(admitted.reservation.id, intent="explore", requested_tier="flash")
+        service.release(
+            admitted.reservation.id, intent="explore", requested_tier="flash",
+            pricing_version=PRICING,
+        )
     assert ledger.lookup(admitted.reservation.id).state.value == "released"
 
-    service.release(admitted.reservation.id, intent="explore", requested_tier="flash")
-    service.release(admitted.reservation.id, intent="explore", requested_tier="flash")
+    service.release(
+        admitted.reservation.id, intent="explore", requested_tier="flash",
+        pricing_version=PRICING,
+    )
+    service.release(
+        admitted.reservation.id, intent="explore", requested_tier="flash",
+        pricing_version=PRICING,
+    )
     terminal = [event for event in sink.events if event.event is RunEventType.BUDGET_RELEASED]
     assert len(terminal) == 1
     assert terminal[0].budget_decision is None
@@ -345,7 +407,10 @@ def test_concurrent_terminal_replay_delivers_once() -> None:
     def release() -> None:
         try:
             barrier.wait()
-            service.release(admitted.reservation.id, intent="explore", requested_tier="flash")
+            service.release(
+                admitted.reservation.id, intent="explore", requested_tier="flash",
+                pricing_version=PRICING,
+            )
         except BaseException as error:  # pragma: no cover - diagnostic only
             failures.append(error)
 
@@ -364,10 +429,34 @@ def test_delivered_terminal_facts_reject_conflicting_context() -> None:
     service, _ = make_service(FakeUsage(snapshot()), sink)
     admitted = service.admit("run-1", "explore", envelope())
     assert admitted.reservation is not None
-    service.release(admitted.reservation.id, intent="explore", requested_tier="flash")
+    service.release(
+        admitted.reservation.id, intent="explore", requested_tier="flash",
+        pricing_version=PRICING,
+    )
 
     with pytest.raises(BudgetAdmissionError, match="context"):
-        service.release(admitted.reservation.id, intent="audit", requested_tier="pro")
+        service.release(
+            admitted.reservation.id, intent="audit", requested_tier="pro",
+            pricing_version=PRICING,
+        )
+    with pytest.raises(BudgetAdmissionError, match="context"):
+        service.release(
+            admitted.reservation.id, intent="explore", requested_tier="flash",
+            pricing_version="other-pricing",
+        )
+
+
+def test_service_rejects_split_ledger_wiring() -> None:
+    ledger_a = SingleFlightBudgetLedger(clock=lambda: NOW)
+    ledger_b = SingleFlightBudgetLedger(clock=lambda: NOW)
+    with pytest.raises(ValueError, match="same instance"):
+        BudgetAdmissionService(
+            usage=FakeUsage(snapshot()),
+            guard=BudgetGuard(ledger_a, now=NOW),
+            ledger=ledger_b,
+            event_sink=MemorySink(),
+            clock=lambda: NOW,
+        )
 
 
 def test_jsonl_sink_persists_only_secret_free_events(tmp_path: Path) -> None:

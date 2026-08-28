@@ -87,6 +87,12 @@ def _tier(value: object) -> ModelTier:
         raise BudgetAdmissionError("requested tier is invalid") from None
 
 
+def _pricing_version(value: object) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise BudgetAdmissionError("pricing version is invalid")
+    return value
+
+
 def _stable_monitor_reason(error: UsageMonitorError) -> str:
     if isinstance(error, (UsageSnapshotStaleError, UsageSnapshotFutureError)):
         return "usage_snapshot_not_fresh"
@@ -116,8 +122,10 @@ class BudgetAdmissionService:
             raise ValueError("event_sink must implement RunEventSink")
         if not callable(getattr(ledger, "reserve", None)):
             raise ValueError("ledger must implement BudgetLedger")
-        if not callable(getattr(guard, "evaluate", None)):
-            raise ValueError("guard must implement BudgetGuard.evaluate")
+        if not isinstance(guard, BudgetGuard):
+            raise ValueError("guard must be a BudgetGuard")
+        if guard.ledger is not ledger:
+            raise ValueError("guard and ledger must be the same instance")
         if clock is not None and not callable(clock):
             raise ValueError("clock must be callable")
         self._usage = usage
@@ -128,7 +136,7 @@ class BudgetAdmissionService:
         self._terminal_lock = RLock()
         self._delivered_terminal_events: dict[tuple[object, ...], RunEventV1] = {}
         self._terminal_contexts: dict[
-            tuple[object, ...], tuple[TaskIntent, ModelTier]
+            tuple[object, ...], tuple[TaskIntent, ModelTier, str]
         ] = {}
 
     def _now(self) -> datetime:
@@ -238,6 +246,7 @@ class BudgetAdmissionService:
         reservation: Reservation,
         intent: TaskIntent,
         requested_tier: ModelTier,
+        pricing_version: str,
         operation: str,
     ) -> RunEventV1:
         decision = BudgetDecision(
@@ -251,7 +260,7 @@ class BudgetAdmissionService:
             requested_reservation=reservation.reserved,
             snapshot_age=None,
             ledger_revision=0,
-            pricing_version=None,
+            pricing_version=pricing_version,
         )
         return BudgetAdmissionService._event_context(
             run_id=reservation.run_id,
@@ -306,7 +315,10 @@ class BudgetAdmissionService:
             )
         except Exception:
             raise BudgetAdmissionError("budget evaluation failed") from None
-        if monitor_kind is not None:
+        if (
+            monitor_kind is not None
+            and decision.kind is BudgetDecisionKind.USAGE_UNAVAILABLE
+        ):
             decision = replace(
                 decision,
                 allowed=False,
@@ -418,9 +430,11 @@ class BudgetAdmissionService:
         *,
         intent: TaskIntent,
         requested_tier: ModelTier,
+        pricing_version: str,
     ) -> Reservation:
         intent = _intent(intent)
         requested_tier = _tier(requested_tier)
+        pricing_version = _pricing_version(pricing_version)
         with self._terminal_lock:
             before = self._ledger.lookup(reservation_id)
             if before.state is ReservationState.RECONCILED:
@@ -430,6 +444,7 @@ class BudgetAdmissionService:
                     before,
                     intent=intent,
                     requested_tier=requested_tier,
+                    pricing_version=pricing_version,
                     operation="release",
                 )
                 return before
@@ -443,6 +458,7 @@ class BudgetAdmissionService:
                 released,
                 intent=intent,
                 requested_tier=requested_tier,
+                pricing_version=pricing_version,
                 operation="release",
             )
             return released
@@ -454,9 +470,11 @@ class BudgetAdmissionService:
         *,
         intent: TaskIntent,
         requested_tier: ModelTier,
+        pricing_version: str,
     ) -> Reservation:
         intent = _intent(intent)
         requested_tier = _tier(requested_tier)
+        pricing_version = _pricing_version(pricing_version)
         with self._terminal_lock:
             before = self._ledger.lookup(reservation_id)
             if before.state is ReservationState.RELEASED:
@@ -468,6 +486,7 @@ class BudgetAdmissionService:
                     before,
                     intent=intent,
                     requested_tier=requested_tier,
+                    pricing_version=pricing_version,
                     operation="reconcile",
                 )
                 return before
@@ -483,6 +502,7 @@ class BudgetAdmissionService:
                 reconciled,
                 intent=intent,
                 requested_tier=requested_tier,
+                pricing_version=pricing_version,
                 operation="reconcile",
             )
             return reconciled
@@ -493,22 +513,29 @@ class BudgetAdmissionService:
         *,
         intent: TaskIntent,
         requested_tier: ModelTier,
+        pricing_version: str,
         operation: str,
     ) -> None:
         key = self._terminal_key(operation, reservation)
         delivered = self._delivered_terminal_events.get(key)
         context = self._terminal_contexts.get(key)
         if delivered is not None:
-            context = (delivered.intent, delivered.requested_tier)
-        if context is not None and context != (intent, requested_tier):
+            context = (
+                delivered.intent,
+                delivered.requested_tier,
+                delivered.pricing_version,
+            )
+        requested_context = (intent, requested_tier, pricing_version)
+        if context is not None and context != requested_context:
             raise BudgetAdmissionError("terminal event context conflicts")
-        self._terminal_contexts.setdefault(key, (intent, requested_tier))
+        self._terminal_contexts.setdefault(key, requested_context)
         if key in self._delivered_terminal_events:
             return
         event = self._terminal_event(
             reservation=reservation,
             intent=intent,
             requested_tier=requested_tier,
+            pricing_version=pricing_version,
             operation=operation,
         )
         self._append(event)

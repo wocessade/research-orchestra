@@ -196,6 +196,11 @@ def test_pricing_version_configuration_is_immutable_and_not_a_string() -> None:
         BudgetGuard(SingleFlightBudgetLedger(), pricing_catalogs=(object(),))  # type: ignore[arg-type]
 
 
+def test_guard_exposes_its_bound_ledger_read_only() -> None:
+    guard, ledger = make_guard()
+    assert guard.ledger is ledger
+
+
 @pytest.mark.parametrize(
     ("allowed", "kind"),
     [

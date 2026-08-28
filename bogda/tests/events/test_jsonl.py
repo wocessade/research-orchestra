@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 import json
+import importlib
 from pathlib import Path
 from threading import Barrier, Thread
 
@@ -132,3 +133,71 @@ def test_jsonl_lock_keeps_concurrent_appends_parseable(tmp_path: Path) -> None:
     assert len(lines) == 8
     for line in lines:
         RunEventV1.model_validate_json(line)
+
+
+def test_jsonl_validates_existing_lines_only_once_at_construction(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = importlib.import_module("bogda.events.jsonl")
+    original = module._validate_existing_lines
+    calls = 0
+
+    def counted(path: Path) -> None:
+        nonlocal calls
+        calls += 1
+        original(path)
+
+    monkeypatch.setattr(module, "_validate_existing_lines", counted)
+    path = tmp_path / "events.jsonl"
+    path.write_text(make_event().model_dump_json() + "\n", encoding="utf-8")
+    sink = JsonlRunEventSink(path)
+    sink.append(make_event(run_id="run-2"))
+    sink.append(make_event(run_id="run-3"))
+
+    assert calls == 1
+
+
+@pytest.mark.parametrize("mutation", ["append", "truncate", "replace", "modify"])
+def test_jsonl_rejects_external_file_changes_between_appends(
+    tmp_path: Path, mutation: str
+) -> None:
+    path = tmp_path / "events.jsonl"
+    sink = JsonlRunEventSink(path)
+    sink.append(make_event())
+
+    if mutation == "append":
+        with path.open("ab") as handle:
+            handle.write(b"external\n")
+    elif mutation == "truncate":
+        path.write_bytes(b"")
+    elif mutation == "replace":
+        replacement = tmp_path / "replacement.jsonl"
+        replacement.write_text(make_event(run_id="replacement").model_dump_json() + "\n", encoding="utf-8")
+        path.unlink()
+        replacement.replace(path)
+    else:
+        original = path.read_bytes()
+        path.write_bytes(original.replace(b"run-1", b"run-9", 1))
+
+    with pytest.raises(ValueError, match="changed"):
+        sink.append(make_event(run_id="after-change"))
+
+
+def test_jsonl_failed_append_that_changes_size_fails_closed_on_retry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = importlib.import_module("bogda.events.jsonl")
+    path = tmp_path / "events.jsonl"
+    sink = JsonlRunEventSink(path)
+    original_fsync = module.os.fsync
+
+    def fail_fsync(fd: int) -> None:
+        raise OSError("fsync failure")
+
+    monkeypatch.setattr(module.os, "fsync", fail_fsync)
+    with pytest.raises(ValueError, match="append"):
+        sink.append(make_event())
+    monkeypatch.setattr(module.os, "fsync", original_fsync)
+
+    with pytest.raises(ValueError, match="changed"):
+        sink.append(make_event(run_id="retry"))

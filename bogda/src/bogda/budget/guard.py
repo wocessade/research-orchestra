@@ -167,6 +167,11 @@ class BudgetGuard:
     def accepted_pricing_versions(self) -> frozenset[str]:
         return frozenset(self._catalogs)
 
+    @property
+    def ledger(self) -> BudgetLedger:
+        """The exact ledger whose facts this guard evaluates."""
+        return self._ledger
+
     def _now(self, supplied: datetime | None) -> datetime:
         value = supplied if supplied is not None else self._fixed_now
         if value is None:

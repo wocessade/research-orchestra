@@ -3,7 +3,7 @@ from decimal import Decimal
 
 import pytest
 
-from bogda.budget.guard import BudgetDecisionKind, BudgetGuard
+from bogda.budget.guard import BudgetDecision, BudgetDecisionKind, BudgetGuard
 from bogda.budget.ledger import LedgerFacts, SingleFlightBudgetLedger
 from bogda.budget.pricing import DEEPSEEK_CN_2026_08_28, PricingCatalogV1
 from bogda.budget.usage import UsageSnapshotV1, UsageSourceStatus
@@ -126,6 +126,22 @@ def test_active_reservation_conflicts_after_explainable_balance_calculation() ->
     assert ledger.lookup(existing.id).state.value == "active"
 
 
+def test_ceiling_breach_precedes_active_reservation_conflict() -> None:
+    guard, ledger = make_guard()
+    ledger.reserve(run_id="existing", amount=Decimal("1"), expected_revision=0)
+
+    decision = guard.evaluate(
+        snapshot=snapshot(balance="10"),
+        envelope=envelope(ceiling="1", minimum="1"),
+        reservation_cny=Decimal("2"),
+    )
+
+    assert decision.kind is BudgetDecisionKind.BUDGET_CEILING_EXCEEDED
+    assert decision.allowed is False
+    assert decision.active_reservations == Decimal("1")
+    assert decision.available_to_start == Decimal("8")
+
+
 def test_exact_available_balance_is_allowed() -> None:
     guard, _ = make_guard()
     decision = guard.evaluate(
@@ -178,6 +194,32 @@ def test_pricing_version_configuration_is_immutable_and_not_a_string() -> None:
         guard.accepted_pricing_versions.add("other")  # type: ignore[attr-defined]
     with pytest.raises(ValueError):
         BudgetGuard(SingleFlightBudgetLedger(), pricing_catalogs=(object(),))  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    ("allowed", "kind"),
+    [
+        (True, BudgetDecisionKind.INSUFFICIENT_BALANCE),
+        (False, BudgetDecisionKind.ALLOW),
+    ],
+)
+def test_budget_decision_requires_allowed_to_match_kind(
+    allowed: bool, kind: BudgetDecisionKind
+) -> None:
+    with pytest.raises(ValueError, match="allowed"):
+        BudgetDecision(
+            allowed=allowed,
+            kind=kind,
+            reason="test",
+            balance=Decimal("1"),
+            active_reservations=Decimal("0"),
+            minimum_remaining=Decimal("0"),
+            available_to_start=Decimal("1"),
+            requested_reservation=Decimal("1"),
+            snapshot_age=1,
+            ledger_revision=0,
+            pricing_version=PRICING,
+        )
 
 
 class CoherentFactsOnlyLedger:

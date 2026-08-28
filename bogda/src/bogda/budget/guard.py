@@ -73,6 +73,8 @@ class BudgetDecision:
             raise ValueError("allowed must be a boolean")
         if not isinstance(self.kind, BudgetDecisionKind):
             raise ValueError("kind must be a BudgetDecisionKind")
+        if self.allowed is not (self.kind is BudgetDecisionKind.ALLOW):
+            raise ValueError("allowed must match kind")
         if not isinstance(self.reason, str) or not self.reason:
             raise ValueError("reason must be a non-empty string")
         if self.balance is not None:
@@ -350,10 +352,10 @@ class BudgetGuard:
                 pricing_version=pricing_version,
             )
         available = balance - active - minimum
-        if active > 0:
+        if requested > ceiling:
             return self._decision(
-                kind=BudgetDecisionKind.RESERVATION_CONFLICT,
-                reason="active_reservation_conflict",
+                kind=BudgetDecisionKind.BUDGET_CEILING_EXCEEDED,
+                reason="reservation_exceeds_authorized_ceiling",
                 revision=revision,
                 active=active,
                 balance=balance,
@@ -363,10 +365,10 @@ class BudgetGuard:
                 age=age,
                 pricing_version=pricing_version,
             )
-        if requested > ceiling:
+        if active > 0:
             return self._decision(
-                kind=BudgetDecisionKind.BUDGET_CEILING_EXCEEDED,
-                reason="reservation_exceeds_authorized_ceiling",
+                kind=BudgetDecisionKind.RESERVATION_CONFLICT,
+                reason="active_reservation_conflict",
                 revision=revision,
                 active=active,
                 balance=balance,

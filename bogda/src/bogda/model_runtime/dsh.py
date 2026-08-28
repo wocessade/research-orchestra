@@ -123,7 +123,7 @@ class DshCliAdapter:
         except (ValidationError, json.JSONDecodeError):
             usage = None
 
-        if not stdout or usage is None:
+        if usage is None:
             return ModelCallResult(outcome=ModelCallOutcome.USAGE_UNKNOWN)
         return ModelCallResult(
             outcome=ModelCallOutcome.FINISHED,

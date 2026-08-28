@@ -220,6 +220,19 @@ def test_valid_usage_receipt_round_trip_finishes_call(tmp_path: Path) -> None:
     assert result.usage == expected_usage
 
 
+def test_empty_stdout_with_valid_usage_receipt_finishes_call(tmp_path: Path) -> None:
+    runner = FakeRunner(returncode=0, stdout="")
+    adapter = adapter_for(tmp_path, runner)
+    request = call_request(tmp_path / "attempt", ModelTier.FLASH)
+    expected_usage = write_usage(request.attempt_dir)
+
+    result = adapter.invoke(request)
+
+    assert result.outcome is ModelCallOutcome.FINISHED
+    assert result.output == ""
+    assert result.usage == expected_usage
+
+
 def test_json_usage_reader_validates_present_receipt(tmp_path: Path) -> None:
     attempt_dir = tmp_path / "attempt"
     attempt_dir.mkdir()

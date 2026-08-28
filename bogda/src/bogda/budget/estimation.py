@@ -208,8 +208,8 @@ class WorkloadEstimate:
             "authorized_ceiling",
         ):
             value = _require_decimal(getattr(self, name), name, non_negative=True)
-            if name == "contingency_factor" and value <= 0:
-                raise ValueError("contingency_factor must be positive")
+            if name == "contingency_factor" and value < 1:
+                raise ValueError("contingency_factor must be at least 1")
         if self.authorized_ceiling < self.expected_cost:
             raise ValueError("authorized_ceiling must be >= expected_cost")
         if self.historical_p90_cost is not None:

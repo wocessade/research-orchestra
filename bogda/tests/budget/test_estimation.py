@@ -215,6 +215,25 @@ def test_manual_estimate_rejects_an_authorized_ceiling_below_expected_cost() -> 
         )
 
 
+def test_manual_estimate_rejects_contingency_factor_below_one() -> None:
+    with pytest.raises(ValueError, match="at least 1"):
+        WorkloadEstimate(
+            intent=TaskIntent.EXECUTE,
+            tier=ModelTier.FLASH,
+            workload=workload(),
+            effective_cache_hit_input_tokens=0,
+            effective_cache_miss_input_tokens=1_000_000,
+            effective_output_tokens=1_000_000,
+            expected_cost=Decimal("1.50"),
+            retry_reserve=Decimal("0"),
+            contingency_factor=Decimal("0.5"),
+            historical_p90_cost=None,
+            authorized_ceiling=Decimal("2.00"),
+            period=PricePeriod.OFF_PEAK,
+            pricing_version="test-pricing",
+        )
+
+
 def test_peak_crossing_window_uses_peak_without_time_charge() -> None:
     result = estimate(
         start=datetime(2026, 8, 28, 11, 30, tzinfo=BEIJING),

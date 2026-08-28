@@ -64,6 +64,18 @@ Prefect Completed means the command ran and required artifacts exist. Scientific
 
 Implemented: local shell flow, attempt directories, required artifact checks, versioned RunResult artifacts, and separate scientific review status.
 
+## Intelligent collaboration contracts
+
+- `autonomy_mode` controls authority.
+- `intent` controls cognitive behavior: execute, explore, decide, audit, or brief.
+- `model_tier` controls reasoning capacity, never permissions.
+- `executor` selects the adapter.
+- Paid dsh requests carry a frozen `RunBudgetEnvelope`; money uses `Decimal` values and JSON decimal strings.
+- Legacy Orchestra cards enter only through `bogda.compat` and become Bogda `JobRequest` objects; Bogda does not import the Orchestra runtime.
+- `RunEventV1` is the versioned structured-log contract. Model-call events pair on `call_id`; ordinary events contain prompt hashes/artifact references rather than full prompts, responses, credentials, or authorization headers.
+
+Public schema-v1 entry points are exported from `bogda.contracts`: `JobRequest`, `RunBudgetEnvelope`, `SchedulePolicy`, `RunEventV1`, `TaskIntent`, `ModelTier`, and `ExecutorKind`.
+
 ## Pi-bundle operations
 
 The fixed ARM64 deployment inventory is in [deploy/pi/manifest.toml](deploy/pi/manifest.toml) (paths and unit names stay Pi-compatible). Day-to-day ops on RK3528: [docs/pi-shadow-runbook.md](docs/pi-shadow-runbook.md) (banner: current host). Local pytest does not authorize a reinstall.

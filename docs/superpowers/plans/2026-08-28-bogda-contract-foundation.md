@@ -1,6 +1,6 @@
 # Bogda Contract Foundation Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** 建立 Bogda 智能协作的版本化领域契约，统一任务意图、模型档位、动态预算和结构化事件类型，并提供不依赖 Orchestra 包的单向旧任务卡转换。
 
@@ -60,7 +60,7 @@
 - `SchedulePolicy(earliest_start, deadline, price_preference)` 只接受带时区时间；若两者同时存在，`deadline` 必须晚于 `earliest_start`。
 - Later tasks import these types only from `bogda.contracts`, not from private module paths.
 
-- [ ] **Step 1: Write failing enum and schedule tests**
+- [x] **Step 1: Write failing enum and schedule tests**
 
 ```python
 from datetime import datetime
@@ -101,7 +101,7 @@ def test_schedule_defaults_to_cheapest_before_deadline() -> None:
     assert policy.price_preference is PricePreference.CHEAPEST_BEFORE_DEADLINE
 ```
 
-- [ ] **Step 2: Run the focused test and verify the expected failure**
+- [x] **Step 2: Run the focused test and verify the expected failure**
 
 Run:
 
@@ -112,7 +112,7 @@ uv run --python 3.11 pytest tests/contracts/test_tasks.py -v
 
 Expected: collection fails because the five exported contract types do not exist.
 
-- [ ] **Step 3: Implement the minimal task-axis contracts**
+- [x] **Step 3: Implement the minimal task-axis contracts**
 
 ```python
 # bogda/src/bogda/contracts/tasks.py
@@ -171,7 +171,7 @@ class SchedulePolicy(BaseModel):
 
 Add all five names to `bogda/contracts/__init__.py` imports and `__all__`.
 
-- [ ] **Step 4: Run focused and existing contract tests**
+- [x] **Step 4: Run focused and existing contract tests**
 
 Run:
 
@@ -181,7 +181,7 @@ uv run --python 3.11 pytest tests/contracts/test_tasks.py tests/contracts/test_m
 
 Expected: all tests pass; existing `JobRequest` behavior is unchanged.
 
-- [ ] **Step 5: Commit the task**
+- [x] **Step 5: Commit the task**
 
 ```powershell
 git add bogda/src/bogda/contracts/tasks.py bogda/src/bogda/contracts/__init__.py bogda/tests/contracts/test_tasks.py
@@ -209,7 +209,7 @@ git commit -m "feat(bogda): add task routing contracts"
 - `RunBudgetEnvelope` serializes all monetary fields as JSON strings and rejects expected cost above the authorized ceiling.
 - `fallback_tier` accepts only `flash` or `None`; Pro/Auto are not fallback tiers in schema v1.
 
-- [ ] **Step 1: Write failing budget-envelope tests**
+- [x] **Step 1: Write failing budget-envelope tests**
 
 ```python
 from decimal import Decimal
@@ -256,7 +256,7 @@ def test_budget_rejects_float_money_input() -> None:
         envelope(expected_cost=2.88)
 ```
 
-- [ ] **Step 2: Add failing regression tests for Decimal agent accounting**
+- [x] **Step 2: Add failing regression tests for Decimal agent accounting**
 
 Update `bogda/tests/agents/test_coordinator.py`:
 
@@ -282,7 +282,7 @@ def test_agent_cost_accounting_uses_decimal() -> None:
     assert isinstance(result.cost_cny_used, Decimal)
 ```
 
-- [ ] **Step 3: Run tests and verify float-based code fails**
+- [x] **Step 3: Run tests and verify float-based code fails**
 
 Run:
 
@@ -292,7 +292,7 @@ uv run --python 3.11 pytest tests/contracts/test_budgets.py tests/agents/test_co
 
 Expected: budget contract import fails and the existing coordinator returns `float` cost.
 
-- [ ] **Step 4: Implement the budget envelope**
+- [x] **Step 4: Implement the budget envelope**
 
 ```python
 # bogda/src/bogda/contracts/budgets.py
@@ -354,7 +354,7 @@ class RunBudgetEnvelope(BaseModel):
 
 Export `BudgetSource` and `RunBudgetEnvelope` from `bogda.contracts`.
 
-- [ ] **Step 5: Replace existing float money with Decimal**
+- [x] **Step 5: Replace existing float money with Decimal**
 
 Apply these exact type changes:
 
@@ -401,7 +401,7 @@ self.cost_cny_used = Decimal("0")
 
 Change the constructor annotation to `cost_per_call: Decimal | str | int = Decimal("0.5")`. In `make_coordinator`, replace defaults `10.0` and `0.5` with strings `"10.0"` and `"0.5"`; in `tests/flows/test_research_cycle.py`, replace `max_cost_cny=10.0` with `max_cost_cny="10.0"`. No later calculation may cast the amount back to float.
 
-- [ ] **Step 6: Run focused and research-cycle tests**
+- [x] **Step 6: Run focused and research-cycle tests**
 
 Run:
 
@@ -411,7 +411,7 @@ uv run --python 3.11 pytest tests/contracts/test_budgets.py tests/agents/test_co
 
 Expected: all tests pass; budget exhaustion behavior and human checkpoints remain unchanged.
 
-- [ ] **Step 7: Commit the task**
+- [x] **Step 7: Commit the task**
 
 ```powershell
 git add bogda/src/bogda/contracts/budgets.py bogda/src/bogda/contracts/__init__.py bogda/src/bogda/agents/contracts.py bogda/src/bogda/agents/coordinator.py bogda/tests/contracts/test_budgets.py bogda/tests/agents/test_coordinator.py bogda/tests/flows/test_research_cycle.py
@@ -439,7 +439,7 @@ git commit -m "refactor(bogda): use decimal budget contracts"
 - Existing shell callers remain valid through conservative defaults: execute + auto + shell + no paid budget.
 - Dsh requests require a budget envelope; an explicit model tier must match `budget.requested_tier`.
 
-- [ ] **Step 1: Add failing JobRequest contract tests**
+- [x] **Step 1: Add failing JobRequest contract tests**
 
 Append to `bogda/tests/contracts/test_models.py`:
 
@@ -478,7 +478,7 @@ def test_dsh_request_requires_budget() -> None:
         )
 ```
 
-- [ ] **Step 2: Run focused tests and confirm missing fields**
+- [x] **Step 2: Run focused tests and confirm missing fields**
 
 Run:
 
@@ -488,7 +488,7 @@ uv run --python 3.11 pytest tests/contracts/test_models.py -v
 
 Expected: assertions fail because `JobRequest` does not expose the new fields.
 
-- [ ] **Step 3: Extend JobRequest without changing existing shell call sites**
+- [x] **Step 3: Extend JobRequest without changing existing shell call sites**
 
 ```python
 # additions in bogda/src/bogda/contracts/models.py
@@ -535,7 +535,7 @@ class JobRequest(BaseModel):
 
 Keep the existing model fields once; do not duplicate the class body. Update `bogda.contracts.__all__` only for names not already exported.
 
-- [ ] **Step 4: Add JSON round-trip and mismatch tests**
+- [x] **Step 4: Add JSON round-trip and mismatch tests**
 
 ```python
 def test_versioned_request_round_trips_without_changing_frozen_axes() -> None:
@@ -553,7 +553,7 @@ def test_versioned_request_round_trips_without_changing_frozen_axes() -> None:
     assert restored.intent is TaskIntent.AUDIT
 ```
 
-- [ ] **Step 5: Run all direct JobRequest consumers**
+- [x] **Step 5: Run all direct JobRequest consumers**
 
 Run:
 
@@ -563,7 +563,7 @@ uv run --python 3.11 pytest tests/contracts/test_models.py tests/control/test_cl
 
 Expected: all tests pass without editing production deployment files.
 
-- [ ] **Step 6: Commit the task**
+- [x] **Step 6: Commit the task**
 
 ```powershell
 git add bogda/src/bogda/contracts/models.py bogda/src/bogda/contracts/__init__.py bogda/tests/contracts/test_models.py bogda/tests/control/test_cli.py bogda/tests/flows/test_shell_job.py bogda/tests/flows/test_research_checkpoint.py bogda/tests/integration/test_vertical_slice.py
@@ -587,7 +587,7 @@ git commit -m "feat(bogda): version task request axes"
 - Converter maps `mode -> intent`, `model None -> auto`, `model flash|pro -> model_tier`, and preserves old execution details under namespaced `parameters["legacy_orchestra"]`.
 - The module must not import anything under `orchestra`.
 
-- [ ] **Step 1: Write failing compatibility tests using an in-test card**
+- [x] **Step 1: Write failing compatibility tests using an in-test card**
 
 ```python
 from pathlib import Path
@@ -645,7 +645,7 @@ def test_legacy_unknown_key_fails_closed(tmp_path: Path) -> None:
         parse_orchestra_task(path)
 ```
 
-- [ ] **Step 2: Run the test and verify missing compatibility module**
+- [x] **Step 2: Run the test and verify missing compatibility module**
 
 Run:
 
@@ -655,7 +655,7 @@ uv run --python 3.11 pytest tests/compat/test_orchestra_taskfile.py -v
 
 Expected: collection fails because `bogda.compat` does not exist.
 
-- [ ] **Step 3: Implement the isolated legacy model and parser**
+- [x] **Step 3: Implement the isolated legacy model and parser**
 
 The production module must define these exact interfaces:
 
@@ -808,7 +808,7 @@ def to_job_request(
 
 The module imports its stdlib path types and the referenced Bogda contracts explicitly. It must not import or monkeypatch the old Orchestra module.
 
-- [ ] **Step 4: Add parity fixtures for all five intents and both model tiers**
+- [x] **Step 4: Add parity fixtures for all five intents and both model tiers**
 
 Use `pytest.mark.parametrize` with:
 
@@ -842,7 +842,7 @@ def test_all_legacy_modes_and_tiers_convert(intent: str, tier: str, tmp_path: Pa
 
 Also cover duplicate keys, parent/absolute paths, self-dependency, undeclared JSON outputs, invalid validator coupling and empty bodies. Use the old tests as behavioral reference but keep fixtures in Bogda.
 
-- [ ] **Step 5: Run compatibility and existing Orchestra parser tests separately**
+- [x] **Step 5: Run compatibility and existing Orchestra parser tests separately**
 
 Run:
 
@@ -855,7 +855,7 @@ python -m unittest broker.tests.test_taskfile -v
 
 Expected: both suites pass; Bogda works without adding Orchestra to its import path.
 
-- [ ] **Step 6: Commit the task**
+- [x] **Step 6: Commit the task**
 
 ```powershell
 Set-Location D:\pythonProject
@@ -880,7 +880,7 @@ git commit -m "feat(bogda): import legacy orchestra task cards"
 - This task defines schema only. It does not append files, publish Prefect Artifacts or call a model.
 - `model_call_started|model_call_finished` require `call_id`; tier changes require requested/effective tiers; timestamps must be timezone-aware.
 
-- [ ] **Step 1: Write failing event-schema tests**
+- [x] **Step 1: Write failing event-schema tests**
 
 ```python
 from decimal import Decimal
@@ -920,7 +920,7 @@ def test_model_call_event_requires_call_id() -> None:
         )
 ```
 
-- [ ] **Step 2: Run focused test and verify the event types are absent**
+- [x] **Step 2: Run focused test and verify the event types are absent**
 
 Run:
 
@@ -931,7 +931,7 @@ uv run --python 3.11 pytest tests/contracts/test_events.py -v
 
 Expected: collection fails because `RunEventType` and `RunEventV1` are not exported.
 
-- [ ] **Step 3: Implement the versioned event envelope**
+- [x] **Step 3: Implement the versioned event envelope**
 
 ```python
 # bogda/src/bogda/contracts/events.py
@@ -1020,11 +1020,11 @@ class RunEventV1(BaseModel):
 
 Export both event names through `bogda.contracts`.
 
-- [ ] **Step 4: Add pairing and secret-surface tests**
+- [x] **Step 4: Add pairing and secret-surface tests**
 
 Add tests that `model_call_started` and `model_call_finished` accept the same `call_id`, and assert the schema has no `headers`, `api_key`, `authorization`, `prompt` or `response` fields. Full prompt/output belongs to referenced artifacts in a later plan.
 
-- [ ] **Step 5: Run all contract tests**
+- [x] **Step 5: Run all contract tests**
 
 Run:
 
@@ -1034,7 +1034,7 @@ uv run --python 3.11 pytest tests/contracts -v
 
 Expected: all contract tests pass and JSON monetary fields are strings.
 
-- [ ] **Step 6: Commit the task**
+- [x] **Step 6: Commit the task**
 
 ```powershell
 git add bogda/src/bogda/contracts/events.py bogda/src/bogda/contracts/__init__.py bogda/tests/contracts/test_events.py
@@ -1056,7 +1056,7 @@ git commit -m "feat(bogda): define versioned run events"
 - Produces: 面向维护者的 schema v1 入口、旧字段映射表、测试证据和下一阶段可消费签名。
 - Does not change production deployment or authorize Phase B.
 
-- [ ] **Step 1: Add a concise contract section to Bogda README**
+- [x] **Step 1: Add a concise contract section to Bogda README**
 
 Document these exact facts:
 
@@ -1071,7 +1071,7 @@ Document these exact facts:
 - Legacy Orchestra cards enter only through `bogda.compat` and become Bogda `JobRequest` objects.
 ```
 
-- [ ] **Step 2: Run the Bogda non-integration suite**
+- [x] **Step 2: Run the Bogda non-integration suite**
 
 Run:
 
@@ -1082,7 +1082,7 @@ uv run --python 3.11 pytest -m "not integration" -q
 
 Expected: zero failures.
 
-- [ ] **Step 3: Run the local Prefect integration suite**
+- [x] **Step 3: Run the local Prefect integration suite**
 
 Run:
 
@@ -1092,7 +1092,7 @@ uv run --python 3.11 pytest -m integration -v
 
 Expected: zero failures; existing shell vertical slice remains operational.
 
-- [ ] **Step 4: Run compatibility and repository hygiene checks**
+- [x] **Step 4: Run compatibility and repository hygiene checks**
 
 Run:
 
@@ -1106,7 +1106,7 @@ git status --short
 
 Expected: old parser tests pass; no whitespace errors; only intended files are modified. The user-owned untracked maintainability report must remain uncommitted unless the user separately asks to add it.
 
-- [ ] **Step 5: Write the acceptance report with exact evidence**
+- [x] **Step 5: Write the acceptance report with exact evidence**
 
 The report must include:
 
@@ -1122,14 +1122,14 @@ The report must include:
 - Phase B inputs: JobRequest, RunBudgetEnvelope, SchedulePolicy, RunEventV1
 ```
 
-- [ ] **Step 6: Mark this plan's completed checkboxes and commit documentation**
+- [x] **Step 6: Mark this plan's completed checkboxes and commit documentation**
 
 ```powershell
 git add bogda/README.md docs/superpowers/plans/2026-08-28-bogda-contract-foundation.md docs/reports/2026-08-28-bogda-contract-foundation-acceptance.md
 git commit -m "docs(bogda): accept contract foundation"
 ```
 
-- [ ] **Step 7: Stop before Phase B**
+- [x] **Step 7: Stop before Phase B**
 
 SOL reviews the acceptance report and creates a new plan for UsagePort, pricing, workload estimation, BudgetGuard and reservations from the actual merged interfaces. Do not begin DeepSeek or frontend integration in the same task.
 

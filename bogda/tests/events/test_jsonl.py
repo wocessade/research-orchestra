@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 import json
 import importlib
+import os
 from pathlib import Path
 from threading import Barrier, Thread
 
@@ -182,6 +183,135 @@ def test_jsonl_rejects_external_file_changes_between_appends(
 
     with pytest.raises(ValueError, match="changed"):
         sink.append(make_event(run_id="after-change"))
+
+
+def _freeze_target_metadata(
+    monkeypatch: pytest.MonkeyPatch, path: Path
+) -> int:
+    real_stat = Path.stat
+    baseline = real_stat(path)
+
+    class ControlledStat:
+        def __init__(self, observed) -> None:
+            self._observed = observed
+
+        @property
+        def st_dev(self):
+            return baseline.st_dev
+
+        @property
+        def st_ino(self):
+            return baseline.st_ino
+
+        @property
+        def st_size(self):
+            return self._observed.st_size
+
+        @property
+        def st_mtime_ns(self):
+            return baseline.st_mtime_ns
+
+        def __getattr__(self, name: str):
+            return getattr(self._observed, name)
+
+    def controlled_stat(candidate: Path, *args, **kwargs):
+        observed = real_stat(candidate, *args, **kwargs)
+        if candidate == path:
+            return ControlledStat(observed)
+        return observed
+
+    monkeypatch.setattr(Path, "stat", controlled_stat)
+    return baseline.st_mtime_ns
+
+
+def test_jsonl_rejects_twenty_same_size_mutations_without_mtime_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "events.jsonl"
+    sink = JsonlRunEventSink(path)
+    sink.append(make_event(run_id="run-000"))
+    frozen_mtime_ns = _freeze_target_metadata(monkeypatch, path)
+
+    for index in range(1, 21):
+        original = path.read_bytes()
+        mutated = original.replace(
+            f"run-{index - 1:03d}".encode(), f"run-{index:03d}".encode(), 1
+        )
+        assert mutated != original
+        assert len(mutated) == len(original)
+        path.write_bytes(mutated)
+        os.utime(path, ns=(frozen_mtime_ns, frozen_mtime_ns))
+
+        with pytest.raises(ValueError, match="changed"):
+            sink.append(make_event(run_id="after-change"))
+
+
+def test_jsonl_detects_large_same_size_change_with_bounded_streaming_reads(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = importlib.import_module("bogda.events.jsonl")
+    path = tmp_path / "events.jsonl"
+    event = make_event(reason="mutation-AAAA" + "x" * 131_072)
+    path.write_text(event.model_dump_json() + "\n", encoding="utf-8")
+    sink = JsonlRunEventSink(path)
+    frozen_mtime_ns = _freeze_target_metadata(monkeypatch, path)
+
+    original = path.read_bytes()
+    mutated = original.replace(b"mutation-AAAA", b"mutation-BBBB", 1)
+    assert mutated != original
+    assert len(mutated) == len(original)
+    path.write_bytes(mutated)
+    os.utime(path, ns=(frozen_mtime_ns, frozen_mtime_ns))
+
+    read_calls: list[tuple[int, int]] = []
+    real_open = Path.open
+
+    class TrackedHandle:
+        def __init__(self, handle) -> None:
+            self._handle = handle
+
+        def __enter__(self):
+            self._handle.__enter__()
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return self._handle.__exit__(exc_type, exc_value, traceback)
+
+        def read(self, size: int = -1):
+            value = self._handle.read(size)
+            read_calls.append((size, len(value)))
+            return value
+
+        def read1(self, size: int = -1):
+            value = self._handle.read1(size)
+            read_calls.append((size, len(value)))
+            return value
+
+        def readinto(self, buffer) -> int:
+            count = self._handle.readinto(buffer)
+            read_calls.append((len(buffer), count))
+            return count
+
+        def __getattr__(self, name: str):
+            return getattr(self._handle, name)
+
+    def tracked_open(candidate: Path, *args, **kwargs):
+        handle = real_open(candidate, *args, **kwargs)
+        mode = args[0] if args else kwargs.get("mode", "r")
+        if candidate == path and "r" in mode and "b" in mode:
+            return TrackedHandle(handle)
+        return handle
+
+    monkeypatch.setattr(module.Path, "open", tracked_open)
+    max_chunk = 64 * 1024
+
+    with pytest.raises(ValueError, match="changed"):
+        sink.append(make_event(run_id="after-change"))
+
+    assert read_calls
+    assert all(0 < requested <= max_chunk for requested, _ in read_calls)
+    assert sum(returned for _, returned in read_calls) >= len(mutated)
+    assert sum(returned > 1 for _, returned in read_calls) >= 2
 
 
 def test_jsonl_failed_append_that_changes_size_fails_closed_on_retry(

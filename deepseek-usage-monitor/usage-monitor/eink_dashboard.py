@@ -86,7 +86,7 @@ ORCH_RIGHT_X = 776        # 时间右对齐 x (与右框线 785 留 9px, D12)
 ORCH_BOX1_BOTTOM = 296    # 框1 底 (末行 266 底 288 留 8px)
 ORCH_BOX2_TOP = 304       # 框2「设备」顶 (与框1 留 8px)
 ORCH_DEV_TITLE_Y = 308    # 「设备」标题 (font_title 加粗; D12 上移, 底 332)
-ORCH_DEV_ROW1_Y = 344     # 设备行1: 4B Broker (标题底留 12px 正文间隙)
+ORCH_DEV_ROW1_Y = 344     # 设备行1: RK3528 Broker (标题底留 12px 正文间隙)
 ORCH_DEV_ROW2_Y = 366     # 设备行2: 核桃派 (本机)
 ORCH_BOX2_BOTTOM = 396    # 框2 底 (行2 底 388 留 8px)
 ORCH_INFO_Y = 402         # DeepSeek/天气小字行 (框2 底留 6px, 底 424 距 footer 6px)
@@ -522,7 +522,7 @@ class EinkDashboard:
         """Orchestra 融合面板 (D9+D10): 状态条 + 最近任务列表 + 设备区 + 小字行
 
         D9: 两态/单数字信息压成单行状态条, 最近任务列表为主内容, 适配研究
-        编排工作流; D10: 下半新增设备区 (4B Broker / 核桃派 负载·内存),
+        编排工作流; D10: 下半新增设备区 (RK3528 Broker / 核桃派 负载·内存),
         DeepSeek 余额/用量与天气压到最底一行。
         """
         self._draw_title_bar(draw, state, show_date=True)
@@ -590,14 +590,14 @@ class EinkDashboard:
                           font=self.font_normal)
                 y += ORCH_LIST_ROW_H
 
-        # ── 设备区: 4B Broker / 核桃派 (本机) 负载·内存 ──
+        # ── 设备区: RK3528 Broker / 核桃派 (本机) 负载·内存 ──
         draw.text((ORCH_BOX_PAD_X, ORCH_DEV_TITLE_Y), "设备", fill=0,
                   font=self.font_title)
         host = orch.get("host") or {}
         # 行1: Broker 在线状态 = 与状态条相同的新鲜度推导
         dev_health = "在线" if health == "OK" else health
         r1 = (
-            f"4B Broker  {dev_health}"
+            f"RK3528  {dev_health}"
             f" · 负载 {self._fmt_val(host.get('load1'))}"
             f" · 内存 {self._fmt_val(host.get('mem_pct'), '%')}"
         )

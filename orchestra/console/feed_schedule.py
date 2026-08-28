@@ -1,6 +1,6 @@
 """console-schedule.toml 解析、事件展开与 ICS 生成（stdlib only）。
 
-system 段是 4B systemd timer 的镜像声明，权威在 Pi `systemctl list-timers`；
+system 段是 RK3528 systemd timer 的镜像声明，权威在盒子 `systemctl list-timers`；
 ICS 生成显式事件实例（窗口 前30天~后60天），floating 本地时间（无 TZ 后缀）。
 """
 from __future__ import annotations
@@ -20,7 +20,7 @@ WINDOW_BEFORE = timedelta(days=30)
 WINDOW_AFTER = timedelta(days=60)
 UPCOMING_DAYS = 14
 _HEADER = (
-    "# 日程单一事实源。system 段 = 4B systemd timer 的镜像声明（权威在 Pi systemctl list-timers，\n"
+    "# 日程单一事实源。system 段 = RK3528 systemd timer 的镜像声明（权威在盒子 systemctl list-timers，\n"
     "# deploy/运维改动 timer 时同步改本文件）；personal 段 = 手录日程。\n"
 )
 _SYSTEM_COMMENTS = {

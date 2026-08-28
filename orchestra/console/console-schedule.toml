@@ -1,4 +1,4 @@
-# 日程单一事实源。system 段 = 4B systemd timer 的镜像声明（权威在 Pi systemctl list-timers，
+# 日程单一事实源。system 段 = RK3528 systemd timer 的镜像声明（权威在盒子 systemctl list-timers，
 # deploy/运维改动 timer 时同步改本文件）；personal 段 = 手录日程。
 
 [system]

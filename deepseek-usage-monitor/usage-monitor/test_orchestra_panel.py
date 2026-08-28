@@ -312,7 +312,7 @@ class SnapshotCliTest(unittest.TestCase):
             r = self.run_cli("--snapshot", out, "--panel", "orchestra")
             self.assertEqual(r.returncode, 0, r.stderr or r.stdout)
             self.assert_png_800x480(out)
-            # D10 设备区 (y 300-370): 标题 + 4B Broker/核桃派 两行应有文本像素
+            # D10 设备区 (y 300-370): 标题 + RK3528/核桃派 两行应有文本像素
             # mode '1' 的 tobytes 是 8px/byte 打包, 先转 'L' 再数黑像素
             with Image.open(out) as img:
                 region = img.convert("L").crop((0, 300, 800, 370))

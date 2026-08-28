@@ -4,6 +4,16 @@
 
 目的：在模型额度和执行者切换后，以本文件作为当前唯一工作入口。不要从聊天记录重新拼装状态。
 
+## 收班补记：2026-08-28 切到 RK3528（Gate 6 仍未通过）
+
+- **不要宣布 Gate 6 / Gate 7 通过。** 4B 失败轮见 `docs/reports/2026-08-27-bogda-pi-gate6-acceptance.md`。复测 `20260827T124429Z` 被 NAS/Prefect 搬盘打断，不能把 08-30 截止点当成 RK3528 的 72h。
+- 现网控制面：`liuxfs@10.77.0.1`，Prefect `:4200`，数据 `/mnt/nas/.bogda`，池名仍 `pi-service`。
+- 仓库 unit 用 `RequiresMountsFor=/mnt/nas/.bogda`，不是 4B 上曾失败的 `Requires=mnt-nas.mount`。下次只读核对真机 unit 是否与仓库一致；未批准不要重装。
+- 软件下一跳仍是 **3101 真实 Prefect S1/S2**，阻塞在 **RK3528 24h Gate 6 + owner 批准**，不是改 3100、不是宿舍机。
+- 展示层已去掉硬编码「4B」：控制台 `status.broker`、墨水屏设备行 `RK3528`（核桃派 `monitor` 已于 2026-08-28 14:41 CST 重启）。
+- **新 24h trial**：`20260828T064220Z`，首样本 `2026-08-28T06:42:23Z` `api_ok=true`。截止 **2026-08-29T06:42:23Z**（北京 14:42）。报告 `docs/reports/2026-08-28-bogda-rk3528-gate6-start.md`。
+- 真机 unit 已是 `RequiresMountsFor`，无 `Requires=mnt-nas.mount`。窗内不改 unit。受控重启仍须另开口。
+
 ## 收班补记：2026-08-27 Gate 6 收口与新 trial
 
 - 失败轮报告：`docs/reports/2026-08-27-bogda-pi-gate6-acceptance.md`（编号 `20260824T083454Z`，未通过）。
@@ -95,7 +105,7 @@ Pi 快照时间：2026-08-24T08:56:05Z（北京时间16:56）。
 
 ## 现在不要做什么
 
-- 72小时窗口内不升级Prefect、不重装Bogda、不修改unit、不调整并发。
+- 24小时窗口内不升级Prefect、不重装Bogda、不修改unit、不调整并发。
 - 不处理Prefect内置UI权限警告和runpy警告；先保持观察变量稳定。
 - 不切换3100，不接入GPU，不接入宿舍runner。
 - 不配置路由器端口映射、Tailscale Serve或Funnel。
@@ -105,7 +115,7 @@ Pi 快照时间：2026-08-24T08:56:05Z（北京时间16:56）。
 
 ## 任务安排
 
-### 自动系统：现在至72小时截止
+### 自动系统：现在至24小时截止
 
 - `bogda-shadow-health.timer` 每5分钟追加一个样本。
 - `bogda-prefect-snapshot.timer` 每日00:00生成快照。

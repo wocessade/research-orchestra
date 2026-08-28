@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Gate 6的72小时窗口内不得修改Pi上的Bogda、Prefect、systemd、认证或端口。
+- Gate 6的24小时窗口内不得修改RK3528上的Bogda、Prefect、systemd、认证或端口。
 - Prefect是唯一执行状态源；不得增加第二套任务队列或Flow Run状态机。
 - Prefect `Completed`只表示执行与必要产物完成，不表示科研结论成立。
 - 模式修改只影响随后创建的运行；每个Run必须冻结当时的有效模式。
@@ -56,7 +56,7 @@ Wake Bridge、健康/快照 timer、雷达调度只看 Type-A 外部事实（Wor
 - OpenClaw / 7×24 管家 Agent / GPU watchdog / 多卡 wave 队列
 - 为换箱或双网口编写采购/驱动任务（owner 硬件线）
 
-待决（只记账，不开 Task 10）：控制面主机从 2GB Pi 换成更大内存盒子之后，瘦协调器仍按任务由 Flow 拉起，还是允许常驻控制面、宿舍机照睡。现 spec 维持前者，箱子到位后再拍。
+待决（2026-08-28 owner，不开 Task 10）：需要**触发式 agent**——有事才拉起，闲时休眠不烧 token，替人做一部分简单决定。**dsh 能做什么要单独设计**，不与「触发式」混成已定方案。禁止常驻会话。
 
 ## Delivery Map
 

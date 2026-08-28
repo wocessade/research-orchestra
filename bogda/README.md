@@ -1,6 +1,19 @@
 # Bogda
 
-Bogda is the Prefect-based successor to Research Orchestra. This directory is independent from orchestra/ and currently implements only the local vertical slice.
+Bogda is the Prefect-based successor to Research Orchestra. This directory is independent from orchestra/. The local vertical slice still lives here; **production Prefect (control plane + `pi-service` worker) runs on RK3528**, not the retired Pi 4B.
+
+## Production host (2026-08-28)
+
+| 项 | 值 |
+|---|---|
+| 机器 | RK3528（hostname `rk3528`，Armbian / aarch64） |
+| SSH | `liuxfs@10.77.0.1`（直连 `/30`）；Tailscale `100.78.158.80` |
+| Prefect UI / API | `http://10.77.0.1:4200`；tailnet `http://100.78.158.80:4200` |
+| 数据 | `/mnt/nas/.bogda`（西数 250G，UUID `d105381a-d80e-47b0-8bb4-2a8c4b56600f`，LABEL `nas-data`） |
+| 程序 | `/opt/bogda` + `/opt/bogda/.venv`；units 仍用 `deploy/pi/` 清单 |
+| 工作池名 | **`pi-service`**（不改名；host 已换） |
+
+Do not treat Pi 4B (`192.168.0.250` / Tailscale `liuxfs`) as a scheduler. Gate trial reports under `docs/reports/2026-08-27-bogda-pi-gate6-*` are historical.
 
 ## Requirements
 
@@ -51,13 +64,13 @@ Prefect Completed means the command ran and required artifacts exist. Scientific
 
 Implemented: local shell flow, attempt directories, required artifact checks, versioned RunResult artifacts, and separate scientific review status.
 
-## Pi shadow operations
+## Pi-bundle operations
 
-The fixed Pi deployment inventory is in [deploy/pi/manifest.toml](deploy/pi/manifest.toml). Future deployment, acceptance, and rollback are gated by the [Pi shadow operations runbook](docs/pi-shadow-runbook.md); local checks do not authorize a Pi install.
+The fixed ARM64 deployment inventory is in [deploy/pi/manifest.toml](deploy/pi/manifest.toml) (paths and unit names stay Pi-compatible). Day-to-day ops on RK3528: [docs/pi-shadow-runbook.md](docs/pi-shadow-runbook.md) (banner: current host). Local pytest does not authorize a reinstall.
 
 ## Deferred
 
-- Actual Pi deployment and 72-hour acceptance
+- Gate 7 and remaining 24-hour acceptance on RK3528 (4B Gate 6 did not pass; owner shortened the window from 72h on 2026-08-28)
 - Wake Bridge/WoL
 - Laptop `dorm-x86`
 - Windows Power Agent/game mode

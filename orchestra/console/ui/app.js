@@ -177,7 +177,7 @@
       return;
     }
     const pills = [
-      { name: "4B", state: status["4b"] || "—" },
+      { name: "RK3528", state: status.broker || status["4b"] || "—" },
       { name: "核桃派", state: status.walnut || "—" },
       { name: "Windows", state: status.windows || "—" },
     ];
@@ -781,7 +781,7 @@
       return;
     }
     const cards = [
-      { name: "4B", state: status["4b"], detail: "orchestra reporter" },
+      { name: "RK3528", state: status.broker || status["4b"], detail: "orchestra reporter" },
       { name: "核桃派", state: status.walnut, detail: "usage-monitor" },
       { name: "Windows", state: status.windows, detail: `同步 ${status.last_sync_text || "—"}` },
     ];
@@ -825,7 +825,7 @@
     const reason = status.degraded_reason || "degraded";
     if (reason === "no_token") {
       el.textContent =
-        "未配置 ORCHESTRA_MONITOR_TOKEN：核桃派 usage-monitor 可达但未鉴权，4B/核桃派状态无法刷新。在用户环境变量里设好后重新登录（计划任务才能读到），再跑一次 refresh。";
+        "未配置 ORCHESTRA_MONITOR_TOKEN：核桃派 usage-monitor 可达但未鉴权，RK3528/核桃派状态无法刷新。在用户环境变量里设好后重新登录（计划任务才能读到），再跑一次 refresh。";
     } else {
       el.textContent = `降级运行：${reason}（设备区可能离线，其余模块继续展示本地缓存）`;
     }

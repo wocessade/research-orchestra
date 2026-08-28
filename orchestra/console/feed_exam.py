@@ -65,7 +65,7 @@ def append_exam_marker(messages_path: Path, exam_alert: dict | None) -> bool:
     if found_at and found_at in existing:
         return False
     if exam_alert.get("cookie_expired") or exam_alert.get("source") == "auth":
-        msg = str(exam_alert.get("message") or "雨课堂 cookie 已过期，请重新导出并上传 4B")
+        msg = str(exam_alert.get("message") or "雨课堂 cookie 已过期，请重新导出并上传 RK3528")
         if found_at:
             msg = f"{msg}（{found_at}）"
         return append_alert(messages_path, msg)
@@ -106,12 +106,12 @@ def exam_beat_ops(beat: dict | None, beat_path: Path | None = None,
     """心跳 → 控制台派生条目。返回值结构与 derive_ops 条目一致。"""
     now = now or datetime.now()
     if not beat:
-        # 无 beat = 4B 从未上报或未部署；4B 离线/同步失败由 derive_ops 覆盖，不重复刷屏
+        # 无 beat = 盒子从未上报或未部署；RK3528 离线/同步失败由 derive_ops 覆盖，不重复刷屏
         return {"items": [], "item_type": "latest"}
     ts = beat.get("last_check_ts")
     if isinstance(ts, (int, float)) and ts and (now.timestamp() - ts) > stale_s:
         # 区分真中断与误报：beat 文件本身也很旧 = 本机 refresh 停摆（睡眠/断网）
-        # 此时无法判断 exam-watch 状态，静默等待 refresh 恢复（4B 离线由 derive_ops 覆盖）
+        # 此时无法判断 exam-watch 状态，静默等待 refresh 恢复（RK3528 离线由 derive_ops 覆盖）
         if beat_path is not None:
             try:
                 file_age = now.timestamp() - beat_path.stat().st_mtime
@@ -120,7 +120,7 @@ def exam_beat_ops(beat: dict | None, beat_path: Path | None = None,
             if file_age > file_stale_s:
                 return {"items": [], "item_type": "alerts"}
         return {"items": [{"title": "雨课堂监控", "time": "", "time_text": _beat_time_text(beat),
-                           "text": "心跳超时（4B 轮询中断）"}], "item_type": "alerts"}
+                           "text": "心跳超时（RK3528 轮询中断）"}], "item_type": "alerts"}
     status = str(beat.get("status") or "")
     time_text = _beat_time_text(beat)
     if status in ("ok", "error"):
@@ -131,7 +131,7 @@ def exam_beat_ops(beat: dict | None, beat_path: Path | None = None,
     if status == "done":
         if beat.get("cookie_expired"):
             return {"items": [{"title": "雨课堂监控", "time": "", "time_text": time_text,
-                               "text": "cookie 已过期，请重新导出并上传 4B"}], "item_type": "alerts"}
+                               "text": "cookie 已过期，请重新导出并上传 RK3528"}], "item_type": "alerts"}
         if beat.get("exam_found"):
             return {"items": [], "item_type": "latest"}
     return {"items": [{"title": "雨课堂监控", "time": "", "time_text": time_text,

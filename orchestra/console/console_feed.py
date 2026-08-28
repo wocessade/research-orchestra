@@ -44,7 +44,7 @@ from feed_status import DEFAULT_MONITOR_API, aggregate, fetch_dashboard
 
 _WINDOW_BEFORE = timedelta(days=30)
 _WINDOW_AFTER = timedelta(days=60)
-DEFAULT_SSH_HOST = "192.168.0.250"
+DEFAULT_SSH_HOST = "10.77.0.1"
 DEFAULT_SSH_USER = "liuxfs"
 DEFAULT_REMOTE_ROOT = "/home/liuxfs/broker-data"
 
@@ -69,7 +69,7 @@ def _no_window_kwargs() -> dict:
 
 
 def sync_pull(results_root: Path) -> str:
-    """拉回 4B results/logs。Windows 优先 OpenSSH scp；否则 bash+sync_pull.sh。"""
+    """拉回 RK3528 results/logs。Windows 优先 OpenSSH scp；否则 bash+sync_pull.sh。"""
     host, user, remote = _ssh_target()
     env = os.environ.copy()
     env["ORCHESTRA_SSH_HOST"] = host

@@ -256,12 +256,12 @@ class ServeTest(unittest.TestCase):
 
     def test_messages_merge_status_without_md_change(self):
         (self.out / "status.json").write_text(
-            json.dumps({"4b": "离线", "walnut": "在线"}), encoding="utf-8")
+            json.dumps({"broker": "离线", "walnut": "在线"}), encoding="utf-8")
         status, body = self._get("/messages.json")
         self.assertEqual(status, 200)
         data = json.loads(body)
         self.assertEqual(data["latest"][0]["title"], "早上好")
-        self.assertTrue(any(a["title"] == "4B 离线" for a in data["alerts"]))
+        self.assertTrue(any(a["title"] == "RK3528 离线" for a in data["alerts"]))
 
     def test_pending_api_roundtrip(self):
         status, data = self._json("POST", "/api/pending", {"text": "拍板预算"})

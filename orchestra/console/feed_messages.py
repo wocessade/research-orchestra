@@ -86,15 +86,15 @@ def derive_ops(status: dict | None, radar: dict | None,
     radar = radar or {}
     alerts: list[dict] = []
     latest: list[dict] = []
-    four_b = str(status.get("4b") or "")
+    broker = str(status.get("broker") or status.get("4b") or "")
     walnut = str(status.get("walnut") or "")
-    if "未配置 token" in four_b or "未配置 token" in walnut:
+    if "未配置 token" in broker or "未配置 token" in walnut:
         alerts.append(_ops_item(
             "监控未鉴权",
-            "ORCHESTRA_MONITOR_TOKEN 未生效，4B/核桃派状态无法刷新"))
+            "ORCHESTRA_MONITOR_TOKEN 未生效，RK3528/核桃派状态无法刷新"))
     else:
-        if "离线" in four_b:
-            alerts.append(_ops_item("4B 离线", four_b))
+        if "离线" in broker:
+            alerts.append(_ops_item("RK3528 离线", broker))
         if "离线" in walnut:
             alerts.append(_ops_item("核桃派离线", walnut))
     note = sync_note if sync_note is not None else status.get("sync_note")

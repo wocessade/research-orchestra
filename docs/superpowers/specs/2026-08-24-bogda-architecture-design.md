@@ -2,6 +2,8 @@
 
 > 日期：2026-08-24
 >
+> 修订：2026-08-28 — 控制面迁到 RK3528；Gate 6 窗 24h。触发式 agent / dsh 能力面 **待定**（§16.1）。
+>
 > 状态：已批准
 >
 > 目标：在独立的 `bogda/` 中建设 Research Orchestra 的下一代内核，宿舍机到位并通过验收后再整体切换。
@@ -24,12 +26,12 @@ Bogda 是以 Prefect 3 为成熟调度内核的人机协同科研系统。它负
 | 主题 | 决策 |
 |---|---|
 | 调度内核 | 使用现成 Prefect 3，不自研通用调度器 |
-| 控制面 | Prefect Server 常驻树莓派 4B，采用 B-lite 方案 |
-| 数据库 | 单机 SQLite；不在 2GB Pi 上部署 PostgreSQL、Redis 或 Kubernetes |
-| Pi 存储 | Prefect 数据落现有 `/mnt/nas` 西数 250GB SSD，不落 SD 卡 |
+| 控制面 | Prefect Server 常驻 RK3528（原 B-lite 落在 4B；2026-08-28 切机），采用 B-lite 方案 |
+| 数据库 | 单机 SQLite；不在控制面盒子上部署 PostgreSQL、Redis 或 Kubernetes |
+| 控制面存储 | Prefect 数据落现有 `/mnt/nas` 西数 250GB SSD，不落系统盘 |
 | 计算节点 | Win10 Pro 22H2 + ESU，WSL2 Ubuntu 内运行 Prefect Worker 和研究任务 |
-| 网络 | 宿舍 Wi-Fi/Tailscale 用于常规访问；Pi 与宿舍机直连网线用于 WoL 和 Prefect API |
-| 并发 | Pi 最多一个系统任务；宿舍机最多一个研究任务 |
+| 网络 | 宿舍 Wi-Fi/Tailscale 用于常规访问；RK3528 与宿舍机直连网线用于 WoL 和 Prefect API |
+| 并发 | 控制面最多一个系统任务；宿舍机最多一个研究任务 |
 | 游戏 | 是宿舍机的附带用途，不为游戏提高预算；游戏模式暂停领取新研究任务 |
 | 切换 | 新旧系统分阶段影子运行；不迁移运行中的任务，不立即删除旧数据 |
 
@@ -37,7 +39,7 @@ Bogda 是以 Prefect 3 为成熟调度内核的人机协同科研系统。它负
 
 ```mermaid
 flowchart TD
-    U[用户 / 3100 控制台] -->|创建 Flow Run| P[Pi 4B: Prefect Server]
+    U[用户 / 3100 控制台] -->|创建 Flow Run| P[RK3528: Prefect Server]
     P --> DB[(SQLite on /mnt/nas SSD)]
     P --> PS[pi-service Worker]
     P --> WB[Bogda Wake Bridge]
@@ -52,25 +54,25 @@ flowchart TD
 
 ### 3.1 为什么选择 B-lite
 
-任务直接进入 Pi 上的 Prefect Server，因此宿舍机休眠时仍可提交和查询任务。Prefect 是唯一队列与执行状态源，Bogda 不再额外维护 Gateway 请求数据库，也不需要维护 `job_id` 到 `flow_run_id` 的跨系统映射。
+任务直接进入控制面盒子上的 Prefect Server，因此宿舍机休眠时仍可提交和查询任务。Prefect 是唯一队列与执行状态源，Bogda 不再额外维护 Gateway 请求数据库，也不需要维护 `job_id` 到 `flow_run_id` 的跨系统映射。
 
-Pi 仍需运行一个很薄的 Wake Bridge。它只观察 Prefect 工作池并发送 WoL，不创建第二套任务状态机。
+控制面仍需运行一个很薄的 Wake Bridge。它只观察 Prefect 工作池并发送 WoL，不创建第二套任务状态机。
 
-如果 Pi 真机资源验收失败，可把 Prefect Server 移到宿舍机并回退到 A 方案。Flow、执行器和任务契约不因此改变。
+如果真机资源验收失败，可把 Prefect Server 移到宿舍机并回退到 A 方案。Flow、执行器和任务契约不因此改变。
 
 ## 4. 设备职责
 
-### 4.1 树莓派 4B 2GB
+### 4.1 RK3528（原 4B；池名仍为 `pi-service`）
 
-Pi 7×24 常开，承担：
+盒子 7×24 常开（直连 `eth0` `10.77.0.1/30`，上网走 USB Wi-Fi），承担：
 
 - Prefect Server、UI 和 SQLite；
-- Wake Bridge；
+- Wake Bridge（未上线则仍挂账）；
 - `pi-service` Worker；
-- 文献雷达、通知、备份等允许列表中的轻量任务；
-- 现有 NAS 服务。
+- 文献雷达、通知、备份等允许列表中的轻量任务（现网 Orchestra 同机）；
+- 现有 NAS 服务（USB3 上的西数 250G）。
 
-Pi 不执行任意论文代码，不运行无人监督的 agent 循环，不承接 CUDA 任务。
+控制面不执行任意论文代码，不运行无人监督的常驻 agent 循环，不承接 CUDA 任务。树莓派 4B 已空机，不再跑调度。触发式 agent 见 §16.1，未批准前不新挂常驻会话。
 
 ### 4.2 宿舍机
 
@@ -102,18 +104,18 @@ Pi 不执行任意论文代码，不运行无人监督的 agent 循环，不承�
 
 ## 5. 网络与唤醒
 
-宿舍没有有线网络基础设施，因此 Pi 和宿舍机都通过 Wi-Fi 接入互联网与 Tailscale。同时使用一根普通网线直连两台设备：
+宿舍没有有线网络基础设施，因此控制面盒子和宿舍机都通过 Wi-Fi 接入互联网与 Tailscale。同时使用一根普通网线直连两台设备：
 
 ```text
-Pi eth0       10.77.0.1/30
+RK3528 eth0   10.77.0.1/30
 宿舍机网口    10.77.0.2/30
 默认网关      不设置
 ```
 
 直连网络只承担：
 
-- Pi 向宿舍机发送 WoL；
-- 宿舍机 Worker 访问 Pi Prefect API；
+- 盒子向宿舍机发送 WoL；
+- 宿舍机 Worker 访问 Prefect API（`http://10.77.0.1:4200`）；
 - 宿舍机上报电源和 Worker 健康状态。
 
 这条链路不依赖宿舍 Wi-Fi 是否允许客户端互访。Prefect API 不暴露到公网；用户通过 Tailscale 或现有控制台访问。
@@ -132,11 +134,11 @@ Wake Bridge 不直接修改 Flow Run 的执行状态。
 
 ## 6. 存储
 
-仓库记录的 Pi 现状为：
+仓库记录的控制面现状为：
 
-- 现网 Orchestra 数据根是 SD 上的 `/home/liuxfs/broker-data`；
-- `/mnt/broker` 是未挂载的旧 U 盘路径，不再作为新系统默认值；
-- 西数 250GB SSD 已以 ext4 挂载到 `/mnt/nas`，并由 Pi 客串 NAS。
+- 现网 Orchestra 数据根是 eMMC 上的 `/home/liuxfs/broker-data`（RK3528）；`/mnt/broker` 为指向该目录的兼容路径；
+- 西数 250GB SSD 已以 ext4 挂载到 RK3528 的 `/mnt/nas`（USB3），并由该盒客串 NAS；
+- 树莓派 4B 不再挂这颗盘、不再跑 Samba / Prefect。
 
 Bogda 使用现有 SSD，不新增存储硬件：
 
@@ -153,10 +155,10 @@ Bogda 使用现有 SSD，不新增存储硬件：
 约束：
 
 - systemd 为 Prefect 设置 `PREFECT_HOME=/mnt/nas/.bogda/prefect`；
-- SQLite 仅通过 Pi 本地 ext4 访问，不能通过 SMB 打开；
+- SQLite 仅通过盒子本地 ext4 访问，不能通过 SMB 打开；
 - `.bogda` 由服务账户持有，并从 Samba 共享中排除；
 - 大型数据集、模型权重和中间产物留在宿舍机 SSD；
-- Pi 保存控制面状态、结果摘要、产物位置和需要归档的小文件；
+- 控制面保存状态、结果摘要、产物位置和需要归档的小文件；
 - 每日生成 SQLite 一致性快照；真正冷备进入核桃派现有备份链。
 
 工业 SLC/pSLC SD 卡只影响 Pi 系统盘可靠性，不是 B-lite 的前置条件，暂列待决事项。
@@ -206,6 +208,8 @@ bogda/
 - 只运行明确部署的雷达、通知、备份和系统维护 Flow；
 - Worker 并发上限为 1；
 - 不接受任意 shell、论文仓库或用户代码。
+
+控制面上的触发式 agent / dsh 能力面未定（§16.1），通过前不要把任意 dsh 接到 `pi-service`。
 
 ### 8.2 `dorm-x86`
 
@@ -340,11 +344,11 @@ summary
 
 本阶段不部署 Pi、不修改 Orchestra、不要求 Docker、CUDA 或新硬件。
 
-### 13.2 阶段 1：Pi 影子运行
+### 13.2 阶段 1：控制面影子运行
 
 部署 Prefect Server、SQLite、Wake Bridge 和 `pi-service` Worker，只运行测试任务与健康检查。Orchestra Broker 继续承担真实任务。
 
-Pi 需连续运行 72 小时，并验证：
+RK3528 需连续运行 **24 小时**（2026-08-28 owner 将原 72h 缩短；须覆盖一次每日快照 timer 与一次受控重启），并验证：
 
 - 无 OOM；
 - 无持续 swap 抖动；
@@ -400,13 +404,14 @@ Pi 需连续运行 72 小时，并验证：
 - 宿舍机出现真实排队瓶颈后是否提高并发；
 - GPU 型号和启用时间；
 - 宿舍机最终主板、CPU 和电源配置；
-- Pi 真机资源验收后是否长期保留 B-lite；
-- 3100 控制台切换的具体交互设计。
+- 控制面真机资源验收后是否长期保留 B-lite；
+- 3100 控制台切换的具体交互设计；
+- **触发式 agent**（需求已提出，方案未定）：闲时休眠、不烧 token；能替人做一部分简单决定。**dsh 允许做什么必须单独设计**，不得默认「有 dsh 就能决策」。未定项包括：触发源（timer / Flow / 人）、工具与任务白名单、哪些决定可自动落、与 Type-B 停机的边界、是否用现网 Orchestra dsh 还是 Prefect 拉起。
 
 ### 16.2 第一版明确不做
 
 - 自研 Prefect 的替代调度内核；
-- 在 Pi 上部署 PostgreSQL、Redis、Kubernetes 或任意论文执行环境；
+- 在控制面盒子上部署 PostgreSQL、Redis、Kubernetes 或任意论文执行环境；
 - 自动认定科研结论成立；
 - 为游戏升级预算；
 - 全文证据扫描器；

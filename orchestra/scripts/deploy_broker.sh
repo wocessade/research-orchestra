@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # 部署 broker 代码到 4B 并 (re)start systemd 服务
-# 用法: ORCHESTRA_SSH_HOST=192.168.x.x [ORCHESTRA_REMOTE_ROOT=~/broker-data] bash deploy_broker.sh
+# 用法: ORCHESTRA_SSH_HOST=192.168.x.x [ORCHESTRA_REMOTE_ROOT=~/broker-data] [ORCHESTRA_ENABLE_TIMERS=0] bash deploy_broker.sh
+# ORCHESTRA_ENABLE_TIMERS=0：只 enable broker，不 enable 雷达/备份/exam-watch（RK3528 备机并行用）
 # SSD 已挂载时 ORCHESTRA_REMOTE_ROOT 默认 /mnt/broker；SD 过渡期传 ~/broker-data
 set -euo pipefail
 SSH_HOST="${ORCHESTRA_SSH_HOST:?用法: ORCHESTRA_SSH_HOST=192.168.x.x bash deploy_broker.sh}"
 SSH_USER="${ORCHESTRA_SSH_USER:-liuxfs}"
 REMOTE_ROOT="${ORCHESTRA_REMOTE_ROOT:-/mnt/broker}"
+# 1=现网 4B；0=RK3528 备机并行部署，禁止 enable 雷达/备份/exam-watch timer
+ENABLE_TIMERS="${ORCHESTRA_ENABLE_TIMERS:-1}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 GUARD_REMOTE="/tmp/orchestra-migration-guard-$$.py"
 
@@ -54,7 +57,7 @@ scp -q "$ROOT"/broker/orchestra-broker.service "$ROOT"/broker/orchestra-timer.ti
 ssh "$SSH_USER@$SSH_HOST" "sed -i 's/\r$//' /home/liuxfs/broker/*.sh /home/liuxfs/broker/templates/*.md"
 
 # 4) 远端：目录 + config.json（不存在时从 example 生成，路径按 REMOTE_ROOT 改写）
-ssh "$SSH_USER@$SSH_HOST" "REMOTE_ROOT='$REMOTE_ROOT' bash -s" << 'REMOTE'
+ssh "$SSH_USER@$SSH_HOST" "REMOTE_ROOT='$REMOTE_ROOT' ENABLE_TIMERS='$ENABLE_TIMERS' bash -s" << 'REMOTE'
 set -euo pipefail
 mkdir -p "$REMOTE_ROOT"/{tasks,results,logs,db}
 cd /home/liuxfs/broker
@@ -86,10 +89,15 @@ if [ ! -f /etc/systemd/system/orchestra-exam-watch.service.d/env.conf ]; then
 fi
 sudo systemctl daemon-reload
 sudo systemctl enable --now orchestra-broker.service
-sudo systemctl enable --now orchestra-timer.timer
-sudo systemctl enable --now orchestra-backup.timer
-sudo systemctl enable --now orchestra-housekeeping.timer
-sudo systemctl enable --now orchestra-exam-watch.timer
+if [ "$ENABLE_TIMERS" = "1" ]; then
+  sudo systemctl enable --now orchestra-timer.timer
+  sudo systemctl enable --now orchestra-backup.timer
+  sudo systemctl enable --now orchestra-housekeeping.timer
+  sudo systemctl enable --now orchestra-exam-watch.timer
+else
+  sudo systemctl disable --now orchestra-timer.timer orchestra-backup.timer orchestra-housekeeping.timer orchestra-exam-watch.timer 2>/dev/null || true
+  echo "SKIP: timers not enabled (ORCHESTRA_ENABLE_TIMERS=$ENABLE_TIMERS)"
+fi
 # 审计 CONCERN-2：enable --now 对已 active 的 service 是 no-op，必须显式重启使新代码生效
 sudo systemctl restart orchestra-broker.service
 sudo systemctl status orchestra-broker.service --no-pager | head -5

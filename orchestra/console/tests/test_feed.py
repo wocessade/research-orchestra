@@ -59,7 +59,7 @@ class RefreshTest(unittest.TestCase):
                      "messages.html", "feed.log"):
             self.assertTrue((self.out / name).exists(), name)
         status = json.loads((self.out / "status.json").read_text(encoding="utf-8"))
-        self.assertIn("在线", status["4b"])
+        self.assertIn("在线", status["broker"])
         self.assertEqual(status["queue_len"], 1)
         self.assertEqual(status["experiments"], {"available": False, "cards": []})
         self.assertIn("upcoming_personal", status)
@@ -114,7 +114,7 @@ class RefreshTest(unittest.TestCase):
             rc = cmd_refresh(self._args())
         self.assertEqual(rc, 0)
         msgs = json.loads((self.out / "messages.json").read_text(encoding="utf-8"))
-        self.assertTrue(any(a["title"] in ("4B 离线", "核桃派离线") for a in msgs["alerts"]))
+        self.assertTrue(any(a["title"] in ("RK3528 离线", "核桃派离线") for a in msgs["alerts"]))
         self.assertEqual(msgs["latest"][0]["title"], "早上好")
 
     def test_refresh_sync_skip_without_bash_or_scp(self):
@@ -142,7 +142,7 @@ class RefreshTest(unittest.TestCase):
         first = run.call_args_list[0].args[0]
         self.assertEqual(first[0], r"C:\Windows\System32\OpenSSH\scp.exe")
         self.assertEqual(first[1], "-rq")
-        self.assertIn("liuxfs@192.168.0.250:/home/liuxfs/broker-data/results/.", first[2])
+        self.assertIn("liuxfs@10.77.0.1:/home/liuxfs/broker-data/results/.", first[2])
         if sys.platform == "win32":
             for call in run.call_args_list:
                 self.assertEqual(
@@ -150,7 +150,7 @@ class RefreshTest(unittest.TestCase):
                     subprocess.CREATE_NO_WINDOW)
         log = (self.out / "feed.log").read_text(encoding="utf-8")
         self.assertIn("sync_pull scp", log)
-        self.assertIn("host=192.168.0.250", log)
+        self.assertIn("host=10.77.0.1", log)
 
     def test_refresh_sync_windows_prefers_scp_over_bash(self):
         def which(name):

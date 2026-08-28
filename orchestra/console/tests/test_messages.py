@@ -175,7 +175,7 @@ class MergeBoardTest(unittest.TestCase):
         human = parse_messages(SAMPLE)
         board = merge_board(
             human,
-            status={"4b": "离线", "walnut": "在线 · load 0.1",
+            status={"broker": "离线", "walnut": "在线 · load 0.1",
                     "attempts": [{"task": "T-x", "status": "failed"}]},
             radar={"available": True, "date": "2026-08-22",
                    "top5": [{}, {}],
@@ -184,7 +184,7 @@ class MergeBoardTest(unittest.TestCase):
                        {"name": "notify", "status": "failed"},
                    ]},
         )
-        self.assertTrue(any(a["title"] == "4B 离线" for a in board["alerts"]))
+        self.assertTrue(any(a["title"] == "RK3528 离线" for a in board["alerts"]))
         self.assertTrue(any("notify" in (a["text"] or "") for a in board["alerts"]))
         self.assertTrue(any(a["title"] == "任务失败" for a in board["alerts"]))
         self.assertTrue(any(a["text"] == "usage-monitor 不可达" for a in board["alerts"]))
@@ -195,12 +195,12 @@ class MergeBoardTest(unittest.TestCase):
     def test_token_missing_is_alert_not_offline(self):
         board = merge_board(
             {"latest": [], "pending": [], "alerts": []},
-            status={"4b": "未配置 token", "walnut": "未配置 token"},
+            status={"broker": "未配置 token", "walnut": "未配置 token"},
             radar={"available": False},
         )
         titles = [a["title"] for a in board["alerts"]]
         self.assertIn("监控未鉴权", titles)
-        self.assertNotIn("4B 离线", titles)
+        self.assertNotIn("RK3528 离线", titles)
 
     def test_sync_timeout_alerts(self):
         board = merge_board(

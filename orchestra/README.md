@@ -12,7 +12,7 @@
 | logs/ | broker.log 与执行日志 |
 | reports/ | CC 复查记录 |
 | scripts/ | sync_push/pull、deploy_broker、backup_to_nas、`orchestra_check.py`（测试 + skill digest + tracked-ignored） |
-| broker/ | Broker 源码（stdlib only，scp 部署到 4B） |
+| broker/ | Broker 源码（stdlib only，scp 部署到 RK3528） |
 | templates/ | dsh 任务模板（nightly-radar 等，inject_daily 填充日期后注入） |
 
 任务文件格式（严格）：
@@ -32,7 +32,7 @@
     ---
     <执行体：dsh 任务的 prompt 全文，或 shell 任务的命令>
 
-本机解析（`broker/taskfile.py`）拒绝未知字段、重复 key、timeout 非 1–86400、`model` 非 `flash|pro`。**4B 在役副本须下次 `deploy_broker.sh` 才对齐。**
+本机解析（`broker/taskfile.py`）拒绝未知字段、重复 key、timeout 非 1–86400、`model` 非 `flash|pro`。**RK3528 在役副本须下次 `deploy_broker.sh` 才对齐。**
 
 快速流程：写 tasks/T-*.md → sync_push.sh → 等 Broker 执行 → sync_pull.sh → CC 复查写 reports/。任务终态后 broker 自动把任务文件移入 tasks/archive/（本地 tasks/ 经 sync_pull 同步该状态）。
 
@@ -70,8 +70,8 @@
 
 ## 仪表盘链路（mission 026 / 总 spec §6.4）
 
-- 数据流：4B Broker reporter 线程每 30s `POST /api/orchestra`（recent_tasks + host 负载/内存）→ 核桃派 usage-monitor 融合面板（状态条 + 最近任务 + 设备区 + DeepSeek/天气行）；Windows sync 脚本上报 last_sync
-- 鉴权：`X-Monitor-Token`（两 Pi 间流转；核桃派 override.conf / 4B config.json，均不入库）
+- 数据流：RK3528 Broker reporter 线程每 30s `POST /api/orchestra`（recent_tasks + host 负载/内存）→ 核桃派 usage-monitor 融合面板（状态条 + 最近任务 + 设备区 + DeepSeek/天气行）；Windows sync 脚本上报 last_sync
+- 鉴权：`X-Monitor-Token`（盒子与核桃派间流转；核桃派 override.conf / RK3528 config.json，均不入库）
 - 面板刷新纪律：内容变化才全刷；last_report 时间戳与负载抖动只走局刷（D10/D14）
 - 验收：`reports/2026-08-dashboard-acceptance.md`（reviewed: ok，含 D15 运行中帧）
 
@@ -101,23 +101,24 @@
 
 ## 部署连接（当前家庭网络）
 
-- 4B：WiFi `liudfs`，静态 IP `192.168.0.250`（NetworkManager 连接名 liudfs；备用：有线 DHCP）
-- 用法：`ORCHESTRA_SSH_HOST=192.168.0.250 [ORCHESTRA_REMOTE_ROOT=/home/liuxfs/broker-data] bash scripts/deploy_broker.sh`
+- **RK3528（现网）**：直连 `10.77.0.1/30`；USB Wi-Fi `liudfs`（LAN DHCP 会变）。SSH `liuxfs@10.77.0.1`
+- 用法：`ORCHESTRA_SSH_HOST=10.77.0.1 [ORCHESTRA_REMOTE_ROOT=/home/liuxfs/broker-data] bash scripts/deploy_broker.sh`（现网 timer 保持 `ORCHESTRA_ENABLE_TIMERS=1`，默认）
+- 切机记录：[`docs/rk3528-standby-cutover.md`](docs/rk3528-standby-cutover.md)。树莓派 4B 已停 Orchestra/NAS/Bogda，可断电
 - 部署脚本先只把 `migration_guard.py` 临时上传到远端 `/tmp` 并检查任务文件及 SQLite；预检通过后才覆盖在役代码。发现 queued/running/仍可重试 failed 的旧单体雷达任务时，部署在任何线上文件覆盖前退出
-- **现网 REMOTE_ROOT = `/home/liuxfs/broker-data`**（SD）。`/mnt/broker` 是旧 U 盘挂载点，未挂时 scp 会失败（控制台曾因此假「同步失败」）。本机 console refresh / `sync_pull.sh` 默认已改到 broker-data
-- **Tailscale 已装（三端同 tailnet）**：4B=`liuxfs`(100.111.75.58)、核桃派=`walnutpi`(100.64.2.60)、Windows=`laptop-w0cessade`；`ORCHESTRA_SSH_HOST` 为 env 驱动，切 tailnet 名零代码改动
+- **现网 REMOTE_ROOT = `/home/liuxfs/broker-data`**。`/mnt/broker` 在 RK3528 上指向该目录（executor 仍写 `/mnt/broker/dsh-patches/`）
+- **Tailscale**：RK3528=`rk3528`(100.78.158.80)、核桃派=`walnutpi`(100.64.2.60)、Windows=`laptop-w0cessade`。旧 4B 名 `liuxfs`(100.111.75.58) 不再当调度。`ORCHESTRA_SSH_HOST` 为 env 驱动
 - **学校网络切换：见 `orchestra/docs/school-network-switch.md`**（入学前必读）
 
 ## 冷备链（NAS 方案 A）
 
 - 核桃派（192.168.0.200）为冷备接收端：`~/backup/broker/`（rsync over ssh，免密）+ samba 共享 `\\192.168.0.200\backup`（user pi）
-- 4B 每日 03:00 `orchestra-backup.timer` 触发 Pi 上 `/home/liuxfs/broker/backup_to_nas.sh`（repo 副本在 scripts/，deploy_broker.sh 同步传载；增量镜像 + SQLite 快照，源路径随 REMOTE_ROOT 改写）
-- 部署拓扑：4B=宿舍（Broker），核桃派=实验室（展示+异地冷备）
+- RK3528 每日 03:00 `orchestra-backup.timer` 触发盒子上 `/home/liuxfs/broker/backup_to_nas.sh`（repo 副本在 scripts/，deploy_broker.sh 同步传载；增量镜像 + SQLite 快照，源路径随 REMOTE_ROOT 改写）
+- 部署拓扑：RK3528=宿舍（Broker + NAS + Prefect），核桃派=实验室（展示+异地冷备）
 - 验收报告：`reports/2026-08-cold-backup-acceptance.md`
 
-## 4B 兼职 NAS（mission 026 D16 / 西数 250G）
+## RK3528 兼职 NAS（原 4B / mission 026 D16 / 西数 250G）
 
-- 盘：西数 250G（sdb）ext4 `LABEL=nas-data`，挂载 `/mnt/nas`（fstab UUID+nofail）；压测 31.7MB/s 写 / 33.1MB/s 读（USB3 接口，实测速率冷备够用；系统未被拖死——broker 上报 canary 实测）
-- 共享：samba `\\192.168.0.250\nas`（user liuxfs；密码在 Pi 上生成，不落库）
-- 备份：`nas_backup.sh`（rsync /mnt/broker/{results,logs} → /mnt/nas/backup/broker/）+ `nas-backup.timer` 每日 04:17；源码 `orchestra/nas/`
+- 盘：西数 250G ext4 `LABEL=nas-data` UUID `d105381a-d80e-47b0-8bb4-2a8c4b56600f`，挂 RK3528 USB3 → `/mnt/nas`（fstab UUID+nofail）
+- 共享：samba `\\10.77.0.1\nas`（user liuxfs；密码在盒子上，不落库）。Tailscale `\\100.78.158.80\nas`
+- 备份：`nas_backup.sh`（rsync broker results/logs → `/mnt/nas/backup/broker/`）+ `nas-backup.timer` 每日 04:17；源码 `orchestra/nas/`
 - 定位：冷备 NAS（入学后宿舍 NAS 预演）；高性能文件服务仍按总 spec §14 触发 N100 评估

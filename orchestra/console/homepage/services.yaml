@@ -24,8 +24,8 @@
           refreshInterval: 30000
           display: block
           mappings:
-            - field: "4b"
-              label: 4B
+            - field: broker
+              label: RK3528
             - field: walnut
               label: 核桃派
             - field: windows
@@ -158,8 +158,8 @@
           refreshInterval: 60000
           display: block
           mappings:
-            - field: "4b"
-              label: 4B
+            - field: broker
+              label: RK3528
             - field: walnut
               label: 核桃派
             - field: windows

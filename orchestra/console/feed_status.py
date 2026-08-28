@@ -106,7 +106,7 @@ def aggregate(dashboard: dict | None, fetch_error: str | None,
     return {
         "generated_at": int(now),
         "generated_text": datetime.fromtimestamp(now).strftime("%Y-%m-%d %H:%M"),
-        "4b": four_b,
+        "broker": four_b,
         "walnut": walnut,
         "windows": _device(True),
         "queue_len": orch.get("queue_len"),

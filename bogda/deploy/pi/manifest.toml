@@ -1,3 +1,5 @@
+# Production host as of 2026-08-28: RK3528 (rk3528 / 10.77.0.1 / Tailscale 100.78.158.80).
+# Paths, unit names, and work_pool stay Pi-bundle compatible. Do not add extra keys (bundle tests).
 service_user = "bogda"
 service_group = "bogda"
 program_root = "/opt/bogda"

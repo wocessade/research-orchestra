@@ -69,7 +69,7 @@
 
 ## I. 控制台/雷达（2026-08-21）
 
-34. **Windows 有 Git Bash ≠ sync_pull 能用**：计划任务找到 bash 后跑 `sync_pull.sh` 常 exit 1，控制台雷达停在旧日。规则：Win32 优先本机 OpenSSH `scp -rq`，`ORCHESTRA_SSH_HOST` 空则默认 `192.168.0.250`；bash 失败不要当作已经拉回。
+34. **Windows 有 Git Bash ≠ sync_pull 能用**：计划任务找到 bash 后跑 `sync_pull.sh` 常 exit 1，控制台雷达停在旧日。规则：Win32 优先本机 OpenSSH `scp -rq`，`ORCHESTRA_SSH_HOST` 空则默认 `10.77.0.1`（RK3528）；bash 失败不要当作已经拉回。
 
 35. **四阶段任务目录带 `nightly-radar-` 前缀**：真机 `T-20260820-nightly-radar-10-fetch`，不是测试夹具的 `T-20260820-10-fetch`。只认短名时 results 已在本地、日报仍显示 8/19 legacy。规则：扫描正则两种都认；加夹具覆盖真机目录名。
 
@@ -104,3 +104,10 @@
 47. **给 supervised 加暂停会挂死旧的 Type-A 切片**：垂直切片若仍用 supervised 会在 `pause_flow_run` 上等一个永远不来的人。规则：纯执行/产物测试改用 `autonomous` 或测试内自动 resume；shell 没有计划产物就不要暂停 `plan_approval`。
 
 48. **协调器可以开车，不能当陪审团**：`supervised` 协调器可写计划、提实验、耗预算；`wait_for_decision` 留在 Flow 里。模型说「计划已足够 / 结果支持结论」只是 Artifact 内容，不能跳过 Type-B，也不能把 `scientific_status` 写成 `accepted`。未知工具直接拒绝；不在允许列表里的实验类型停在 `experiment_approval`，仍是 `unreviewed`。
+
+## M. RK3528 备机（2026-08-28）
+
+49. **Orchestra 备机禁止 enable 与现网相同的 timer**：`orchestra-timer` / exam-watch 双开会双注入雷达、双告警。规则：并行机 `ORCHESTRA_ENABLE_TIMERS=0`，`api_url` 留空直到一次切；切日清单 `orchestra/docs/rk3528-standby-cutover.md`。
+50. **这块 Armbian 没有 nmcli，有 netplan+wpa**：USB MT7601U 用 netplan `wifis` + 电口静态 `/30` never-default。`/tmp` sticky 下 root 不能覆盖 liuxfs 的半截 curl 产物——大文件下到 `/var/tmp`。
+51. **切到 RK3528 后文档默认机必须一起改**：Prefect 池名仍叫 `pi-service`，但 SSH/SMB/控制台缺省 host 是 `10.77.0.1` / `rk3528`，不是 4B `192.168.0.250`。venv 的 python 不能指向已搬走的 `/root/.local/share/uv/python`。
+52. **从 4B 拷来的 Prefect venv 要修 shebang**：Armbian 上 `uv python` 装到 `/opt/uv-python/...`，否则 unit 报 203/EXEC。

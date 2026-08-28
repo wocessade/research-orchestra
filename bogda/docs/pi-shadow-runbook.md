@@ -1,6 +1,8 @@
 # Bogda Pi Shadow Operations Runbook
 
-This runbook is for a future, reviewed Raspberry Pi deployment. It is not authorization to run the scripts on a Pi today. Local success does not prove ARM64 compatibility, systemd behavior, SSD mounting, Tailscale exposure, reboot persistence, or 72-hour stability.
+**Current control-plane host (2026-08-28):** RK3528, not Raspberry Pi 4B. SSH `liuxfs@10.77.0.1` (direct `/30`) or Tailscale hostname `rk3528` (`100.78.158.80`). Prefect `http://10.77.0.1:4200`. Data still `/mnt/nas/.bogda`. Work pool still `pi-service`. In this runbook, “Pi” means that ARM64 box.
+
+This runbook remains the gate procedure for install / start / rollback. It is not a second authorization to reinstall over a live Prefect DB. Local pytest does not prove Tailscale ACLs, USB remount after reboot, or 24-hour stability. Historical Gate 6 evidence on 4B stays in `docs/reports/2026-08-27-bogda-pi-gate6-*`.
 
 Proceed through the gates in order. A hard failure stops the shadow deployment and returns operation to the existing system. Do not print, commit, or paste either Basic Auth value.
 
@@ -55,7 +57,7 @@ rc=$?
 printf 'verify_exit=%s\n' "$rc"
 ```
 
-Expected facts: uname -m is aarch64; Python is 3.11 or newer; /mnt/nas is an approved local SSD partition with FSTYPE ext4; its UUID/PARTUUID and source match the approved SSD and /etc/fstab; and the available-byte value has capacity for the approved 72-hour evidence plus seven snapshots. Record the Tailscale identity, tailnet IPv4 address, and netcheck output; it must show the approved tailnet rather than an unreviewed public exposure. A missing mount, wrong source/identity, non-ext4 filesystem, or inadequate capacity is a hard failure.
+Expected facts: uname -m is aarch64; Python is 3.11 or newer; /mnt/nas is an approved local SSD partition with FSTYPE ext4; its UUID/PARTUUID and source match the approved SSD and /etc/fstab; and the available-byte value has capacity for the approved 24-hour evidence plus seven snapshots. Record the Tailscale identity, tailnet IPv4 address, and netcheck output; it must show the approved tailnet rather than an unreviewed public exposure. A missing mount, wrong source/identity, non-ext4 filesystem, or inadequate capacity is a hard failure.
 
 uv is a Gate 3 install prerequisite. Record `command -v uv` and `uv --version`. If uv is missing, stop and obtain separate authorization to install it; install.sh must not fetch uv from the network on its own. This Pi already has owner-authorized uv 0.12.5 at /usr/local/bin, so this change does not install uv again.
 
@@ -142,7 +144,7 @@ Do not add `--fail` to this negative test: an HTTP 401/403 is still proof that t
 
 ## Gate 5 — Rotate trial evidence, then start worker and timers
 
-Each 72-hour trial uses a fresh health JSONL file. Archive any prior file before starting the worker or timers so summarize is unbounded but cannot mix trials:
+Each 24-hour trial uses a fresh health JSONL file. Archive any prior file before starting the worker or timers so summarize is unbounded but cannot mix trials:
 
 ```sh
 trial_id="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -173,9 +175,9 @@ systemctl status \
 
 Confirm the worker and both timers are enabled and active as appropriate, no unit is repeatedly restarting, and no new backup pointer was created. This is a shadow operation: it must not replace the established production workflow.
 
-## Gate 6 — 72-hour collection, reboot, snapshot, and restore drill
+## Gate 6 — 24-hour collection, reboot, snapshot, and restore drill
 
-Collect the active trial for at least 72 hours. Produce the exact health summary and retain its JSON output with the trial record:
+Collect the active trial for at least **24 hours** (owner 2026-08-28: shortened from 72h so one daily snapshot timer and one controlled reboot still fit). Produce the exact health summary and retain its JSON output with the trial record:
 
 ```sh
 /opt/bogda/.venv/bin/python -m bogda.ops.health summarize \
@@ -186,7 +188,7 @@ Evaluate every summary field against this acceptance table. A documented control
 
 | Summary field | Acceptance check |
 |---|---|
-| started_at, ended_at | Span covers the recorded 72-hour trial window. |
+| started_at, ended_at | Span covers the recorded 24-hour trial window. |
 | sample_count | Consistent with the five-minute cadence and recorded downtime. |
 | missing_intervals | Zero, or every gap has a recorded and approved explanation. |
 | api_failure_count | Zero; any failure is investigated before acceptance. |
@@ -244,7 +246,7 @@ Rollback stops/disables only the four startable Bogda units, restores or removes
 
 ## Deferred work
 
-- Actual Pi deployment and 72-hour acceptance
+- Actual ARM64 deployment and 24-hour acceptance
 - Wake Bridge/WoL
 - Laptop dorm-x86
 - Windows Power Agent/game mode

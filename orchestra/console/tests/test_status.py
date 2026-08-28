@@ -81,24 +81,24 @@ class DashboardUrlTest(unittest.TestCase):
 class AggregateTest(unittest.TestCase):
     def test_online_full(self):
         status = aggregate(DASH, None, _SCHED, NOW)
-        self.assertIn("在线", status["4b"])
-        self.assertIn("load 0.3", status["4b"])
-        self.assertIn("mem 38%", status["4b"])
+        self.assertIn("在线", status["broker"])
+        self.assertIn("load 0.3", status["broker"])
+        self.assertIn("mem 38%", status["broker"])
         self.assertEqual(status["queue_len"], 2)
         self.assertEqual(status["active_tasks"], 1)
         self.assertFalse(status["degraded"])
 
     def test_offline_degraded(self):
         status = aggregate(None, "no_token", _SCHED, NOW)
-        self.assertIn("未配置 token", status["4b"])
+        self.assertIn("未配置 token", status["broker"])
         self.assertIn("未配置 token", status["walnut"])
-        self.assertNotIn("离线", status["4b"])
+        self.assertNotIn("离线", status["broker"])
         self.assertTrue(status["degraded"])
         self.assertEqual(status["degraded_reason"], "no_token")
 
     def test_network_error_is_offline(self):
         status = aggregate(None, "timed out", _SCHED, NOW)
-        self.assertIn("离线", status["4b"])
+        self.assertIn("离线", status["broker"])
         self.assertIn("离线", status["walnut"])
         self.assertEqual(status["degraded_reason"], "timed out")
 
@@ -141,18 +141,18 @@ class AggregateTest(unittest.TestCase):
         dashboard = {"orchestra_last_report": {"ts": NOW - FRESH_S},
                      "orchestra": {}}
         status = aggregate(dashboard, None, None, NOW)
-        self.assertIn("在线", status["4b"])
+        self.assertIn("在线", status["broker"])
 
     def test_stale_report_is_offline(self):
         dashboard = {"orchestra_last_report": {"ts": NOW - FRESH_S - 0.1},
                      "orchestra": {}}
         status = aggregate(dashboard, None, None, NOW)
-        self.assertIn("离线", status["4b"])
+        self.assertIn("离线", status["broker"])
 
     def test_recent_task_does_not_replace_missing_report(self):
         dashboard = {"orchestra": {"recent_tasks": [{"ts": NOW - 1}]}}
         status = aggregate(dashboard, None, None, NOW)
-        self.assertIn("离线", status["4b"])
+        self.assertIn("离线", status["broker"])
 
 
 if __name__ == "__main__":

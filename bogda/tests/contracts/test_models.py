@@ -82,6 +82,53 @@ def test_explicit_model_tier_must_match_budget() -> None:
         )
 
 
+def test_explicit_model_tier_requires_budget() -> None:
+    with pytest.raises(ValidationError, match="explicit model_tier requires a budget"):
+        JobRequest(
+            job_id="job-3b",
+            project_id="project-1",
+            task_type="shell",
+            resource_class=ResourceClass.CPU,
+            autonomy_mode=AutonomyMode.SUPERVISED,
+            model_tier="pro",
+        )
+
+
+def test_matching_dsh_request_is_valid() -> None:
+    request = JobRequest(
+        job_id="job-3c",
+        project_id="project-1",
+        task_type="research",
+        resource_class=ResourceClass.CPU,
+        autonomy_mode=AutonomyMode.SUPERVISED,
+        executor="dsh",
+        model_tier="pro",
+        budget=budget("pro"),
+    )
+
+    assert request.executor is ExecutorKind.DSH
+    assert request.model_tier is ModelTier.PRO
+    assert request.budget == budget("pro")
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("intent", "unknown"), ("executor", "unknown")],
+)
+def test_job_request_rejects_unknown_axes(field: str, value: str) -> None:
+    values = {
+        "job_id": "job-3d",
+        "project_id": "project-1",
+        "task_type": "shell",
+        "resource_class": ResourceClass.CPU,
+        "autonomy_mode": AutonomyMode.SUPERVISED,
+        field: value,
+    }
+
+    with pytest.raises(ValidationError):
+        JobRequest(**values)
+
+
 def test_versioned_request_round_trips_without_changing_frozen_axes() -> None:
     request = JobRequest(
         job_id="job-4",
@@ -103,10 +150,11 @@ def test_versioned_request_round_trips_without_changing_frozen_axes() -> None:
     )
 
 
-def test_job_request_rejects_unknown_schema_version() -> None:
+@pytest.mark.parametrize("schema_version", [2, True, "1", 1.0])
+def test_job_request_rejects_unknown_schema_version(schema_version: object) -> None:
     with pytest.raises(ValidationError):
         JobRequest(
-            schema_version=2,
+            schema_version=schema_version,
             job_id="job-5",
             project_id="project-1",
             task_type="shell",

@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from bogda.contracts.budgets import RunBudgetEnvelope
 from bogda.contracts.tasks import ExecutorKind, ModelTier, SchedulePolicy, TaskIntent
@@ -70,10 +70,19 @@ class JobRequest(BaseModel):
     retryable: bool = False
     expected_artifacts: tuple[ArtifactSpec, ...] = ()
 
+    @field_validator("schema_version", mode="before")
+    @classmethod
+    def validate_schema_version_type(cls, value: object) -> object:
+        if type(value) is not int:
+            raise ValueError("schema_version must be an integer")
+        return value
+
     @model_validator(mode="after")
-    def validate_paid_execution(self) -> Self:
+    def validate_tier_budget_consistency(self) -> Self:
         if self.executor is ExecutorKind.DSH and self.budget is None:
             raise ValueError("dsh requests require a budget envelope")
+        if self.model_tier is not ModelTier.AUTO and self.budget is None:
+            raise ValueError("explicit model_tier requires a budget envelope")
         if (
             self.budget is not None
             and self.model_tier is not ModelTier.AUTO

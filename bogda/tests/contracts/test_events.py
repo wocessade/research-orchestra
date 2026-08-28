@@ -69,13 +69,61 @@ def test_model_call_start_and_finish_can_be_paired_by_call_id() -> None:
     assert started.call_id == finished.call_id == "call-123"
 
 
+def test_usage_unknown_is_additive_and_requires_call_id_without_accounting() -> None:
+    unknown = event(
+        event="model_call_usage_unknown",
+        call_id="call-123",
+        requested_tier="flash",
+        effective_tier="flash",
+        reason="usage_unknown",
+        prompt_hash="sha256:abc123",
+        prompt_artifact="artifact://prompt/123",
+    )
+    assert unknown.event is RunEventType.MODEL_CALL_USAGE_UNKNOWN
+    assert unknown.actual_cost_cny is None
+    assert unknown.usage_reference is None
+
+    with pytest.raises(ValidationError, match="call_id is required"):
+        event(event="model_call_usage_unknown")
+
+    with pytest.raises(ValidationError, match="reason=usage_unknown"):
+        event(
+            event="model_call_usage_unknown",
+            call_id="call-123",
+            reason="missing_receipt",
+        )
+
+
 @pytest.mark.parametrize("event_name", ["route_selected", "tier_upgrade_requested", "tier_downgraded"])
 def test_tier_route_and_change_events_require_both_tiers(event_name: str) -> None:
+    if event_name == "tier_upgrade_requested":
+        requested = event(event=event_name, requested_tier="pro")
+        assert requested.effective_tier is None
+        with pytest.raises(ValidationError, match="requested_tier"):
+            event(event=event_name)
+        return
+
     with pytest.raises(ValidationError, match="requested_tier and effective_tier"):
         event(event=event_name, requested_tier="pro")
 
     with pytest.raises(ValidationError, match="requested_tier and effective_tier"):
         event(event=event_name, effective_tier="flash")
+
+
+def test_finished_accounting_requires_usage_reference_and_actual_cost() -> None:
+    with pytest.raises(ValidationError, match="usage_reference and actual_cost_cny"):
+        event(event="model_call_finished", call_id="call-123", actual_cost_cny="1")
+
+    with pytest.raises(ValidationError, match="usage_reference and actual_cost_cny"):
+        event(event="model_call_finished", call_id="call-123", usage_reference="r-1")
+
+    finished = event(
+        event="model_call_finished",
+        call_id="call-123",
+        usage_reference="r-1",
+        actual_cost_cny="1",
+    )
+    assert finished.actual_cost_cny == Decimal("1")
 
 
 @pytest.mark.parametrize("schema_version", [True, "1", 1.0, 2])

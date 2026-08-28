@@ -27,6 +27,7 @@ class RunEventType(StrEnum):
     TIER_DOWNGRADED = "tier_downgraded"
     MODEL_CALL_STARTED = "model_call_started"
     MODEL_CALL_FINISHED = "model_call_finished"
+    MODEL_CALL_USAGE_UNKNOWN = "model_call_usage_unknown"
     BUDGET_PAUSED = "budget_paused"
     BUDGET_RESUMED = "budget_resumed"
     BUDGET_OVERRIDE_APPROVED = "budget_override_approved"
@@ -106,14 +107,32 @@ class RunEventV1(BaseModel):
         if self.event in {
             RunEventType.MODEL_CALL_STARTED,
             RunEventType.MODEL_CALL_FINISHED,
+            RunEventType.MODEL_CALL_USAGE_UNKNOWN,
         } and (not self.call_id or not self.call_id.strip()):
             raise ValueError("call_id is required for model call events")
         if self.event in {
-            RunEventType.TIER_UPGRADE_REQUESTED,
             RunEventType.TIER_DOWNGRADED,
             RunEventType.ROUTE_SELECTED,
         } and (self.requested_tier is None or self.effective_tier is None):
             raise ValueError("tier events require requested_tier and effective_tier")
+        if self.event is RunEventType.TIER_UPGRADE_REQUESTED and self.requested_tier is None:
+            raise ValueError("tier upgrade events require requested_tier")
+        if self.event is RunEventType.MODEL_CALL_FINISHED and (
+            self.actual_cost_cny is not None or self.usage_reference is not None
+        ) and (
+            self.actual_cost_cny is None
+            or self.usage_reference is None
+            or not self.usage_reference.strip()
+        ):
+            raise ValueError(
+                "finished accounting requires usage_reference and actual_cost_cny"
+            )
+        if self.event is RunEventType.MODEL_CALL_USAGE_UNKNOWN and (
+            self.actual_cost_cny is not None or self.usage_reference is not None
+        ):
+            raise ValueError("usage unknown events must not contain accounting facts")
+        if self.event is RunEventType.MODEL_CALL_USAGE_UNKNOWN and self.reason != "usage_unknown":
+            raise ValueError("usage unknown events require reason=usage_unknown")
         if self.reservation_id is not None and not self.reservation_id.strip():
             raise ValueError("reservation_id must be non-empty")
         if self.pricing_version is not None and not self.pricing_version.strip():

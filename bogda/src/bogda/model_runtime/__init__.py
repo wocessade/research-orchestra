@@ -22,6 +22,18 @@ from bogda.model_runtime.routing import (
     RouteDecision,
     RouteDecisionKind,
 )
+from bogda.model_runtime.service import (
+    PaidCallResult,
+    PaidCallStatus,
+    PaidModelArchiveError,
+    PaidModelBudgetError,
+    PaidModelCallService,
+    PaidModelClockError,
+    PaidModelCompensationError,
+    PaidModelEventError,
+    PaidModelExecutionError,
+    PaidModelRuntimeError,
+)
 
 __all__ = [
     "DshTokenUsageV1",
@@ -43,4 +55,14 @@ __all__ = [
     "JsonUsageReceiptReader",
     "MAX_STDERR_BYTES",
     "SubprocessCommandRunner",
+    "PaidCallResult",
+    "PaidCallStatus",
+    "PaidModelArchiveError",
+    "PaidModelBudgetError",
+    "PaidModelCallService",
+    "PaidModelClockError",
+    "PaidModelCompensationError",
+    "PaidModelEventError",
+    "PaidModelExecutionError",
+    "PaidModelRuntimeError",
 ]

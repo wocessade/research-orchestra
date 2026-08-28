@@ -145,6 +145,31 @@ async def test_model_control_validation_and_not_found_are_typed(client) -> None:
 
 
 @pytest.mark.asyncio
+async def test_stale_resolved_decision_conflicts_but_current_unknown_decision_is_not_found(client) -> None:
+    resolved = await client.post(
+        "/api/v1/decisions/decision-1",
+        json={"actionId": "approve", "expectedRevision": 0, "rationale": "approved"},
+    )
+    assert resolved.status_code == 200
+
+    stale = await client.post(
+        "/api/v1/decisions/decision-1",
+        json={"actionId": "approve", "expectedRevision": 0, "rationale": "retry"},
+    )
+    assert stale.status_code == 409
+    stale_error = stale.json()["errors"][0]
+    assert stale_error["code"] == "RESOURCE_CHANGED"
+    assert stale_error["details"]["currentResource"]["revision"] == 1
+
+    unknown = await client.post(
+        "/api/v1/decisions/not-real",
+        json={"actionId": "approve", "expectedRevision": 1, "rationale": "not applicable"},
+    )
+    assert unknown.status_code == 404
+    assert unknown.json()["errors"][0]["code"] == "NOT_FOUND"
+
+
+@pytest.mark.asyncio
 async def test_policy_request_shapes_split_global_and_project_restore(client) -> None:
     global_missing_patch = await client.post(
         "/api/v1/model-policy/global", json={"expectedRevision": 0}

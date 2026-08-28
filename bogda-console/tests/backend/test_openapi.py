@@ -4,6 +4,17 @@ from bogda_console.app import create_app
 from bogda_console.config import Settings
 
 
+def _deref_schema(schema: dict, schemas: dict) -> dict:
+    if "$ref" in schema:
+        return schemas[schema["$ref"].split("/")[-1]]
+    for key in ("anyOf", "oneOf", "allOf"):
+        if key in schema:
+            for option in schema[key]:
+                if option.get("type") != "null":
+                    return _deref_schema(option, schemas)
+    return schema
+
+
 def test_openapi_contains_every_canonical_wire_schema() -> None:
     schemas = create_app(Settings.from_env({})).openapi()["components"]["schemas"]
     required = {
@@ -37,6 +48,17 @@ def test_openapi_keeps_command_and_review_request_bodies_closed() -> None:
     assert paths["/api/v1/runs/{run_id}/checkpoints"]["post"]["requestBody"]
     assert paths["/api/v1/run-preparations/preview"]["post"]["requestBody"]
     assert paths["/api/v1/model-policy/global"]["post"]["requestBody"]
+
+    schemas = schema["components"]["schemas"]
+    new_model_control_paths = (
+        "/api/v1/decisions/{decision_id}",
+        "/api/v1/model-policy/global",
+        "/api/v1/model-policy/projects/{project_id}",
+        "/api/v1/run-preparations/preview",
+    )
+    for path in new_model_control_paths:
+        body_schema = paths[path]["post"]["requestBody"]["content"]["application/json"]["schema"]
+        assert _deref_schema(body_schema, schemas)["additionalProperties"] is False, path
 
 
 def test_openapi_model_control_mutations_use_typed_receipts() -> None:

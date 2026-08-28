@@ -118,12 +118,12 @@ class MockModelControlAdapter:
         return preview
 
     async def resolve_decision(self, decision_id: str, action_id: str, expected_revision: int, rationale: str | None = None) -> DecisionCenterSnapshot:
-        item = self._items.get(decision_id)
-        if item is None:
-            raise ModelControlNotFound(decision_id)
         current = await self.decision_center()
         if expected_revision != self._revision:
             raise ModelControlConflict(current)
+        item = self._items.get(decision_id)
+        if item is None:
+            raise ModelControlNotFound(decision_id)
         action = next((action for action in item.actions if action.action_id == action_id), None)
         if action is None:
             raise ModelControlConflict(current)

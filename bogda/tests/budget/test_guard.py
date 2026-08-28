@@ -4,7 +4,8 @@ from decimal import Decimal
 import pytest
 
 from bogda.budget.guard import BudgetDecisionKind, BudgetGuard
-from bogda.budget.ledger import SingleFlightBudgetLedger
+from bogda.budget.ledger import LedgerFacts, SingleFlightBudgetLedger
+from bogda.budget.pricing import DEEPSEEK_CN_2026_08_28, PricingCatalogV1
 from bogda.budget.usage import UsageSnapshotV1, UsageSourceStatus
 from bogda.contracts import BudgetSource, ModelTier, RunBudgetEnvelope
 
@@ -47,9 +48,14 @@ def envelope(
     )
 
 
-def make_guard() -> tuple[BudgetGuard, SingleFlightBudgetLedger]:
+def make_guard(
+    *, now: datetime = NOW, pricing_catalogs: tuple[PricingCatalogV1, ...] | None = None
+) -> tuple[BudgetGuard, SingleFlightBudgetLedger]:
     ledger = SingleFlightBudgetLedger(clock=lambda: NOW)
-    return BudgetGuard(ledger=ledger, now=NOW), ledger
+    arguments: dict[str, object] = {"ledger": ledger, "now": now}
+    if pricing_catalogs is not None:
+        arguments["pricing_catalogs"] = pricing_catalogs
+    return BudgetGuard(**arguments), ledger  # type: ignore[arg-type]
 
 
 def test_fresh_sufficient_balance_allows_without_mutating_ledger() -> None:
@@ -101,7 +107,7 @@ def test_unavailable_wrong_state_and_stale_snapshots_deny(
     assert decision.kind is kind
 
 
-def test_minimum_remaining_and_active_reservations_reduce_available_balance() -> None:
+def test_active_reservation_conflicts_after_explainable_balance_calculation() -> None:
     guard, ledger = make_guard()
     existing = ledger.reserve(
         run_id="existing", amount=Decimal("4"), expected_revision=0
@@ -112,16 +118,12 @@ def test_minimum_remaining_and_active_reservations_reduce_available_balance() ->
         envelope=envelope(minimum="2"),
         reservation_cny=Decimal("4"),
     )
-    assert decision.kind is BudgetDecisionKind.ALLOW
+    assert decision.kind is BudgetDecisionKind.RESERVATION_CONFLICT
+    assert decision.allowed is False
     assert decision.available_to_start == Decimal("4")
+    assert decision.ledger_revision == 1
+    assert decision.active_reservations == Decimal("4")
     assert ledger.lookup(existing.id).state.value == "active"
-
-    denied = guard.evaluate(
-        snapshot=snapshot(balance="10"),
-        envelope=envelope(minimum="2"),
-        reservation_cny=Decimal("4.000000000000000001"),
-    )
-    assert denied.kind is BudgetDecisionKind.INSUFFICIENT_BALANCE
 
 
 def test_exact_available_balance_is_allowed() -> None:
@@ -175,7 +177,119 @@ def test_pricing_version_configuration_is_immutable_and_not_a_string() -> None:
     with pytest.raises(AttributeError):
         guard.accepted_pricing_versions.add("other")  # type: ignore[attr-defined]
     with pytest.raises(ValueError):
-        BudgetGuard(SingleFlightBudgetLedger(), accepted_pricing_versions=PRICING)
+        BudgetGuard(SingleFlightBudgetLedger(), pricing_catalogs=(object(),))  # type: ignore[arg-type]
+
+
+class CoherentFactsOnlyLedger:
+    @property
+    def revision(self) -> int:
+        raise AssertionError("guard must not read revision separately")
+
+    @property
+    def active_total(self) -> Decimal:
+        raise AssertionError("guard must not read active_total separately")
+
+    def facts(self) -> LedgerFacts:
+        return LedgerFacts(revision=7, active_total=Decimal("0"))
+
+    def lookup(self, reservation_id: str) -> object:
+        raise AssertionError("guard must not look up reservations")
+
+    def reserve(self, **kwargs: object) -> object:
+        raise AssertionError("guard must not reserve")
+
+    def release(self, reservation_id: str, **kwargs: object) -> object:
+        raise AssertionError("guard must not release")
+
+    def reconcile(self, reservation_id: str, actual_cost: Decimal, **kwargs: object) -> object:
+        raise AssertionError("guard must not reconcile")
+
+
+def test_guard_uses_one_coherent_ledger_facts_snapshot() -> None:
+    guard = BudgetGuard(CoherentFactsOnlyLedger(), now=NOW)
+    decision = guard.evaluate(
+        snapshot=snapshot(balance="10"),
+        envelope=envelope(minimum="1"),
+        reservation_cny=Decimal("2"),
+    )
+    assert decision.kind is BudgetDecisionKind.ALLOW
+    assert decision.ledger_revision == 7
+    assert decision.active_reservations == Decimal("0")
+
+
+def custom_catalog() -> PricingCatalogV1:
+    return DEEPSEEK_CN_2026_08_28.model_copy(
+        update={
+            "version": "custom-pricing",
+            "effective_at": datetime(2026, 9, 1, tzinfo=timezone.utc),
+            "review_by": datetime(2026, 10, 1, tzinfo=timezone.utc),
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    "now",
+    [
+        datetime(2026, 8, 31, 23, 59, tzinfo=timezone.utc),
+        datetime(2026, 10, 1, 0, 0, 1, tzinfo=timezone.utc),
+    ],
+)
+def test_custom_catalog_is_invalid_outside_its_effective_review_window(
+    now: datetime,
+) -> None:
+    catalog = custom_catalog()
+    guard, _ = make_guard(now=now, pricing_catalogs=(catalog,))
+    decision = guard.evaluate(
+        snapshot=snapshot(observed_at=now - timedelta(seconds=30)),
+        envelope=envelope(pricing_version=catalog.version),
+        reservation_cny=Decimal("1"),
+    )
+    assert decision.kind is BudgetDecisionKind.INVALID_PRICING
+    assert decision.allowed is False
+
+
+def test_custom_catalog_is_valid_inside_its_effective_review_window() -> None:
+    catalog = custom_catalog()
+    now = datetime(2026, 9, 15, tzinfo=timezone.utc)
+    guard, _ = make_guard(now=now, pricing_catalogs=(catalog,))
+    decision = guard.evaluate(
+        snapshot=snapshot(observed_at=now - timedelta(seconds=30)),
+        envelope=envelope(pricing_version=catalog.version),
+        reservation_cny=Decimal("1"),
+    )
+    assert decision.kind is BudgetDecisionKind.ALLOW
+
+
+def test_current_catalog_is_invalid_after_review_deadline() -> None:
+    now = datetime(2026, 9, 28, 0, 0, 1, tzinfo=timezone.utc)
+    guard, _ = make_guard(now=now)
+    decision = guard.evaluate(
+        snapshot=snapshot(observed_at=now - timedelta(seconds=30)),
+        envelope=envelope(),
+        reservation_cny=Decimal("1"),
+    )
+    assert decision.kind is BudgetDecisionKind.INVALID_PRICING
+
+
+def test_pricing_catalog_metadata_rejects_duplicates_and_invalid_windows() -> None:
+    catalog = custom_catalog()
+    with pytest.raises(ValueError, match="duplicate"):
+        BudgetGuard(
+            SingleFlightBudgetLedger(), pricing_catalogs=(catalog, catalog)
+        )
+    invalid = catalog.model_copy(
+        update={"effective_at": datetime(2026, 10, 2, tzinfo=timezone.utc)}
+    )
+    with pytest.raises(ValueError, match="effective_at"):
+        BudgetGuard(SingleFlightBudgetLedger(), pricing_catalogs=(invalid,))
+
+    invalid_version = catalog.model_copy(update={"version": ""})
+    with pytest.raises(ValueError, match="version"):
+        BudgetGuard(SingleFlightBudgetLedger(), pricing_catalogs=(invalid_version,))
+
+    invalid_schema = catalog.model_copy(update={"schema_version": 2})
+    with pytest.raises(ValueError, match="schema_version"):
+        BudgetGuard(SingleFlightBudgetLedger(), pricing_catalogs=(invalid_schema,))
 
 
 def test_insufficient_balance_is_explainable() -> None:

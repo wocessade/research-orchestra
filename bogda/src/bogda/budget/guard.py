@@ -6,10 +6,11 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
 from enum import StrEnum
+from types import MappingProxyType
 from typing import Callable, Iterable
 
-from bogda.budget.ledger import BudgetLedger
-from bogda.budget.pricing import DEEPSEEK_CN_2026_08_28
+from bogda.budget.ledger import BudgetLedger, LedgerFacts
+from bogda.budget.pricing import DEEPSEEK_CN_2026_08_28, PricingCatalogV1
 from bogda.budget.usage import (
     UsageSnapshotStaleError,
     UsageSnapshotV1,
@@ -107,33 +108,62 @@ class BudgetGuard:
         self,
         ledger: BudgetLedger,
         *,
-        accepted_pricing_versions: Iterable[str] | None = None,
+        pricing_catalog: PricingCatalogV1 | None = None,
+        pricing_catalogs: Iterable[PricingCatalogV1] | None = None,
         now: datetime | None = None,
         clock: Callable[[], datetime] | None = None,
     ) -> None:
-        if not isinstance(ledger, BudgetLedger):
-            raise ValueError("ledger must implement BudgetLedger")
-        if isinstance(accepted_pricing_versions, str):
-            raise ValueError("accepted_pricing_versions must be an iterable of strings")
-        versions = (
-            (DEEPSEEK_CN_2026_08_28.version,)
-            if accepted_pricing_versions is None
-            else tuple(accepted_pricing_versions)
-        )
-        if not versions or any(not isinstance(version, str) or not version for version in versions):
-            raise ValueError("accepted_pricing_versions must contain non-empty strings")
+        if not callable(getattr(ledger, "facts", None)):
+            raise ValueError("ledger must implement BudgetLedger.facts")
+        if pricing_catalog is not None and pricing_catalogs is not None:
+            raise ValueError("provide pricing_catalog or pricing_catalogs, not both")
+        source = pricing_catalogs
+        if pricing_catalog is not None:
+            source = (pricing_catalog,)
+        elif source is None:
+            source = (DEEPSEEK_CN_2026_08_28,)
+        elif isinstance(source, PricingCatalogV1):
+            source = (source,)
+        try:
+            catalog_sequence = tuple(source)
+        except TypeError as exc:
+            raise ValueError("pricing_catalogs must be an iterable of catalogs") from exc
+        catalogs: dict[str, PricingCatalogV1] = {}
+        for catalog in catalog_sequence:
+            if not isinstance(catalog, PricingCatalogV1):
+                raise ValueError("pricing metadata must be PricingCatalogV1")
+            if type(catalog.schema_version) is not int or catalog.schema_version != 1:
+                raise ValueError("pricing catalog schema_version is invalid")
+            if not isinstance(catalog.version, str) or not catalog.version:
+                raise ValueError("pricing catalog version is invalid")
+            if catalog.currency != "CNY" or catalog.timezone != "Asia/Shanghai":
+                raise ValueError("pricing catalog currency/timezone is invalid")
+            if (
+                not isinstance(catalog.effective_at, datetime)
+                or not isinstance(catalog.review_by, datetime)
+                or catalog.effective_at.utcoffset() is None
+                or catalog.review_by.utcoffset() is None
+            ):
+                raise ValueError("pricing catalog timestamps must be timezone-aware")
+            if catalog.review_by <= catalog.effective_at:
+                raise ValueError("effective_at must be before review_by")
+            if catalog.version in catalogs:
+                raise ValueError("duplicate pricing catalog version")
+            catalogs[catalog.version] = catalog
+        if not catalogs:
+            raise ValueError("at least one pricing catalog is required")
         if now is not None:
             _aware(now, "now")
         if clock is not None and not callable(clock):
             raise ValueError("clock must be callable")
         self._ledger = ledger
-        self._accepted_pricing_versions = frozenset(versions)
+        self._catalogs = MappingProxyType(catalogs)
         self._fixed_now = now
         self._clock = clock or (lambda: datetime.now(timezone.utc))
 
     @property
     def accepted_pricing_versions(self) -> frozenset[str]:
-        return self._accepted_pricing_versions
+        return frozenset(self._catalogs)
 
     def _now(self, supplied: datetime | None) -> datetime:
         value = supplied if supplied is not None else self._fixed_now
@@ -142,11 +172,16 @@ class BudgetGuard:
         return _aware(value, "now")
 
     def _facts(self) -> tuple[int, Decimal]:
-        revision = self._ledger.revision
-        active = self._ledger.active_total
-        if type(revision) is not int or revision < 0:
+        facts = self._ledger.facts()
+        if not isinstance(facts, LedgerFacts):
             raise BudgetGuardError("ledger revision is invalid")
-        return revision, _money(active, "active_reservations")
+        if type(facts.revision) is not int or facts.revision < 0:
+            raise BudgetGuardError("ledger revision is invalid")
+        try:
+            active = _money(facts.active_total, "active_reservations")
+        except ValueError as exc:
+            raise BudgetGuardError("ledger active total is invalid") from exc
+        return facts.revision, active
 
     @staticmethod
     def _decision(
@@ -209,7 +244,13 @@ class BudgetGuard:
             expected = _money(envelope.expected_cost, "expected_cost")
             ceiling = _money(envelope.authorized_ceiling, "authorized_ceiling")
             minimum = _money(envelope.minimum_remaining, "minimum_remaining")
-            if expected > ceiling or pricing_version not in self._accepted_pricing_versions:
+            catalog = self._catalogs.get(pricing_version)
+            if (
+                expected > ceiling
+                or catalog is None
+                or current < catalog.effective_at
+                or current > catalog.review_by
+            ):
                 raise ValueError("pricing is not accepted")
             if not isinstance(reservation_cny, Decimal) or isinstance(reservation_cny, bool):
                 raise ValueError("reservation_cny must be a Decimal")
@@ -309,6 +350,19 @@ class BudgetGuard:
                 pricing_version=pricing_version,
             )
         available = balance - active - minimum
+        if active > 0:
+            return self._decision(
+                kind=BudgetDecisionKind.RESERVATION_CONFLICT,
+                reason="active_reservation_conflict",
+                revision=revision,
+                active=active,
+                balance=balance,
+                minimum=minimum,
+                available=available,
+                requested=requested,
+                age=age,
+                pricing_version=pricing_version,
+            )
         if requested > ceiling:
             return self._decision(
                 kind=BudgetDecisionKind.BUDGET_CEILING_EXCEEDED,

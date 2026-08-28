@@ -67,6 +67,19 @@ def _require_revision(value: object) -> int:
 
 
 @dataclass(frozen=True, slots=True)
+class LedgerFacts:
+    """Coherent read-only ledger facts captured under one lock."""
+
+    revision: int
+    active_total: Decimal
+
+    def __post_init__(self) -> None:
+        if type(self.revision) is not int or self.revision < 0:
+            raise InvalidReservationError("revision must be a non-negative integer")
+        _require_decimal(self.active_total, "active_total")
+
+
+@dataclass(frozen=True, slots=True)
 class Reservation:
     """Immutable, explainable reservation and terminal accounting facts."""
 
@@ -131,6 +144,10 @@ class BudgetLedger(Protocol):
 
     @property
     def active_total(self) -> Decimal:
+        ...
+
+    def facts(self) -> LedgerFacts:
+        """Return revision and active total from one atomic read."""
         ...
 
     def lookup(self, reservation_id: str) -> Reservation:
@@ -200,6 +217,20 @@ class SingleFlightBudgetLedger:
                 ),
                 Decimal("0"),
             )
+
+    def facts(self) -> LedgerFacts:
+        """Capture revision and active total coherently under the RLock."""
+
+        with self._lock:
+            active_total = sum(
+                (
+                    reservation.reserved
+                    for reservation in self._reservations.values()
+                    if reservation.state is ReservationState.ACTIVE
+                ),
+                Decimal("0"),
+            )
+            return LedgerFacts(revision=self._revision, active_total=active_total)
 
     def _timestamp(self, now: datetime | None) -> datetime:
         try:
@@ -325,6 +356,7 @@ __all__ = [
     "BudgetLedger",
     "BudgetLedgerError",
     "InvalidReservationError",
+    "LedgerFacts",
     "LedgerRevisionConflictError",
     "Reservation",
     "ReservationConflictError",

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Protocol, runtime_checkable
 
 from bogda_console.contracts.models import (
@@ -18,6 +19,11 @@ from bogda_console.contracts.models import (
     RunSummary,
     ScientificStatus,
     WorkerSnapshot,
+    DecisionCenterSnapshot,
+    DecisionItem,
+    ModelBudgetSnapshot,
+    ModelPolicySnapshot,
+    RunPreparationPreview,
 )
 
 
@@ -76,3 +82,35 @@ class AutonomyPolicyConflict(Exception):
     def __init__(self, current: AutonomyPolicySnapshot) -> None:
         super().__init__("autonomy policy revision mismatch")
         self.current = current
+
+
+class ModelControlConflict(Exception):
+    def __init__(self, current: Any) -> None:
+        super().__init__("model-control revision or idempotency conflict")
+        self.current = current
+
+
+class ModelControlUnavailable(Exception):
+    pass
+
+
+@runtime_checkable
+class ModelControlQueryPort(Protocol):
+    async def decision_center(self) -> DecisionCenterSnapshot: ...
+    async def run_budget(self, run_id: str) -> ModelBudgetSnapshot: ...
+    async def model_policy(self, project_id: str | None = None) -> ModelPolicySnapshot: ...
+    async def preview_run(
+        self,
+        project_id: str,
+        intent: str,
+        requested_model_tier: str,
+        deadline: datetime | None = None,
+    ) -> RunPreparationPreview: ...
+
+
+@runtime_checkable
+class ModelControlCommandPort(Protocol):
+    async def resolve_decision(self, decision_id: str, action_id: str, expected_revision: int) -> DecisionCenterSnapshot: ...
+    async def set_global_policy(self, patch: dict[str, Any], expected_revision: int) -> ModelPolicySnapshot: ...
+    async def set_project_policy(self, project_id: str, patch: dict[str, Any] | None, expected_revision: int) -> ModelPolicySnapshot: ...
+    async def confirm_preparation(self, preparation_id: str, idempotency_key: str) -> RunPreparationPreview: ...

@@ -1,0 +1,135 @@
+from __future__ import annotations
+
+from copy import deepcopy
+from datetime import UTC, datetime
+from decimal import Decimal
+from uuid import uuid4
+
+from bogda_console.contracts.models import (
+    BudgetState,
+    DecisionAction,
+    DecisionCenterSnapshot,
+    DecisionItem,
+    EvidenceReference,
+    ModelBudgetSnapshot,
+    ModelPolicySnapshot,
+    RunPreparationPreview,
+    UrgencyGroup,
+)
+from bogda_console.contracts.ports import ModelControlConflict
+
+
+class MockModelControlAdapter:
+    """The sole deterministic in-memory authority for console model controls."""
+
+    def __init__(self) -> None:
+        self._revision = 0
+        self._global: dict[str, object] = {
+            "default_model_tier": "auto", "allow_auto_upgrade": True,
+            "allow_flash_downgrade": True, "prefer_off_peak": True,
+            "auto_resume": True, "minimum_remaining": Decimal("10.00"),
+        }
+        self._projects: dict[str, dict[str, object]] = {}
+        self._items: dict[str, DecisionItem] = {
+            "decision-1": DecisionItem(
+                decisionId="decision-1", urgencyGroup=UrgencyGroup.NEEDS_OWNER_NOW,
+                projectId="project-1", runId="run-1", reason="Preparation needs owner approval",
+                risk="budget", estimatedCost=Decimal("1.00"), deadline=None,
+                evidence=[EvidenceReference(kind="run", refId="run-1", label="Run")],
+                actions=[DecisionAction(actionId="approve", label="Approve", costImpact="Uses budget")],
+                revision=0, logSummary="Awaiting owner decision.",
+            )
+        }
+        self._budgets = {"run-1": ModelBudgetSnapshot(
+            runId="run-1", projectId="project-1", state=BudgetState.AWAITING_APPROVAL,
+            currency="CNY", expectedCost=Decimal("1.00"), authorizedCeiling=Decimal("2.00"),
+            usedCost=Decimal("0"), reservedCost=Decimal("0"), remainingCost=Decimal("2.00"),
+            decisionId="decision-1", revision=0,
+        )}
+        self._preparations: dict[str, RunPreparationPreview] = {}
+        self._confirmations: dict[str, tuple[str, str]] = {}
+
+    async def decision_center(self) -> DecisionCenterSnapshot:
+        return DecisionCenterSnapshot(items=list(self._items.values()), revision=self._revision)
+
+    async def run_budget(self, run_id: str) -> ModelBudgetSnapshot:
+        return self._budgets.get(run_id, ModelBudgetSnapshot(
+            runId=run_id, projectId="unknown", state=BudgetState.USAGE_UNKNOWN,
+            currency="CNY", expectedCost=Decimal("0"), authorizedCeiling=Decimal("0"),
+            usedCost=Decimal("0"), reservedCost=Decimal("0"), remainingCost=Decimal("0"),
+            decisionId=None, revision=self._revision,
+        ))
+
+    def _policy(self, project_id: str | None, source: str, values: dict[str, object], inherits: bool) -> ModelPolicySnapshot:
+        return ModelPolicySnapshot(
+            projectId=project_id if source == "project" else None, source=source,
+            inheritsGlobal=inherits, revision=self._revision, usageSnapshotStaleAfterSeconds=120,
+            hardSafetyBaselines={"staleUsageFailClosed": True, "minimumRemainingIsImmutablePerRun": True},
+            **values,
+        )
+
+    async def model_policy(self, project_id: str | None = None) -> ModelPolicySnapshot:
+        if project_id and project_id in self._projects:
+            values = {**self._global, **self._projects[project_id]}
+            return self._policy(project_id, "project", values, False)
+        return self._policy(project_id, "global", dict(self._global), True)
+
+    async def preview_run(self, project_id: str, intent: str, requested_model_tier: str, deadline=None) -> RunPreparationPreview:
+        policy = await self.model_policy(project_id)
+        effective = "pro" if requested_model_tier == "pro" else "flash"
+        preparation_id = f"prep_{uuid4().hex}"
+        budget = ModelBudgetSnapshot(
+            runId=preparation_id, projectId=project_id, state=BudgetState.READY,
+            currency="CNY", expectedCost=Decimal("1.00"), authorizedCeiling=Decimal("2.00"),
+            usedCost=Decimal("0"), reservedCost=Decimal("0"), remainingCost=Decimal("2.00"),
+            decisionId=None, revision=self._revision,
+        )
+        preview = RunPreparationPreview(
+            preparationId=preparation_id, projectId=project_id, intent=intent,
+            requestedModelTier=requested_model_tier, effectiveModelTier=effective,
+            deadline=deadline, budget=budget, policyRevision=policy.revision,
+        )
+        self._preparations[preparation_id] = preview
+        return preview
+
+    async def resolve_decision(self, decision_id: str, action_id: str, expected_revision: int) -> DecisionCenterSnapshot:
+        current = await self.decision_center()
+        if expected_revision != self._revision:
+            raise ModelControlConflict(current)
+        item = self._items.get(decision_id)
+        if item is None or action_id not in {action.action_id for action in item.actions}:
+            raise ModelControlConflict(current)
+        del self._items[decision_id]
+        self._revision += 1
+        return await self.decision_center()
+
+    async def set_global_policy(self, patch: dict[str, object], expected_revision: int) -> ModelPolicySnapshot:
+        current = await self.model_policy()
+        if expected_revision != self._revision:
+            raise ModelControlConflict(current)
+        self._global.update({key: value for key, value in patch.items() if key in self._global})
+        self._revision += 1
+        return await self.model_policy()
+
+    async def set_project_policy(self, project_id: str, patch: dict[str, object] | None, expected_revision: int) -> ModelPolicySnapshot:
+        current = await self.model_policy(project_id)
+        if expected_revision != self._revision:
+            raise ModelControlConflict(current)
+        if patch is None:
+            self._projects.pop(project_id, None)
+        else:
+            self._projects[project_id] = {key: value for key, value in patch.items() if key in self._global}
+        self._revision += 1
+        return await self.model_policy(project_id)
+
+    async def confirm_preparation(self, preparation_id: str, idempotency_key: str) -> RunPreparationPreview:
+        preview = self._preparations[preparation_id]
+        prior = self._confirmations.get(preparation_id)
+        if prior is not None:
+            if prior[0] != idempotency_key:
+                raise ModelControlConflict(preview)
+            return preview
+        confirmed = preview.model_copy(update={"confirmed": True, "confirmed_at": datetime.now(UTC)})
+        self._preparations[preparation_id] = confirmed
+        self._confirmations[preparation_id] = (idempotency_key, preparation_id)
+        return confirmed

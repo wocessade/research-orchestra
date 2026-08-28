@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import datetime
+from decimal import Decimal
 from enum import StrEnum
 from typing import Any, Generic, Literal, TypeVar
 
@@ -168,7 +169,9 @@ class ArtifactRecord(WireModel):
     size_bytes: int | None = Field(default=None, ge=0)
 
 
-def _utc_datetime(value: datetime) -> datetime:
+def _utc_datetime(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
     if value.tzinfo is None or value.utcoffset() is None:
         raise ValueError("timestamp must include a timezone")
     return value
@@ -361,6 +364,113 @@ class AutonomyPolicySnapshot(WireModel):
     global_default: AutonomyMode
     project_overrides: dict[str, AutonomyMode] = Field(default_factory=dict)
     revision: int = Field(ge=0)
+
+
+class ImmutableWireModel(WireModel):
+    model_config = ConfigDict(
+        alias_generator=_to_camel,
+        populate_by_name=True,
+        extra="forbid",
+        use_enum_values=True,
+        frozen=True,
+    )
+
+
+class BudgetState(StrEnum):
+    READY = "ready"
+    STALE = "stale"
+    INSUFFICIENT = "insufficient"
+    SCHEDULED_OFF_PEAK = "scheduled-off-peak"
+    AWAITING_APPROVAL = "awaiting-approval"
+    USAGE_UNKNOWN = "usage-unknown"
+
+
+class UrgencyGroup(StrEnum):
+    NEEDS_OWNER_NOW = "needs-owner-now"
+    HAS_DEADLINE = "has-deadline"
+    FOR_INFORMATION = "for-information"
+
+
+class DecisionAction(ImmutableWireModel):
+    action_id: str = Field(min_length=1)
+    label: str = Field(min_length=1)
+    cost_impact: str = Field(min_length=1)
+    quality_impact: str | None = None
+    irreversible_consequence: str | None = None
+    requires_confirmation: bool = True
+
+
+class EvidenceReference(ImmutableWireModel):
+    kind: str = Field(min_length=1)
+    ref_id: str = Field(min_length=1)
+    label: str = Field(min_length=1)
+    uri: str | None = None
+
+
+class DecisionItem(ImmutableWireModel):
+    decision_id: str = Field(min_length=1)
+    urgency_group: UrgencyGroup
+    project_id: str = Field(min_length=1)
+    run_id: str | None = None
+    reason: str = Field(min_length=1)
+    risk: str = Field(min_length=1)
+    estimated_cost: Decimal = Field(ge=0)
+    deadline: datetime | None = None
+    evidence: list[EvidenceReference] = Field(default_factory=list)
+    actions: list[DecisionAction] = Field(min_length=1)
+    revision: int = Field(ge=0)
+    log_summary: str = Field(min_length=1)
+
+    _deadline_aware = field_validator("deadline")(_utc_datetime)
+
+
+class DecisionCenterSnapshot(ImmutableWireModel):
+    items: list[DecisionItem] = Field(default_factory=list)
+    revision: int = Field(ge=0)
+
+
+class ModelBudgetSnapshot(ImmutableWireModel):
+    run_id: str = Field(min_length=1)
+    project_id: str = Field(min_length=1)
+    state: BudgetState
+    currency: str = Field(min_length=1)
+    expected_cost: Decimal = Field(ge=0)
+    authorized_ceiling: Decimal = Field(ge=0)
+    used_cost: Decimal = Field(ge=0)
+    reserved_cost: Decimal = Field(ge=0)
+    remaining_cost: Decimal = Field(ge=0)
+    decision_id: str | None = None
+    revision: int = Field(ge=0)
+
+
+class ModelPolicySnapshot(ImmutableWireModel):
+    project_id: str | None = None
+    source: Literal["global", "project"]
+    inherits_global: bool
+    default_model_tier: Literal["auto", "flash", "pro"]
+    allow_auto_upgrade: bool
+    allow_flash_downgrade: bool
+    prefer_off_peak: bool
+    auto_resume: bool
+    minimum_remaining: Decimal = Field(ge=0)
+    usage_snapshot_stale_after_seconds: int = Field(ge=1)
+    hard_safety_baselines: dict[str, Any] = Field(default_factory=dict)
+    revision: int = Field(ge=0)
+
+
+class RunPreparationPreview(ImmutableWireModel):
+    preparation_id: str = Field(min_length=1)
+    project_id: str = Field(min_length=1)
+    intent: Literal["execute", "brief", "explore", "decide", "audit"]
+    requested_model_tier: Literal["auto", "flash", "pro"]
+    effective_model_tier: Literal["flash", "pro"]
+    deadline: datetime | None = None
+    budget: ModelBudgetSnapshot
+    policy_revision: int = Field(ge=0)
+    confirmed: bool = False
+    confirmed_at: datetime | None = None
+
+    _preview_deadline_aware = field_validator("deadline", "confirmed_at")(_utc_datetime)
 
 
 class SetGlobalAutonomyRequest(WireModel):

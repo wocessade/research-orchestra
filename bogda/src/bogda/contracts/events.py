@@ -153,8 +153,15 @@ class RunEventV1(BaseModel):
                     self.overspend_cny,
                 )
             )
-            if budget_facts_supplied and (
-                self.reservation_id is not None or self.reserved_cny is not None
+            actual_reservation_axes = (
+                self.reservation_id,
+                self.reserved_cny,
+                self.actual_cost_cny,
+                self.released_cny,
+                self.overspend_cny,
+            )
+            if budget_facts_supplied and any(
+                value is not None for value in actual_reservation_axes
             ):
                 raise ValueError(
                     "snapshot and pause events must not contain actual reservation facts"
@@ -163,6 +170,23 @@ class RunEventV1(BaseModel):
         # Empty lifecycle events remain source-compatible with Phase A. Once a
         # caller supplies accounting facts, the v1 facts are strict and
         # self-consistent; the budget service always supplies the full set.
+        budget_axes_supplied = any(
+            value is not None
+            for value in (
+                self.balance_cny,
+                self.reserved_cny,
+                self.active_reservations_cny,
+                self.requested_reservation_cny,
+                self.minimum_remaining_cny,
+                self.snapshot_age_seconds,
+                self.reservation_id,
+                self.actual_cost_cny,
+                self.released_cny,
+                self.overspend_cny,
+                self.pricing_version,
+                self.budget_decision,
+            )
+        )
         accounting_supplied = any(
             value is not None
             for value in (
@@ -184,7 +208,18 @@ class RunEventV1(BaseModel):
                 self.requested_reservation_cny,
             )
         )
-        if self.event is RunEventType.BUDGET_RESERVED and accounting_supplied:
+        if self.event is RunEventType.BUDGET_RESERVED and budget_axes_supplied:
+            if any(
+                value is not None
+                for value in (
+                    self.actual_cost_cny,
+                    self.released_cny,
+                    self.overspend_cny,
+                )
+            ):
+                raise ValueError(
+                    "budget_reserved must not contain terminal accounting facts"
+                )
             if self.reservation_id is None or self.reserved_cny is None:
                 raise ValueError("budget_reserved requires reservation_id and reserved_cny")
             if self.reserved_cny <= 0:

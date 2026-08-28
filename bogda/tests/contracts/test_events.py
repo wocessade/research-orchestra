@@ -229,6 +229,43 @@ def test_decided_snapshot_and_pause_reject_actual_reservation_facts(
         )
 
 
+@pytest.mark.parametrize("event_name", ["budget_snapshot", "budget_paused"])
+@pytest.mark.parametrize(
+    "field",
+    [
+        "reservation_id",
+        "reserved_cny",
+        "actual_cost_cny",
+        "released_cny",
+        "overspend_cny",
+    ],
+)
+def test_snapshot_and_pause_reject_all_actual_reservation_axes(
+    event_name: str, field: str,
+) -> None:
+    with pytest.raises(ValidationError, match="actual reservation facts"):
+        event(
+            event=event_name,
+            budget_decision="allow",
+            reason="budget_admitted",
+            active_reservations_cny="0",
+            requested_reservation_cny="1",
+            **{field: "1" if field != "reservation_id" else "r-1"},
+        )
+
+
+@pytest.mark.parametrize("field", ["actual_cost_cny", "released_cny", "overspend_cny"])
+def test_reserved_event_rejects_terminal_accounting_axes(field: str) -> None:
+    with pytest.raises(ValidationError, match="terminal accounting facts"):
+        event(
+            event="budget_reserved",
+            reservation_id="r-1",
+            reserved_cny="1",
+            budget_decision="allow",
+            **{field: "1"},
+        )
+
+
 @pytest.mark.parametrize(
     "field",
     [

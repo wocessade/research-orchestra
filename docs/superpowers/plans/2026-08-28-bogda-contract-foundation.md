@@ -435,7 +435,7 @@ git commit -m "refactor(bogda): use decimal budget contracts"
 
 **Interfaces:**
 - Consumes: Task 1 `TaskIntent`, `ModelTier`, `ExecutorKind`, `SchedulePolicy`; Task 2 `RunBudgetEnvelope`.
-- Produces: `JobRequest.schema_version == 1`, plus frozen `intent`, `model_tier`, `executor`, `budget` and `schedule_policy`.
+- Produces: `JobRequest.schema_version == 1`, plus request-bound `intent`, `model_tier`, `executor`, `budget` and `schedule_policy` values persisted in the request; this does not imply an immutable Pydantic object.
 - Existing shell callers remain valid through conservative defaults: execute + auto + shell + no paid budget.
 - Dsh requests require a budget envelope; an explicit model tier must match `budget.requested_tier`.
 
@@ -1067,7 +1067,7 @@ Document these exact facts:
 - `intent` controls cognitive behavior.
 - `model_tier` controls reasoning capacity, never permissions.
 - `executor` selects the adapter.
-- Paid dsh requests carry a frozen `RunBudgetEnvelope`; money uses Decimal strings.
+- Paid dsh requests carry a request-bound `RunBudgetEnvelope` snapshot; money uses Decimal strings.
 - Legacy Orchestra cards enter only through `bogda.compat` and become Bogda `JobRequest` objects.
 ```
 
@@ -1118,7 +1118,7 @@ The report must include:
 - Public contract names and schema version
 - Confirmation that Bogda imports no Orchestra package
 - Confirmation that all money fields serialize as Decimal strings
-- Confirmation that no RK3528, Prefect, systemd or Console writes occurred
+- Confirmation that no RK3528, production Prefect, systemd or Console writes occurred; local integration tests may use ephemeral Prefect test state
 - Phase B inputs: JobRequest, RunBudgetEnvelope, SchedulePolicy, RunEventV1
 ```
 

@@ -7,7 +7,7 @@ Scope: Phase A contract foundation only
 
 ## Outcome
 
-Phase A is accepted for planning Phase B. It does not authorize live DeepSeek usage, balance API calls, dsh model execution, Prefect writes, Console writes, RK3528 changes, systemd changes, pricing enforcement, reservations, or production gate transitions.
+Phase A is accepted for planning Phase B. It does not authorize live DeepSeek usage, balance API calls, dsh model execution, production Prefect writes, Console writes, RK3528 changes, systemd changes, pricing enforcement, reservations, or production gate transitions.
 
 ## Task commits
 
@@ -89,7 +89,7 @@ No whitespace errors were present and only intended Phase-A files were committed
 
 ## Production safety confirmation
 
-This work made no writes to RK3528, Prefect, systemd, `prefect.db`, `bogda.env`, work pools, Console, production concurrency, or external APIs. It did not call DeepSeek or query/consume a live balance.
+This work made no writes to RK3528, production Prefect, systemd, production `prefect.db`, `bogda.env`, work pools, Console, production concurrency, or external APIs. The integration suite used only ephemeral local `prefect_test_harness` state and local test artifacts. It did not call DeepSeek or query/consume a live balance.
 
 ## Phase B handoff
 

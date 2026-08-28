@@ -70,11 +70,11 @@ Implemented: local shell flow, attempt directories, required artifact checks, ve
 - `intent` controls cognitive behavior: execute, explore, decide, audit, or brief.
 - `model_tier` controls reasoning capacity, never permissions.
 - `executor` selects the adapter.
-- Paid dsh requests carry a frozen `RunBudgetEnvelope`; money uses `Decimal` values and JSON decimal strings.
+- Paid dsh requests carry a request-bound `RunBudgetEnvelope` snapshot; money uses `Decimal` values and JSON decimal strings. “Request-bound” means the resolved values are persisted with the request, not that the Pydantic object is immutable.
 - Legacy Orchestra cards enter only through `bogda.compat` and become Bogda `JobRequest` objects; Bogda does not import the Orchestra runtime.
-- `RunEventV1` is the versioned structured-log contract. Model-call events pair on `call_id`; ordinary events contain prompt hashes/artifact references rather than full prompts, responses, credentials, or authorization headers.
+- `RunEventV1` is the versioned structured-log contract. Model-call events pair on `call_id`; ordinary events may carry prompt hashes/artifact references and never store full prompts, responses, credentials, or authorization headers.
 
-Public schema-v1 entry points are exported from `bogda.contracts`: `JobRequest`, `RunBudgetEnvelope`, `SchedulePolicy`, `RunEventV1`, `TaskIntent`, `ModelTier`, and `ExecutorKind`.
+Core schema-v1 entry points are exported from `bogda.contracts`: `JobRequest`, `RunBudgetEnvelope`, `SchedulePolicy`, `RunEventV1`, `TaskIntent`, `ModelTier`, and `ExecutorKind`. Supporting public enums include `PricePreference`, `BudgetSource`, and `RunEventType`.
 
 ## Pi-bundle operations
 

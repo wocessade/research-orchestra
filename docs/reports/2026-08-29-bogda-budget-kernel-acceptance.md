@@ -1,9 +1,9 @@
 # Bogda Phase B budget-kernel acceptance
 
-Date: 2026-08-29  
-Worktree: `D:\pythonProject\.worktrees\bogda-budget-kernel`  
-Branch: `codex/bogda-budget-kernel`  
-Fork point: `08e6d35fdfc8daf1a0fcb02367779d8c8a102d99`  
+Date: 2026-08-29
+Worktree: `D:\pythonProject\.worktrees\bogda-budget-kernel`
+Branch: `codex/bogda-budget-kernel`
+Fork point: `08e6d35fdfc8daf1a0fcb02367779d8c8a102d99`
 Acceptance baseline/current HEAD before Task 6: `0caa27d1642009645d361613b4256eb480d4c838`
 
 ## Scope and result

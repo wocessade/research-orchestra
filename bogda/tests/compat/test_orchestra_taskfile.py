@@ -113,6 +113,18 @@ def test_omitted_legacy_model_converts_to_auto(tmp_path: Path) -> None:
     assert request.model_tier is ModelTier.AUTO
 
 
+def test_shell_executor_conversion_is_supported(tmp_path: Path) -> None:
+    text = CARD.replace("executor: dsh", "executor: shell").replace(
+        "model: pro\n", ""
+    )
+    path = _write_card(tmp_path, text)
+
+    request = _request(path)
+
+    assert request.executor is ExecutorKind.SHELL
+    assert request.model_tier is ModelTier.AUTO
+
+
 def test_legacy_import_boundary_does_not_load_orchestra() -> None:
     source_files = [
         Path(inspect.getfile(parse_orchestra_task)),
@@ -224,6 +236,28 @@ def test_unsafe_posix_or_windows_paths_fail_closed(
     path = _write_card(tmp_path, text)
 
     with pytest.raises(ValueError, match="safe relative path"):
+        parse_orchestra_task(path)
+
+
+@pytest.mark.parametrize("rooted", ["\\", "\\tmp\\out"])
+def test_windows_rooted_paths_fail_closed(rooted: str, tmp_path: Path) -> None:
+    path = _write_card(
+        tmp_path, CARD.replace("result: T-20260828-audit", f"result: {rooted}")
+    )
+
+    with pytest.raises(ValueError, match="safe relative path"):
+        parse_orchestra_task(path)
+
+
+def test_malformed_csv_with_empty_item_fails_closed(tmp_path: Path) -> None:
+    path = _write_card(
+        tmp_path,
+        CARD.replace(
+            "depends_on: T-20260827-source", "depends_on: T-20260827-a,,T-20260827-b"
+        ),
+    )
+
+    with pytest.raises(ValueError, match="malformed CSV"):
         parse_orchestra_task(path)
 
 

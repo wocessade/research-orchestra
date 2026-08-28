@@ -1,9 +1,17 @@
 from __future__ import annotations
 
 from pathlib import Path, PurePosixPath, PureWindowsPath
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 
 from bogda.contracts import (
     ArtifactSpec,
@@ -36,56 +44,104 @@ class LegacyOrchestraTask(BaseModel):
     validator: Literal["radar-fetch", "radar-rank", "radar-render"] | None = None
 
 
-_REQUIRED = {"executor", "net", "result"}
-_ALLOWED = {
-    "executor",
-    "net",
-    "result",
-    "timeout",
-    "model",
-    "depends_on",
-    "mode",
-    "detail",
-    "required_outputs",
-    "json_outputs",
-    "validation_output",
-    "validator",
-}
-_VALID_EXECUTORS = {item.value for item in ExecutorKind}
-_VALID_NETS = {"required", "optional"}
-_VALID_MODELS = {"flash", "pro"}
-_VALID_MODES = {item.value for item in TaskIntent}
-_VALID_DETAILS = {"brief", "standard", "deep"}
-_VALID_VALIDATORS = {"radar-fetch", "radar-rank", "radar-render"}
-_TIMEOUT_MIN = 1
-_TIMEOUT_MAX = 86400
+class _LegacyTaskInput(BaseModel):
+    """Validated representation of the legacy header before conversion."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    executor: ExecutorKind
+    net: Literal["required", "optional"]
+    result: str
+    timeout: int = Field(default=3600, ge=1, le=86400)
+    model: Literal["flash", "pro"] | None = None
+    depends_on: tuple[str, ...] = ()
+    mode: TaskIntent = TaskIntent.EXECUTE
+    detail: Literal["brief", "standard", "deep"] = "standard"
+    required_outputs: tuple[str, ...] = ()
+    json_outputs: tuple[str, ...] = ()
+    validation_output: str | None = None
+    validator: Literal["radar-fetch", "radar-rank", "radar-render"] | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def require_known_header_fields(cls, values: object) -> object:
+        if not isinstance(values, dict):
+            return values
+        unknown = sorted(set(values) - set(cls.model_fields))
+        if unknown:
+            raise ValueError(f"unknown field {unknown[0]}")
+        missing = sorted(
+            field for field in ("executor", "net", "result") if field not in values
+        )
+        if missing:
+            raise ValueError(f"missing fields {missing}")
+        return values
+
+    @field_validator("depends_on", "required_outputs", "json_outputs", mode="before")
+    @classmethod
+    def decode_csv(cls, value: object) -> tuple[str, ...]:
+        if value is None:
+            return ()
+        if not isinstance(value, str):
+            raise ValueError("malformed CSV")
+        if not value.strip():
+            return ()
+        items = tuple(item.strip() for item in value.split(","))
+        if any(not item for item in items):
+            raise ValueError("malformed CSV")
+        return items
+
+    @field_validator("validation_output", "validator", mode="before")
+    @classmethod
+    def normalize_empty_optional(cls, value: object) -> object:
+        return None if value == "" else value
+
+    @field_validator("result", "required_outputs", "json_outputs", "validation_output")
+    @classmethod
+    def reject_unsafe_paths(cls, value: object, info: ValidationInfo) -> object:
+        paths = (
+            value
+            if isinstance(value, tuple)
+            else ()
+            if value is None
+            else (value,)
+        )
+        for path in paths:
+            if not isinstance(path, str):
+                continue
+            posix = PurePosixPath(path)
+            windows = PureWindowsPath(path)
+            if path in ("", ".") or any(
+                candidate.is_absolute()
+                or candidate.anchor
+                or candidate.drive
+                or ".." in candidate.parts
+                for candidate in (posix, windows)
+            ):
+                raise ValueError(f"{info.field_name} must be a safe relative path")
+        return value
+
+    @model_validator(mode="after")
+    def validate_relationships(self, info: ValidationInfo) -> Self:
+        slug = (info.context or {}).get("slug")
+        if slug in self.depends_on:
+            raise ValueError("self dependency")
+        if len(self.depends_on) != len(set(self.depends_on)):
+            raise ValueError("duplicate dependency")
+        if set(self.json_outputs) - set(self.required_outputs):
+            raise ValueError("json_outputs must also be required_outputs")
+        if (
+            self.validation_output is not None
+            and self.validation_output not in self.json_outputs
+        ):
+            raise ValueError("validation_output must also be a json_output")
+        if self.validator is not None and not self.required_outputs:
+            raise ValueError("validator requires required_outputs")
+        return self
 
 
-def _csv(value: str) -> tuple[str, ...]:
-    return tuple(item.strip() for item in value.split(",") if item.strip())
-
-
-def _safe_relative(value: str, field: str, source: Path) -> None:
-    candidates = (PurePosixPath(value), PureWindowsPath(value))
-    if value in ("", ".") or any(
-        candidate.is_absolute() or candidate.drive or ".." in candidate.parts
-        for candidate in candidates
-    ):
-        raise ValueError(f"{source}: {field} must be a safe relative path")
-
-
-def _validate_enum(
-    fields: dict[str, str], field: str, valid: set[str], source: Path
-) -> None:
-    value = fields.get(field)
-    if value is not None and value not in valid:
-        choices = "|".join(sorted(valid))
-        raise ValueError(f"{source}: {field} must be one of {choices}")
-
-
-def parse_orchestra_task(path: str | Path) -> LegacyOrchestraTask:
-    source = Path(path)
-    header, separator, body = source.read_text(encoding="utf-8").partition("\n---\n")
+def _decode_card(text: str, source: Path) -> tuple[dict[str, str], str]:
+    header, separator, body = text.partition("\n---\n")
     if not separator:
         raise ValueError(f"{source}: missing task body separator")
 
@@ -100,75 +156,36 @@ def parse_orchestra_task(path: str | Path) -> LegacyOrchestraTask:
         key, value = key.strip(), value.strip()
         if key in fields:
             raise ValueError(f"{source}: duplicate field {key}")
-        if key not in _ALLOWED:
-            raise ValueError(f"{source}: unknown field {key}")
         fields[key] = value
+    return fields, body.strip()
 
-    missing = sorted(_REQUIRED - fields.keys())
-    if missing:
-        raise ValueError(f"{source}: missing fields {missing}")
 
-    _validate_enum(fields, "executor", _VALID_EXECUTORS, source)
-    _validate_enum(fields, "net", _VALID_NETS, source)
-    _validate_enum(fields, "model", _VALID_MODELS, source)
-    _validate_enum(fields, "mode", _VALID_MODES, source)
-    _validate_enum(fields, "detail", _VALID_DETAILS, source)
-    _validate_enum(fields, "validator", _VALID_VALIDATORS, source)
-
-    body = body.strip()
+def parse_orchestra_task(path: str | Path) -> LegacyOrchestraTask:
+    source = Path(path)
+    fields, body = _decode_card(source.read_text(encoding="utf-8"), source)
     if not body:
         raise ValueError(f"{source}: empty body")
-
     try:
-        timeout = int(fields.get("timeout", "3600"))
-    except ValueError:
-        raise ValueError(f"{source}: timeout must be an integer") from None
-    if not _TIMEOUT_MIN <= timeout <= _TIMEOUT_MAX:
-        raise ValueError(
-            f"{source}: timeout must be between {_TIMEOUT_MIN} and {_TIMEOUT_MAX} seconds"
+        header = _LegacyTaskInput.model_validate(
+            fields, context={"slug": source.stem}
         )
-
-    depends_on = _csv(fields.get("depends_on", ""))
-    if source.stem in depends_on:
-        raise ValueError(f"{source}: self dependency")
-    if len(depends_on) != len(set(depends_on)):
-        raise ValueError(f"{source}: duplicate dependency")
-
-    required_outputs = _csv(fields.get("required_outputs", ""))
-    json_outputs = _csv(fields.get("json_outputs", ""))
-    validation_output = fields.get("validation_output") or None
-    validator = fields.get("validator") or None
-
-    _safe_relative(fields["result"], "result", source)
-    for output in required_outputs:
-        _safe_relative(output, "required_outputs", source)
-    for output in json_outputs:
-        _safe_relative(output, "json_outputs", source)
-    if validation_output is not None:
-        _safe_relative(validation_output, "validation_output", source)
-
-    if set(json_outputs) - set(required_outputs):
-        raise ValueError(f"{source}: json_outputs must also be required_outputs")
-    if validation_output is not None and validation_output not in json_outputs:
-        raise ValueError(f"{source}: validation_output must also be a json_output")
-    if validator is not None and not required_outputs:
-        raise ValueError(f"{source}: validator requires required_outputs")
-
+    except ValidationError as exc:
+        raise ValueError(f"{source}: {exc}") from None
     return LegacyOrchestraTask(
         slug=source.stem,
-        executor=fields["executor"],
-        net=fields["net"],
-        result_dir=fields["result"],
-        timeout=timeout,
+        executor=header.executor,
+        net=header.net,
+        result_dir=header.result,
+        timeout=header.timeout,
         body=body,
-        model=fields.get("model"),
-        depends_on=depends_on,
-        mode=fields.get("mode", "execute"),
-        detail=fields.get("detail", "standard"),
-        required_outputs=required_outputs,
-        json_outputs=json_outputs,
-        validation_output=validation_output,
-        validator=validator,
+        model=header.model,
+        depends_on=header.depends_on,
+        mode=header.mode,
+        detail=header.detail,
+        required_outputs=header.required_outputs,
+        json_outputs=header.json_outputs,
+        validation_output=header.validation_output,
+        validator=header.validator,
     )
 
 

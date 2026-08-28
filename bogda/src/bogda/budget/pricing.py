@@ -107,6 +107,8 @@ def period_at(instant: datetime) -> PricePeriod:
 
 
 def _peak_windows(day: date) -> tuple[tuple[datetime, datetime], ...]:
+    if day.weekday() >= 5:
+        return ()
     return (
         (
             datetime.combine(day, time(9), tzinfo=BEIJING_TIMEZONE),

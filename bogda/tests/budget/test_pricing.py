@@ -95,6 +95,20 @@ def test_period_for_window_rejects_non_positive_intervals() -> None:
         period_for_window(start + timedelta(hours=1), start)
 
 
+def test_period_for_window_ignores_saturday_peak_hours() -> None:
+    assert period_for_window(
+        datetime(2026, 8, 29, 9, 0, tzinfo=BEIJING),
+        datetime(2026, 8, 29, 10, 0, tzinfo=BEIJING),
+    ) is PricePeriod.OFF_PEAK
+
+
+def test_period_for_window_ignores_weekend_when_spanning_off_peak_boundaries() -> None:
+    assert period_for_window(
+        datetime(2026, 8, 28, 18, 0, tzinfo=BEIJING),
+        datetime(2026, 8, 31, 9, 0, tzinfo=BEIJING),
+    ) is PricePeriod.OFF_PEAK
+
+
 def test_catalog_contains_versioned_decimal_flash_and_pro_rows() -> None:
     catalog = DEEPSEEK_CN_2026_08_28
     assert catalog.schema_version == 1

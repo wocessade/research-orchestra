@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+import io
 import json
+from urllib.error import HTTPError, URLError
 
 import pytest
 from pydantic import ValidationError
@@ -254,6 +256,81 @@ def test_wrong_currency_and_unavailable_state_fail_closed() -> None:
         ).get_snapshot()
 
 
+@pytest.mark.parametrize(
+    ("source", "exception"),
+    [
+        ("http_401", UsageMonitorAuthenticationError),
+        ("http_403", UsageMonitorAuthenticationError),
+        ("http_429", UsageMonitorSourceUnavailableError),
+        ("http_500", UsageMonitorSourceUnavailableError),
+    ],
+)
+def test_upstream_http_source_statuses_map_to_typed_failures(
+    source: str, exception: type[Exception]
+) -> None:
+    transport = FakeTransport(
+        FakeResponse(body=dashboard(source=source, observed_at=NOW.timestamp()))
+    )
+
+    with pytest.raises(exception):
+        client(transport).get_snapshot()
+
+
+@pytest.mark.parametrize("timeout", [float("nan"), float("inf"), float("-inf")])
+def test_timeout_must_be_finite(timeout: float) -> None:
+    with pytest.raises(ValueError, match="finite"):
+        UsageMonitorClient("http://monitor.example", timeout=timeout)
+
+
+def test_urllib_timeout_reason_preserves_timeout_type_without_leaking_reason() -> None:
+    transport = FakeTransport(error=URLError(TimeoutError(SENTINEL)))
+
+    with pytest.raises(UsageMonitorTimeoutError) as raised:
+        client(transport).get_snapshot()
+
+    assert SENTINEL not in str(raised.value)
+    assert SENTINEL not in repr(raised.value)
+
+
+def test_non_timeout_urllib_error_remains_transport_failure_without_leaking_reason() -> None:
+    transport = FakeTransport(error=URLError(OSError(SENTINEL)))
+
+    with pytest.raises(UsageMonitorTransportError) as raised:
+        client(transport).get_snapshot()
+
+    assert SENTINEL not in str(raised.value)
+    assert SENTINEL not in repr(raised.value)
+
+
+@pytest.mark.parametrize(
+    ("status", "exception"),
+    [
+        (401, UsageMonitorAuthenticationError),
+        (403, UsageMonitorAuthenticationError),
+        (429, UsageMonitorHTTPError),
+        (500, UsageMonitorHTTPError),
+    ],
+)
+def test_custom_http_error_is_mapped_by_status_without_reading_error_body(
+    status: int, exception: type[Exception]
+) -> None:
+    transport = FakeTransport(
+        error=HTTPError(
+            "http://monitor.example/api/dashboard",
+            status,
+            SENTINEL,
+            hdrs=None,
+            fp=io.BytesIO(SENTINEL.encode()),
+        )
+    )
+
+    with pytest.raises(exception) as raised:
+        client(transport).get_snapshot()
+
+    assert SENTINEL not in str(raised.value)
+    assert SENTINEL not in repr(raised.value)
+
+
 def test_base_url_query_and_duplicate_endpoint_are_rejected() -> None:
     transport = FakeTransport()
     with pytest.raises(ValueError, match="query"):
@@ -261,6 +338,14 @@ def test_base_url_query_and_duplicate_endpoint_are_rejected() -> None:
     with pytest.raises(ValueError, match="dashboard"):
         UsageMonitorClient(
             "http://monitor.example/api/dashboard", transport=transport
+        )
+    with pytest.raises(ValueError, match="dashboard"):
+        UsageMonitorClient(
+            "http://monitor.example/base/api/dashboard", transport=transport
+        )
+    with pytest.raises(ValueError, match="dashboard"):
+        UsageMonitorClient(
+            "http://monitor.example/base/api/dashboard/", transport=transport
         )
 
 

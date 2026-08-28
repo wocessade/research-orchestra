@@ -7,7 +7,7 @@ from enum import StrEnum
 import json
 from math import isfinite
 import socket
-from typing import Callable, Literal, Mapping, Protocol, runtime_checkable
+from typing import Callable, Literal, Mapping, NoReturn, Protocol, runtime_checkable
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
@@ -194,7 +194,7 @@ def _dashboard_url(base_url: str) -> str:
     if parsed.fragment or "#" in base_url:
         raise ValueError("base_url must not contain a fragment")
     base_path = parsed.path.rstrip("/")
-    if base_path == "/api/dashboard":
+    if base_path.endswith("/api/dashboard"):
         raise ValueError("base_url must be the monitor base, not the dashboard endpoint")
     return f"{base_url.rstrip('/')}/api/dashboard"
 
@@ -243,6 +243,15 @@ def _normalize_dashboard(payload: object) -> UsageSnapshotV1:
     if source == "unauthorized" or source == "no_key":
         raise UsageMonitorAuthenticationError()
     if source != "up":
+        if source.startswith("http_"):
+            status_text = source.removeprefix("http_")
+            if len(status_text) == 3 and status_text.isdigit():
+                status_code = int(status_text)
+                if 100 <= status_code <= 599:
+                    if status_code in {401, 403}:
+                        raise UsageMonitorAuthenticationError()
+                    raise UsageMonitorSourceUnavailableError()
+            raise UsageMonitorPayloadError()
         if source in {"unknown", "unavailable", "timeout", "error", "down"} or source.startswith("error_"):
             raise UsageMonitorSourceUnavailableError()
         raise UsageMonitorPayloadError()
@@ -272,6 +281,18 @@ def _response_parts(response: object) -> tuple[int, bytes | str]:
     if type(status) is not int or not isinstance(body, (bytes, str)):
         raise UsageMonitorTransportError()
     return status, body
+
+
+def _raise_http_status(status_code: object) -> NoReturn:
+    if type(status_code) is not int:
+        raise UsageMonitorTransportError()
+    if status_code in {401, 403}:
+        raise UsageMonitorAuthenticationError(status_code)
+    raise UsageMonitorHTTPError(status_code)
+
+
+def _is_timeout_reason(reason: object) -> bool:
+    return isinstance(reason, (TimeoutError, socket.timeout))
 
 
 def _decode_payload(body: bytes | str) -> object:
@@ -332,8 +353,13 @@ class UsageMonitorClient:
     ) -> None:
         if monitor_token is not None and not isinstance(monitor_token, str):
             raise ValueError("monitor_token must be a string or None")
-        if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout <= 0:
-            raise ValueError("timeout must be positive")
+        if (
+            isinstance(timeout, bool)
+            or not isinstance(timeout, (int, float))
+            or not isfinite(float(timeout))
+            or timeout <= 0
+        ):
+            raise ValueError("timeout must be a finite positive number")
         self._url = _dashboard_url(base_url)
         self._monitor_token = monitor_token
         self._timeout = float(timeout)
@@ -355,7 +381,11 @@ class UsageMonitorClient:
                 )
         except (TimeoutError, socket.timeout):
             raise UsageMonitorTimeoutError() from None
-        except (HTTPError, URLError):
+        except HTTPError as exc:
+            _raise_http_status(exc.code)
+        except URLError as exc:
+            if _is_timeout_reason(exc.reason):
+                raise UsageMonitorTimeoutError() from None
             raise UsageMonitorTransportError() from None
         except OSError:
             raise UsageMonitorTransportError() from None

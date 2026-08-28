@@ -20,7 +20,7 @@
 | NOW-01 | Phase C Task 5–6：Prefect 挂起边界、fake 集成验收与维护者交接 | 已完成本地交接；真实部署/生产验证仍见 DEF-02/03/12 | [Phase C acceptance 报告](2026-08-29-bogda-paid-model-runtime-acceptance.md)、一次最终 Bogda full suite、Orchestra 兼容测试 |
 | NOW-02 | Stage D：owner 可操作的前端裁决面与状态可视化 | Phase C 本地合并后继续，SOL 自主裁定并本地 auto-merge | 前端测试、窗口/开关矩阵、决策中心单一事实源验收 |
 | NOW-03 | Stage E：运行接线与迁移前验收 | Stage D 后继续；仍不默认授权 live spend/production mutation | 影子/强制门禁证据、回滚与运维说明 |
-| NOW-04 | Gate 6 收尾 | 只读证据可与 Stage D/E 并行推进；状态变更/正式切换等待 owner-approved prerequisites，当日目标 | Gate 6 工作台、验收清单和剩余 blocker 归零或显式登记 |
+| NOW-04 | Gate 6 收尾 | `20260828T064220Z` 因 USB SSD 断连和 120 次 API 失败已收口为失败；新 trial 等待 DEF-15 的 owner-approved 维护 | [Gate 6 失败报告](2026-08-29-bogda-rk3528-gate6-failure.md)、新 trial 与剩余 blocker 清单 |
 
 ## 必要延期项
 
@@ -40,6 +40,7 @@
 | DEF-12 | 生产运维接线：密钥注入、systemd/worker、日志保留、备份/恢复、告警和回滚 | 当前明确禁止改生产、密钥、systemd、Prefect DB | Gate 6 变更窗和备份确认 | 运维窗口显示目标主机/服务/版本/回滚；敏感值永不回显 | Gate 6；runbook 演练、健康检查、回滚验证、秘密扫描通过 |
 | DEF-13 | 运行产物生命周期：prompt/stdout/stderr/receipt 的权限、保留期、清理与科研可复现引用 | Phase C 只定义落盘与脱敏，没有生产保留策略 | 正式产生真实科研产物前 | 运行详情提供可点击引用和权限状态；清理必须是显式受控动作 | Stage E；保留/清理不破坏事件引用，秘密扫描与恢复抽查通过 |
 | DEF-14 | 高风险科学/外部动作统一审批：结果 accepted/rejected/inconclusive、发布、采购、新增支出 | 不属于模型调用内核，autonomous 也不能跳过 | Stage D 决策中心接线 | 每个窗口显示证据、费用/质量影响、不可逆后果和日志摘要 | Stage D/E；审批事件、冲突修订和拒绝路径端到端通过 |
+| DEF-15 | RK3528 USB/SSD 稳定性整改并重跑 Gate 6 | 失败轮发生 USB SSD 断连、ext4 journal abort、Prefect server/worker 停止；只读证据不能修复物理/运行状态 | owner 批准维护窗、设备检查、离线文件系统/SSD 健康检查和服务恢复 | 运维窗口显示目标设备、检查步骤、备份、回滚与新 trial 编号；不能把重挂载当成通过 | Gate 6；根因证据、服务恢复、全新 24h trial、每日快照、受控 reboot、独立 restore 全部通过 |
 
 ## 明确不登记为必要目标
 

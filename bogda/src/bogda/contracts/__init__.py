@@ -8,6 +8,13 @@ from bogda.contracts.models import (
     RunResult,
     ScientificStatus,
 )
+from bogda.contracts.tasks import (
+    ExecutorKind,
+    ModelTier,
+    PricePreference,
+    SchedulePolicy,
+    TaskIntent,
+)
 
 __all__ = [
     "ArtifactRecord",
@@ -18,4 +25,9 @@ __all__ = [
     "ResourceClass",
     "RunResult",
     "ScientificStatus",
+    "ExecutorKind",
+    "ModelTier",
+    "PricePreference",
+    "SchedulePolicy",
+    "TaskIntent",
 ]

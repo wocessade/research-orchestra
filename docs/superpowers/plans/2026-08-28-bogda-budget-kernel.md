@@ -282,6 +282,17 @@ SOL performs a whole-branch review from the Phase B fork point, verifies no `orc
 
 Commit: `docs(bogda): accept budget kernel phase`
 
+## Phase B completion checklist (Task 6)
+
+The following checklist records the accepted feature and hardening SHAs without replacing the detailed task specifications above. The acceptance baseline/current HEAD before Task 6 was `0caa27d1642009645d361613b4256eb480d4c838`, forked from `08e6d35fdfc8daf1a0fcb02367779d8c8a102d99`.
+
+- [x] Task 1 — pricing catalog: `003ed35ec5a51ceedb9cc8b601ade4f36c5d71d2`, `59b6b9298b4f8c5aae1c748d477980c1b38d31f6`, `ab44295b022ebcae6d9d77607eeaeb0e7859dd3c`
+- [x] Task 2 — UsagePort/read-only adapter: `a49a72d0cf5f697a691c7b5a95825952eef62f43`, `f67cdf12d912855d70eca640271a770f59f4c6bd`, `9a321f1098de4209de8371f6de1f96db28edea5b`
+- [x] Task 3 — workload estimation: `2953246ad955ca70396930c763d583558e4d7c5e`, `0b655e8dbdaf104d82a46a4341855158489ec2a9`, `3f96d39b7da12f7420d909a3570167a41069f0dd`
+- [x] Task 4 — guard and single-flight ledger: `206fbb707f51f65ce7a4cd46cf5e032ed982d441`, `a30d9c6108e9f6dad864d2879f3f2190aa428a54`, `9dfd19bb5f3cdc28e60bf576a1209e4f9f0244df`
+- [x] Task 5 — JSONL events and admission service: `73fefc0740d3619451cd0ac5676bf6c08befb62`, `e622cc85aaf68188fba0d4b0555f36e70f80e48c`, `5a4261e62c0c3f10e913bce048fe3c1f471c11a8`, `03c6c70c65665832310aa91af1be06ee20acf7c7`, `0caa27d1642009645d361613b4256eb480d4c838`
+- [x] Task 6 — integration acceptance and maintainer docs: five acceptance scenarios passed; acceptance commit SHA is recorded by the final handoff; verification baseline/current HEAD before that commit is `0caa27d1642009645d361613b4256eb480d4c838`
+
 ## Review and stop gate
 
 Each task requires focused red/green evidence, relevant regression tests, `git diff --check`, an isolated commit, and SOL review before the next task. Luna's report is implementation input, not acceptance evidence.

@@ -9,6 +9,13 @@ from bogda.model_runtime.contracts import (
     PromptArtifactV1,
     UsageReceiptPort,
 )
+from bogda.model_runtime.dsh import (
+    DshCliAdapter,
+    DshCommandRunner,
+    JsonUsageReceiptReader,
+    MAX_STDERR_BYTES,
+    SubprocessCommandRunner,
+)
 from bogda.model_runtime.routing import (
     LOW_RISK_FALLBACK_INTENTS,
     ModelRouter,
@@ -18,6 +25,8 @@ from bogda.model_runtime.routing import (
 
 __all__ = [
     "DshTokenUsageV1",
+    "DshCliAdapter",
+    "DshCommandRunner",
     "FilePromptArchive",
     "LOW_RISK_FALLBACK_INTENTS",
     "ModelCallOutcome",
@@ -31,4 +40,7 @@ __all__ = [
     "RouteDecision",
     "RouteDecisionKind",
     "UsageReceiptPort",
+    "JsonUsageReceiptReader",
+    "MAX_STDERR_BYTES",
+    "SubprocessCommandRunner",
 ]

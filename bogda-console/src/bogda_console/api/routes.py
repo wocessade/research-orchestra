@@ -49,12 +49,12 @@ class DecisionRequest(WireModel):
 
 class GlobalModelPolicyRequest(WireModel):
     patch: ModelPolicyPatch
-    expected_revision: int
+    expected_revision: int = Field(ge=0)
 
 
 class ProjectModelPolicyRequest(WireModel):
     patch: ModelPolicyPatch | None
-    expected_revision: int
+    expected_revision: int = Field(ge=0)
 
 
 class RunPreparationPreviewRequest(WireModel):

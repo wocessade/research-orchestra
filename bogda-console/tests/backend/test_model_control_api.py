@@ -151,11 +151,22 @@ async def test_policy_request_shapes_split_global_and_project_restore(client) ->
     )
     assert global_missing_patch.status_code == 422
 
+    global_negative_revision = await client.post(
+        "/api/v1/model-policy/global",
+        json={"patch": {"defaultModelTier": "pro"}, "expectedRevision": -1},
+    )
+    assert global_negative_revision.status_code == 422
+
     project_restore = await client.post(
         "/api/v1/model-policy/projects/project-1",
         json={"patch": None, "expectedRevision": 0},
     )
     assert project_restore.status_code == 200
+    project_negative_revision = await client.post(
+        "/api/v1/model-policy/projects/project-1",
+        json={"patch": None, "expectedRevision": -1},
+    )
+    assert project_negative_revision.status_code == 422
 
 
 @pytest.mark.asyncio

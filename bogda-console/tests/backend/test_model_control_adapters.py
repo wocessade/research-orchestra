@@ -27,6 +27,7 @@ from bogda_console.contracts.models import (
 )
 from bogda_console.contracts.ports import (
     ModelControlConflict,
+    ModelControlNotFound,
     ModelControlUnavailable,
 )
 
@@ -203,7 +204,7 @@ def test_decision_kinds_actions_and_budget_operational_fields_are_typed() -> Non
 @pytest.mark.asyncio
 async def test_unknown_run_is_not_fabricated_and_usage_unknown_has_canonical_decision() -> None:
     adapter = MockModelControlAdapter()
-    with pytest.raises(KeyError):
+    with pytest.raises(ModelControlNotFound):
         await adapter.run_budget("missing")
     budget = await adapter.run_budget("run-unknown-usage")
     center = await adapter.decision_center()

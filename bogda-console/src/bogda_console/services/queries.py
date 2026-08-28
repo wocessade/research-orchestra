@@ -117,8 +117,6 @@ class QueryService:
             data = await self._require_model_control().decision_center()
         except ModelControlUnavailable as error:
             raise ServiceError(ApiErrorCode.MODEL_CONTROL_UNAVAILABLE, str(error), source="modelControl", retryable=False, status_code=503)
-        except ModelControlNotFound as error:
-            raise ServiceError(ApiErrorCode.NOT_FOUND, str(error), source="modelControl", retryable=False, status_code=404)
         return ApiEnvelope(data=data, sources={"modelControl": self._model_source()}, errors=[])
 
     async def run_budget(self, run_id: str) -> ApiEnvelope[ModelBudgetSnapshot]:

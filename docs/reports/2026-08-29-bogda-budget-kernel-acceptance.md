@@ -8,9 +8,9 @@ Acceptance baseline/current HEAD before Task 6: `0caa27d1642009645d361613b4256eb
 
 ## Scope and result
 
-Task 6 only was executed. The authorized integration test contains five scenarios and all five passed: fresh Flash admission and JSONL round-trip; raised stale versus generic unavailable; Pro peak pricing with dynamic p90/retry/contingency ceiling; balance recovery against the same envelope; and deterministic barrier-controlled competing admissions with one winner. No implementation code was modified.
+Task 6 was executed, followed by the narrowly scoped JSONL audit fix described below. The authorized integration test contains five scenarios and all five passed: fresh Flash admission and JSONL round-trip; raised stale versus generic unavailable; Pro peak pricing with dynamic p90/retry/contingency ceiling; balance recovery against the same envelope; and deterministic barrier-controlled competing admissions with one winner. The follow-up changes are limited to the JSONL sink, its regression tests, and the maintainer documentation.
 
-The Task 6 acceptance commit is the commit carrying this report, test, README, and plan checklist; its exact SHA is supplied by the final `git rev-parse HEAD` handoff because a commit cannot contain its own hash. The exact Phase B history through the acceptance baseline is:
+The original Task 6 acceptance commit carried this report, test, README, and plan checklist. The narrowly scoped JSONL fix is included in the current `fix(bogda): fingerprint JSONL audit history` commit; its exact SHA is supplied by the final `git rev-parse HEAD` handoff because a commit cannot contain its own hash. The exact Phase B history through the acceptance baseline is:
 
 ```text
 003ed35ec5a51ceedb9cc8b601ade4f36c5d71d2 docs(bogda): fix Phase B test setup
@@ -37,14 +37,20 @@ e622cc85aaf68188fba0d4b0555f36e70f80e48c fix(bogda): make budget event delivery 
 All commands were run from `D:\pythonProject\.worktrees\bogda-budget-kernel\bogda` unless noted:
 
 ```text
+uv run --extra dev --python 3.11 pytest tests/events/test_jsonl.py -q
+14 passed, 1 skipped in 0.31s
+
+20 consecutive runs of the same-size mutation regression
+modify_regression_runs=20 failures=0
+
 uv run --extra dev --python 3.11 pytest tests/integration/test_budget_kernel.py -q
 5 passed in 0.26s
 
 uv run --extra dev --python 3.11 pytest tests/contracts tests/budget tests/events tests/integration/test_budget_kernel.py -q
-260 passed, 1 skipped in 0.65s
+262 passed, 1 skipped in 0.72s
 
 uv run --extra dev --python 3.11 pytest -q
-453 passed, 11 skipped in 30.50s
+455 passed, 11 skipped in 33.39s
 
 D:\pythonProject\.worktrees\bogda-budget-kernel\bogda\.venv\Scripts\python.exe -m unittest tests.test_taskfile -q
 Ran 25 tests in 0.064s — OK
@@ -53,7 +59,7 @@ git diff --check
 exit 0
 ```
 
-Final status before the Task 6 commit was clean apart from the four authorized files. The final handoff must re-run `git status --short --branch` and record the resulting clean branch state and exact current HEAD.
+The follow-up fix worktree was clean apart from the three authorized files before commit. The final handoff must re-run `git status --short --branch` and record the resulting clean branch state and exact current HEAD.
 
 ## Integration evidence
 
@@ -64,7 +70,7 @@ Final status before the Task 6 commit was clean apart from the four authorized f
 - Recovery first denies at insufficient balance, then admits after a fresh sufficient fake snapshot while the exact same envelope remains unchanged.
 - A `threading.Barrier(2)` synchronizes competing admissions. Exactly one reservation wins, `active_total` equals that reservation, and all four event lines parse as `RunEventV1`.
 
-## Defect found and not changed
+## JSONL defect and resolution
 
 The first fresh run of the requested relevant regression command reported one failure:
 
@@ -73,7 +79,9 @@ tests/events/test_jsonl.py::test_jsonl_rejects_external_file_changes_between_app
 Failed: DID NOT RAISE ValueError("changed")
 ```
 
-The isolated four-case event test then passed, the complete events module passed `12 passed, 1 skipped`, the relevant suite passed `260 passed, 1 skipped`, and the full suite passed `453 passed, 11 skipped`. The behavior is therefore timing-sensitive rather than resolved by Task 6. Root-cause evidence is in the existing implementation: `_file_state()` compares device/inode, size, and `st_mtime_ns`; an in-place same-size mutation can evade that state comparison when the filesystem timestamp does not advance with sufficient resolution. The test remains strict and the implementation was not weakened or modified. This is an unresolved MEDIUM maintainability/integrity defect for the next SOL-directed fix.
+The isolated four-case event test then passed, the complete events module passed `12 passed, 1 skipped`, the relevant suite passed `260 passed, 1 skipped`, and the full suite passed `453 passed, 11 skipped`. The behavior was timing-sensitive rather than resolved by Task 6. Root-cause evidence was in the existing implementation: `_file_state()` compared device/inode, size, and `st_mtime_ns`; an in-place same-size mutation could evade that state comparison when the filesystem timestamp did not advance with sufficient resolution.
+
+The follow-up fix extends the expected file state with a streaming SHA-256 digest. Each append compares metadata and recalculates the digest before opening the append handle; the expected state is replaced only after the existing flush+fsync succeeds and the resulting file state is checked. The deterministic regression restores the original mtime after same-size mutations and passes in 20 consecutive iterations. The fixed chunk size is 64 KiB, so the tradeoff is O(n) streaming hashing before every append; this is intentionally local and maintainable, not a general tamper-evident log. The MEDIUM defect is resolved by the follow-up commit `fix(bogda): fingerprint JSONL audit history`; its exact SHA is recorded by the final `git rev-parse HEAD` handoff.
 
 ## Maintainer contract and limitations
 
@@ -87,7 +95,7 @@ Known limitations are explicit:
 - Phase B does not run dsh, route Flash/Pro, archive prompts, reconcile dsh usage, wire Prefect pause/resume, add frontend windows or switches, deploy, mutate systemd/Prefect/device state, or alter production data.
 - Price catalog expiry requires a new reviewed version; runtime is priced conservatively by possible peak overlap, not billed as wall-clock time.
 - The same-envelope recovery behavior never expands a ceiling automatically. Unknown usage after a future model call still requires reconciliation before retry.
-- The external same-size file-mutation detection defect above remains open.
+- JSONL append admission performs an O(n) 64 KiB-chunk SHA-256 pass over the current file. The process-local lock does not coordinate external processes; an external mutation racing after the pre-append fingerprint and before/while the append may evade the check if it preserves identity and size, so this sink is not a cross-process security boundary. A durable high-throughput/cross-process sink remains Phase C/E work.
 
 Phase C must consume `JobRequest`'s `intent`, `model_tier`, `budget`, `schedule_policy`, and `executor`, and use the existing boundaries:
 

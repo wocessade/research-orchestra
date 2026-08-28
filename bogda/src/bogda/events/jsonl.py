@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 from pathlib import Path
 import stat
@@ -11,6 +12,9 @@ from typing import Protocol, runtime_checkable
 from pydantic import ValidationError
 
 from bogda.contracts import RunEventV1
+
+
+_HASH_CHUNK_SIZE = 64 * 1024
 
 
 @runtime_checkable
@@ -67,17 +71,33 @@ def _validate_existing_lines(path: Path) -> None:
         raise ValueError("existing event log is invalid") from None
 
 
-def _file_state(path: Path) -> tuple[tuple[int, int] | None, int, int | None]:
+def _file_digest(path: Path) -> str:
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as handle:
+            while chunk := handle.read(_HASH_CHUNK_SIZE):
+                digest.update(chunk)
+    except OSError:
+        raise ValueError("event log could not be inspected safely") from None
+    except Exception:
+        raise ValueError("event log could not be inspected safely") from None
+    return digest.hexdigest()
+
+
+def _file_state(
+    path: Path,
+) -> tuple[tuple[int, int] | None, int, int | None, str | None]:
     try:
         file_stat = path.stat()
     except FileNotFoundError:
-        return None, 0, None
+        return None, 0, None, None
     except OSError:
         raise ValueError("event log could not be inspected safely") from None
     return (
         (file_stat.st_dev, file_stat.st_ino),
         file_stat.st_size,
         file_stat.st_mtime_ns,
+        _file_digest(path),
     )
 
 

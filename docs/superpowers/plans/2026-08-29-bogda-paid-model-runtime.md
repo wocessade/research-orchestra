@@ -35,7 +35,7 @@
 - Create: `bogda/tests/model_runtime/test_archive.py`
 
 **Interfaces:**
-- Consumes: `ModelTier`, timezone-aware timestamps, caller-selected archive root.
+- Consumes: `ModelTier` and caller-selected archive root; audited time remains `RunEventV1.occurred_at`.
 - Produces: `PromptArtifactV1`, `DshTokenUsageV1`, `ModelCallOutcome`, `ModelCallRequest`, `ModelCallResult`, `ModelExecutionPort`, `UsageReceiptPort`, `PromptArchivePort`, and `FilePromptArchive.archive(run_id, call_id, prompt)`.
 
 - [ ] **Step 1: Write failing contract and archive tests**

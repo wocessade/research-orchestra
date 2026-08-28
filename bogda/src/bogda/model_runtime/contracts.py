@@ -2,10 +2,18 @@ from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
 from enum import StrEnum
+from math import isfinite
 from pathlib import Path
-from typing import Protocol, runtime_checkable
+from typing import Protocol, Self, runtime_checkable
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 
 from bogda.contracts import ModelTier
 
@@ -59,16 +67,46 @@ class ModelCallRequest(BaseModel):
 
     run_id: str = Field(min_length=1)
     call_id: str = Field(min_length=1)
-    model_tier: ModelTier
+    effective_tier: ModelTier
+    attempt_dir: Path
+    timeout_seconds: float = Field(gt=0)
     prompt: str = Field(min_length=1, repr=False)
+
+    @field_validator("effective_tier")
+    @classmethod
+    def require_concrete_tier(cls, value: ModelTier) -> ModelTier:
+        if value is ModelTier.AUTO:
+            raise ValueError("effective_tier must be concrete")
+        return value
+
+    @field_validator("timeout_seconds", mode="before")
+    @classmethod
+    def require_finite_positive_timeout(cls, value: object) -> object:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError("timeout_seconds must be a finite positive number")
+        if not isfinite(float(value)) or value <= 0:
+            raise ValueError("timeout_seconds must be a finite positive number")
+        return value
 
 
 class ModelCallResult(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     outcome: ModelCallOutcome
-    output: str | None = None
+    output: str | None = Field(default=None, repr=False)
     usage: DshTokenUsageV1 | None = None
+
+    @model_validator(mode="after")
+    def validate_outcome_state(self) -> Self:
+        if self.outcome is ModelCallOutcome.FINISHED:
+            if self.output is None or self.usage is None:
+                raise ValueError("finished results require output and usage")
+        elif self.outcome is ModelCallOutcome.NOT_STARTED:
+            if self.output is not None or self.usage is not None:
+                raise ValueError("not_started results cannot contain output or usage")
+        elif self.usage is not None:
+            raise ValueError("usage_unknown results cannot contain usage")
+        return self
 
 
 @runtime_checkable

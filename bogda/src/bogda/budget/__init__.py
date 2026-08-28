@@ -54,6 +54,14 @@ from bogda.budget.ledger import (
     SingleFlightBudgetLedger,
     UnknownReservationError,
 )
+from bogda.budget.service import (
+    BudgetAdmissionError,
+    BudgetAdmissionResult,
+    BudgetAdmissionService,
+    BudgetEventCompensationError,
+    BudgetEventWriteError,
+    BudgetServiceError,
+)
 
 __all__ = [
     "DEEPSEEK_CN_2026_08_28",
@@ -102,4 +110,10 @@ __all__ = [
     "ReservationState",
     "SingleFlightBudgetLedger",
     "UnknownReservationError",
+    "BudgetAdmissionError",
+    "BudgetAdmissionResult",
+    "BudgetAdmissionService",
+    "BudgetEventCompensationError",
+    "BudgetEventWriteError",
+    "BudgetServiceError",
 ]

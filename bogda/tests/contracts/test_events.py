@@ -158,3 +158,60 @@ def test_event_rejects_secret_bearing_fields(secret_field: str) -> None:
 )
 def test_ordinary_budget_lifecycle_events_are_constructible(event_name: str) -> None:
     assert event(event=event_name).event is RunEventType(event_name)
+
+
+def test_budget_reserved_requires_positive_reservation_facts() -> None:
+    with pytest.raises(ValidationError):
+        event(event="budget_reserved", reserved_cny="0", reservation_id="r-1")
+    with pytest.raises(ValidationError):
+        event(event="budget_reserved", reserved_cny="1")
+
+
+def test_budget_released_requires_coherent_release_facts() -> None:
+    with pytest.raises(ValidationError):
+        event(event="budget_released", reservation_id="r-1", reserved_cny="2")
+    with pytest.raises(ValidationError):
+        event(
+            event="budget_released",
+            reservation_id="r-1",
+            reserved_cny="2",
+            released_cny="1",
+        )
+
+    released = event(
+        event="budget_released",
+        reservation_id="r-1",
+        reserved_cny="2",
+        released_cny="2",
+    )
+    assert released.released_cny == Decimal("2")
+
+
+def test_budget_released_reconciliation_facts_are_coherent() -> None:
+    reconciled = event(
+        event="budget_released",
+        reservation_id="r-1",
+        reserved_cny="2",
+        actual_cost_cny="1.25",
+        released_cny="0.75",
+        overspend_cny="0",
+    )
+    assert reconciled.actual_cost_cny == Decimal("1.25")
+
+
+def test_budget_events_with_decision_codes_require_accounting_facts() -> None:
+    with pytest.raises(ValidationError):
+        event(event="budget_reserved", budget_decision="allow")
+    with pytest.raises(ValidationError):
+        event(event="budget_released", budget_decision="allow")
+
+
+def test_explainable_budget_snapshot_requires_reason_when_decided() -> None:
+    with pytest.raises(ValidationError, match="reason"):
+        event(event="budget_snapshot", budget_decision="allow")
+
+
+@pytest.mark.parametrize("field", ["actual_cost_cny", "released_cny", "overspend_cny"])
+def test_additive_accounting_fields_reject_floats(field: str) -> None:
+    with pytest.raises(ValidationError, match="money values must not be floats"):
+        event(**{field: 1.25})

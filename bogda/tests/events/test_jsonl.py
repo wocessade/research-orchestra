@@ -24,7 +24,8 @@ def make_event(run_id: str = "run-1", **updates: object) -> RunEventV1:
         "budget_decision": "allow",
         "pricing_version": "deepseek-cn-2026-08-28",
         "balance_cny": "10",
-        "reserved_cny": "0",
+        "active_reservations_cny": "0",
+        "requested_reservation_cny": "1",
         "minimum_remaining_cny": "1",
         "snapshot_age_seconds": 30,
     }

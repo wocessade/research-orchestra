@@ -281,6 +281,30 @@ class BudgetGuard:
                 pricing_version=pricing_version if isinstance(pricing_version, str) else None,
             )
 
+        # The authorized ceiling is a frozen structural constraint.  Decide
+        # it before consulting snapshot availability or freshness so monitor
+        # outages cannot mask an over-ceiling request.
+        ceiling_balance = (
+            snapshot.total_balance if isinstance(snapshot, UsageSnapshotV1) else None
+        )
+        if requested > ceiling:
+            available = (
+                ceiling_balance - active - minimum
+                if ceiling_balance is not None
+                else None
+            )
+            return self._decision(
+                kind=BudgetDecisionKind.BUDGET_CEILING_EXCEEDED,
+                reason="reservation_exceeds_authorized_ceiling",
+                revision=revision,
+                active=active,
+                balance=ceiling_balance,
+                minimum=minimum,
+                available=available,
+                requested=requested,
+                pricing_version=pricing_version,
+            )
+
         balance: Decimal | None = None
         age: int | None = None
         if snapshot is None:

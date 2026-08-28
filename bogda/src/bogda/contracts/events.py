@@ -136,6 +136,30 @@ class RunEventV1(BaseModel):
             } and (self.reason is None or not self.reason.strip()):
                 raise ValueError("decided budget events require reason")
 
+        if self.event in {
+            RunEventType.BUDGET_SNAPSHOT,
+            RunEventType.BUDGET_PAUSED,
+        }:
+            budget_facts_supplied = any(
+                value is not None
+                for value in (
+                    self.budget_decision,
+                    self.reservation_id,
+                    self.reserved_cny,
+                    self.active_reservations_cny,
+                    self.requested_reservation_cny,
+                    self.actual_cost_cny,
+                    self.released_cny,
+                    self.overspend_cny,
+                )
+            )
+            if budget_facts_supplied and (
+                self.reservation_id is not None or self.reserved_cny is not None
+            ):
+                raise ValueError(
+                    "snapshot and pause events must not contain actual reservation facts"
+                )
+
         # Empty lifecycle events remain source-compatible with Phase A. Once a
         # caller supplies accounting facts, the v1 facts are strict and
         # self-consistent; the budget service always supplies the full set.
@@ -156,6 +180,8 @@ class RunEventV1(BaseModel):
                 self.actual_cost_cny,
                 self.released_cny,
                 self.overspend_cny,
+                self.active_reservations_cny,
+                self.requested_reservation_cny,
             )
         )
         if self.event is RunEventType.BUDGET_RESERVED and accounting_supplied:

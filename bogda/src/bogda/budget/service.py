@@ -138,6 +138,9 @@ class BudgetAdmissionService:
         self._terminal_contexts: dict[
             tuple[object, ...], tuple[TaskIntent, ModelTier, str]
         ] = {}
+        self._admission_contexts: dict[
+            str, tuple[TaskIntent, ModelTier, str]
+        ] = {}
 
     def _now(self) -> datetime:
         try:
@@ -422,6 +425,11 @@ class BudgetAdmissionService:
             except Exception:
                 raise BudgetEventCompensationError("reservation compensation failed") from None
             raise
+        self._admission_contexts[reservation.id] = (
+            intent,
+            envelope.requested_tier,
+            envelope.pricing_version,
+        )
         return BudgetAdmissionResult(decision=decision, reservation=reservation)
 
     def release(
@@ -437,6 +445,12 @@ class BudgetAdmissionService:
         pricing_version = _pricing_version(pricing_version)
         with self._terminal_lock:
             before = self._ledger.lookup(reservation_id)
+            self._validate_admission_context(
+                before.id,
+                intent=intent,
+                requested_tier=requested_tier,
+                pricing_version=pricing_version,
+            )
             if before.state is ReservationState.RECONCILED:
                 raise BudgetAdmissionError("reconciled reservation cannot be released")
             if before.state is ReservationState.RELEASED:
@@ -477,6 +491,12 @@ class BudgetAdmissionService:
         pricing_version = _pricing_version(pricing_version)
         with self._terminal_lock:
             before = self._ledger.lookup(reservation_id)
+            self._validate_admission_context(
+                before.id,
+                intent=intent,
+                requested_tier=requested_tier,
+                pricing_version=pricing_version,
+            )
             if before.state is ReservationState.RELEASED:
                 raise BudgetAdmissionError("released reservation cannot be reconciled")
             if before.state is ReservationState.RECONCILED:
@@ -516,6 +536,12 @@ class BudgetAdmissionService:
         pricing_version: str,
         operation: str,
     ) -> None:
+        self._validate_admission_context(
+            reservation.id,
+            intent=intent,
+            requested_tier=requested_tier,
+            pricing_version=pricing_version,
+        )
         key = self._terminal_key(operation, reservation)
         delivered = self._delivered_terminal_events.get(key)
         context = self._terminal_contexts.get(key)
@@ -540,6 +566,22 @@ class BudgetAdmissionService:
         )
         self._append(event)
         self._delivered_terminal_events[key] = event
+
+    def _validate_admission_context(
+        self,
+        reservation_id: str,
+        *,
+        intent: TaskIntent,
+        requested_tier: ModelTier,
+        pricing_version: str,
+    ) -> None:
+        expected = self._admission_contexts.get(reservation_id)
+        if expected is not None and expected != (
+            intent,
+            requested_tier,
+            pricing_version,
+        ):
+            raise BudgetAdmissionError("terminal event context conflicts")
 
 
 __all__ = [

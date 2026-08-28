@@ -323,6 +323,22 @@ def test_raised_stale_monitor_does_not_override_invalid_pricing() -> None:
     ]
 
 
+def test_raised_stale_monitor_does_not_mask_over_ceiling() -> None:
+    sink = MemorySink()
+    service, ledger = make_service(FakeUsage(UsageSnapshotStaleError()), sink)
+
+    result = service.admit(
+        "run-1", "explore", envelope(ceiling="1"), reservation_cny=Decimal("2")
+    )
+
+    assert result.decision.kind.value == "budget_ceiling_exceeded"
+    assert [event.budget_decision for event in sink.events] == [
+        "budget_ceiling_exceeded",
+        "budget_ceiling_exceeded",
+    ]
+    assert ledger.active_total == Decimal("0")
+
+
 def test_snapshot_and_pause_do_not_overload_reserved_amount() -> None:
     sink = MemorySink()
     service, ledger = make_service(FakeUsage(snapshot()), sink)
@@ -365,6 +381,65 @@ def test_release_and_reconcile_require_truthful_context() -> None:
             requested_tier="flash",
             pricing_version="",
         )
+
+
+@pytest.mark.parametrize(
+    ("intent", "requested_tier", "pricing_version"),
+    [
+        ("audit", "flash", PRICING),
+        ("explore", "pro", PRICING),
+        ("explore", "flash", "other-pricing"),
+    ],
+)
+def test_first_terminal_call_must_match_successful_admission_context(
+    intent: str, requested_tier: str, pricing_version: str
+) -> None:
+    sink = MemorySink()
+    service, ledger = make_service(FakeUsage(snapshot()), sink)
+    admitted = service.admit("run-1", "explore", envelope())
+    assert admitted.reservation is not None
+
+    with pytest.raises(BudgetAdmissionError, match="context"):
+        service.release(
+            admitted.reservation.id,
+            intent=intent,
+            requested_tier=requested_tier,
+            pricing_version=pricing_version,
+        )
+
+    assert ledger.lookup(admitted.reservation.id).state.value == "active"
+    assert not [event for event in sink.events if event.event is RunEventType.BUDGET_RELEASED]
+
+
+def test_failed_terminal_delivery_retains_admission_context_for_retry() -> None:
+    sink = FailingSink(fail_on=3)
+    service, ledger = make_service(FakeUsage(snapshot()), sink)
+    admitted = service.admit("run-1", "explore", envelope())
+    assert admitted.reservation is not None
+
+    with pytest.raises(BudgetEventWriteError):
+        service.release(
+            admitted.reservation.id,
+            intent="explore",
+            requested_tier="flash",
+            pricing_version=PRICING,
+        )
+
+    with pytest.raises(BudgetAdmissionError, match="context"):
+        service.release(
+            admitted.reservation.id,
+            intent="audit",
+            requested_tier="flash",
+            pricing_version=PRICING,
+        )
+    assert ledger.lookup(admitted.reservation.id).state.value == "released"
+
+    service.release(
+        admitted.reservation.id,
+        intent="explore",
+        requested_tier="flash",
+        pricing_version=PRICING,
+    )
 
 
 def test_terminal_event_failure_is_retried_once_on_replay() -> None:

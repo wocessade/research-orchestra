@@ -165,6 +165,8 @@ def test_budget_reserved_requires_positive_reservation_facts() -> None:
         event(event="budget_reserved", reserved_cny="0", reservation_id="r-1")
     with pytest.raises(ValidationError):
         event(event="budget_reserved", reserved_cny="1")
+    with pytest.raises(ValidationError):
+        event(event="budget_reserved", active_reservations_cny="1")
 
 
 def test_budget_released_requires_coherent_release_facts() -> None:
@@ -209,6 +211,22 @@ def test_budget_events_with_decision_codes_require_accounting_facts() -> None:
 def test_explainable_budget_snapshot_requires_reason_when_decided() -> None:
     with pytest.raises(ValidationError, match="reason"):
         event(event="budget_snapshot", budget_decision="allow")
+
+
+@pytest.mark.parametrize("event_name", ["budget_snapshot", "budget_paused"])
+@pytest.mark.parametrize("field", ["reserved_cny", "reservation_id"])
+def test_decided_snapshot_and_pause_reject_actual_reservation_facts(
+    event_name: str, field: str
+) -> None:
+    with pytest.raises(ValidationError, match="must not contain actual reservation"):
+        event(
+            event=event_name,
+            budget_decision="allow",
+            reason="budget_admitted",
+            active_reservations_cny="0",
+            requested_reservation_cny="1",
+            **{field: "2" if field == "reserved_cny" else "r-1"},
+        )
 
 
 @pytest.mark.parametrize(

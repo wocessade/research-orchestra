@@ -142,6 +142,34 @@ def test_ceiling_breach_precedes_active_reservation_conflict() -> None:
     assert decision.available_to_start == Decimal("8")
 
 
+def test_ceiling_breach_is_independent_of_missing_snapshot() -> None:
+    guard, _ = make_guard()
+
+    decision = guard.evaluate(
+        snapshot=None,
+        envelope=envelope(ceiling="1"),
+        reservation_cny=Decimal("2"),
+    )
+
+    assert decision.kind is BudgetDecisionKind.BUDGET_CEILING_EXCEEDED
+    assert decision.allowed is False
+    assert decision.balance is None
+    assert decision.snapshot_age is None
+    assert decision.available_to_start is None
+
+
+def test_in_ceiling_stale_snapshot_remains_stale() -> None:
+    guard, _ = make_guard()
+
+    decision = guard.evaluate(
+        snapshot=snapshot(observed_at=NOW - timedelta(seconds=121)),
+        envelope=envelope(ceiling="2"),
+        reservation_cny=Decimal("2"),
+    )
+
+    assert decision.kind is BudgetDecisionKind.STALE_USAGE_SNAPSHOT
+
+
 def test_exact_available_balance_is_allowed() -> None:
     guard, _ = make_guard()
     decision = guard.evaluate(

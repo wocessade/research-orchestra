@@ -20,7 +20,7 @@
 | NOW-01 | Phase C Task 5–6：Prefect 挂起边界、fake 集成验收与维护者交接 | 已完成本地交接；真实部署/生产验证仍见 DEF-02/03/12 | [Phase C acceptance 报告](2026-08-29-bogda-paid-model-runtime-acceptance.md)、一次最终 Bogda full suite、Orchestra 兼容测试 |
 | NOW-02 | Stage D：owner 可操作的前端裁决面与状态可视化 | Phase C 本地合并后继续，SOL 自主裁定并本地 auto-merge | 前端测试、窗口/开关矩阵、决策中心单一事实源验收 |
 | NOW-03 | Stage E：运行接线与迁移前验收 | Stage D 后继续；仍不默认授权 live spend/production mutation | 影子/强制门禁证据、回滚与运维说明 |
-| NOW-04 | Gate 6 收尾 | Stage D/E 后继续推进，当日目标 | Gate 6 工作台、验收清单和剩余 blocker 归零或显式登记 |
+| NOW-04 | Gate 6 收尾 | 只读证据可与 Stage D/E 并行推进；状态变更/正式切换等待 owner-approved prerequisites，当日目标 | Gate 6 工作台、验收清单和剩余 blocker 归零或显式登记 |
 
 ## 必要延期项
 

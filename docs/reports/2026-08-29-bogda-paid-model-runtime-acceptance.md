@@ -5,7 +5,7 @@
 
 ## 结论
 
-Phase C 的六个集成场景已用 fake usage provider、fake model executor、文件 prompt archive、进程内 budget ledger 和 fake suspension boundary 验收。实现保持 `JobRequest`/`RunBudgetEnvelope`/`RunEventV1` 契约不变，且 Bogda runtime 不导入 Orchestra 或 usage-monitor runtime。
+Phase C 的六个集成场景已用 fake usage provider、fake model executor、文件 prompt archive、进程内 budget ledger 和 fake suspension boundary 验收。实现保持 `JobRequest`/`RunBudgetEnvelope` envelope 语义不变；`RunEventV1` 仅有 additive、v1-compatible 扩展，且 Bogda runtime 不导入 Orchestra 或 usage-monitor runtime。
 
 ## 六个验收场景
 
@@ -32,7 +32,7 @@ Phase C 的六个集成场景已用 fake usage provider、fake model executor、
 
 `usage_unknown` 是人工对账门禁：先检查 receipt/产物并录入或获取实际费用，完成 reconcile 后才能决定是否重试；自动 retry 不得绕过该 barrier。当前 claim、ledger、终态事件去重和 JSONL sink 都是进程内能力，不能宣称跨进程 exactly-once 或崩溃后自动恢复。
 
-Stage D 接手 owner-facing decision center、创建/确认/详情窗口、requested/effective tier、预算与价格窗口、暂停原因和恢复动作，并保持 stale、insufficient、scheduled、approval、unknown-usage 状态可区分。Stage E 接手真实只读 usage/balance wiring、受限 Flash/Pro dsh smoke、Prefect deployment 与真实 suspend/resume、持久 accounting/outbox、artifact lifecycle 和运维接线。Gate 6 在 Stage D/E 完成后由 owner 按 shadow/production、回滚和观察窗证据推进；本报告不宣布 Gate 6 或 Gate 7 通过。
+Stage D 接手 owner-facing decision center、创建/确认/详情窗口、requested/effective tier、预算与价格窗口、暂停原因和恢复动作，并保持 stale、insufficient、scheduled、approval、unknown-usage 状态可区分。Stage E 接手真实只读 usage/balance wiring、受限 Flash/Pro dsh smoke、Prefect deployment 与真实 suspend/resume、持久 accounting/outbox、artifact lifecycle 和运维接线。Gate 6 的只读证据收尾可与 Stage D/E 并行；有状态变更的 Stage E/正式切换仍须等待 owner-approved prerequisites、shadow/production、回滚和观察窗证据；本报告不宣布 Gate 6 或 Gate 7 通过。
 
 真实 Prefect 验证需要 registered deployment、可恢复 suspended run 的 worker、持久结果/事件/产物存储和新鲜 usage/balance source。真实 provider 验证还需要 owner 明确 live spend 上限、时段和凭据注入方案。
 

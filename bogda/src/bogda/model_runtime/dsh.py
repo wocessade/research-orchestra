@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import re
 import subprocess
 from typing import Protocol
 
@@ -18,6 +19,23 @@ from bogda.model_runtime.contracts import (
 
 
 MAX_STDERR_BYTES = 16 * 1024
+_SENSITIVE_DIAGNOSTIC_PATTERNS = (
+    (
+        re.compile(r"(Authorization\s*:\s*Bearer\s+)[^\s]+", re.IGNORECASE),
+        r"\1[REDACTED]",
+    ),
+    (
+        re.compile(r"(X-Monitor-Token\s*:\s*)[^\s]+", re.IGNORECASE),
+        r"\1[REDACTED]",
+    ),
+    (
+        re.compile(
+            r"((?:DEEPSEEK_API_KEY|api_key|password)\s*[=:]\s*)[^\s]+",
+            re.IGNORECASE,
+        ),
+        r"\1[REDACTED]",
+    ),
+)
 
 
 class DshCommandRunner(Protocol):
@@ -120,7 +138,7 @@ class DshCliAdapter:
 
         try:
             usage = self._usage_reader.read(request.attempt_dir)
-        except (ValidationError, json.JSONDecodeError):
+        except Exception:
             usage = None
 
         if usage is None:
@@ -134,9 +152,9 @@ class DshCliAdapter:
     @staticmethod
     def _write_artifacts(attempt_dir: Path, stdout: str, stderr: str) -> None:
         (attempt_dir / "stdout.log").write_text(stdout, encoding="utf-8")
-        bounded_stderr = stderr.encode("utf-8")[:MAX_STDERR_BYTES].decode(
-            "utf-8", errors="ignore"
-        )
+        bounded_stderr = _sanitize_diagnostic(stderr).encode("utf-8")[
+            :MAX_STDERR_BYTES
+        ].decode("utf-8", errors="ignore")
         (attempt_dir / "stderr.log").write_text(
             bounded_stderr,
             encoding="utf-8",
@@ -149,6 +167,12 @@ def _as_text(value: str | bytes | None) -> str:
     if isinstance(value, bytes):
         return value.decode("utf-8", errors="replace")
     return value
+
+
+def _sanitize_diagnostic(stderr: str) -> str:
+    for pattern, replacement in _SENSITIVE_DIAGNOSTIC_PATTERNS:
+        stderr = pattern.sub(replacement, stderr)
+    return stderr
 
 
 __all__ = [

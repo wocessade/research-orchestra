@@ -45,6 +45,11 @@ class FakeRunner:
         )
 
 
+class FailingUsageReader:
+    def read(self, attempt_dir: Path):
+        raise OSError("receipt disappeared")
+
+
 def call_request(attempt_dir: Path, tier: ModelTier, timeout: float = 7.5):
     return ModelCallRequest(
         run_id="run-1",
@@ -253,3 +258,40 @@ def test_malformed_receipt_is_unknown_not_free_success(tmp_path: Path) -> None:
 
     assert result.outcome is ModelCallOutcome.USAGE_UNKNOWN
     assert result.usage is None
+
+
+def test_usage_reader_failure_after_completion_is_unknown_not_raised(
+    tmp_path: Path,
+) -> None:
+    runner = FakeRunner(returncode=0, stdout="answer")
+    adapter = adapter_for(tmp_path, runner, usage_reader=FailingUsageReader())
+
+    result = adapter.invoke(call_request(tmp_path / "attempt", ModelTier.FLASH))
+
+    assert result.outcome is ModelCallOutcome.USAGE_UNKNOWN
+    assert result.usage is None
+
+
+def test_stderr_diagnostic_redacts_common_credentials_but_stdout_is_exact(
+    tmp_path: Path,
+) -> None:
+    stdout = "model output: Authorization: Bearer keep-this-exact"
+    stderr = (
+        "Authorization: Bearer bearer-secret\n"
+        "X-Monitor-Token: monitor-secret\n"
+        "DEEPSEEK_API_KEY=deepseek-secret api_key=generic-secret password=pw-secret"
+    )
+    runner = FakeRunner(returncode=2, stdout=stdout, stderr=stderr)
+    adapter = adapter_for(tmp_path, runner)
+    request = call_request(tmp_path / "attempt", ModelTier.FLASH)
+
+    adapter.invoke(request)
+
+    assert (request.attempt_dir / "stdout.log").read_text(encoding="utf-8") == stdout
+    diagnostic = (request.attempt_dir / "stderr.log").read_text(encoding="utf-8")
+    assert "bearer-secret" not in diagnostic
+    assert "monitor-secret" not in diagnostic
+    assert "deepseek-secret" not in diagnostic
+    assert "generic-secret" not in diagnostic
+    assert "pw-secret" not in diagnostic
+    assert "[REDACTED]" in diagnostic

@@ -225,19 +225,9 @@ def _mapping_field(payload: object, field: str) -> object:
 def _normalize_dashboard(payload: object) -> UsageSnapshotV1:
     if not isinstance(payload, dict):
         raise UsageMonitorPayloadError()
-    balance = _mapping_field(payload, "balance")
-    last_updated = _mapping_field(payload, "last_updated")
     services = _mapping_field(payload, "services")
-    total = _mapping_field(balance, "total")
-    currency = _mapping_field(balance, "currency")
-    available = _mapping_field(balance, "is_available")
-    epoch = _mapping_field(last_updated, "balance")
     source = _mapping_field(services, "deepseek_api")
 
-    if currency != "CNY":
-        raise UsageMonitorCurrencyError()
-    if type(available) is not bool:
-        raise UsageMonitorPayloadError()
     if not isinstance(source, str):
         raise UsageMonitorPayloadError()
     if source == "unauthorized" or source == "no_key":
@@ -254,6 +244,17 @@ def _normalize_dashboard(payload: object) -> UsageSnapshotV1:
             raise UsageMonitorPayloadError()
         if source in {"unknown", "unavailable", "timeout", "error", "down"} or source.startswith("error_"):
             raise UsageMonitorSourceUnavailableError()
+        raise UsageMonitorPayloadError()
+
+    balance = _mapping_field(payload, "balance")
+    last_updated = _mapping_field(payload, "last_updated")
+    total = _mapping_field(balance, "total")
+    currency = _mapping_field(balance, "currency")
+    available = _mapping_field(balance, "is_available")
+    epoch = _mapping_field(last_updated, "balance")
+    if currency != "CNY":
+        raise UsageMonitorCurrencyError()
+    if type(available) is not bool:
         raise UsageMonitorPayloadError()
     if not available:
         raise UsageMonitorBalanceUnavailableError()

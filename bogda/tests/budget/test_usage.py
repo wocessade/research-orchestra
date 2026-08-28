@@ -276,6 +276,22 @@ def test_upstream_http_source_statuses_map_to_typed_failures(
         client(transport).get_snapshot()
 
 
+def test_no_key_source_is_classified_before_empty_balance() -> None:
+    payload = dashboard(source="no_key", observed_at=NOW.timestamp())
+    payload["balance"] = {}
+
+    with pytest.raises(UsageMonitorAuthenticationError):
+        client(FakeTransport(FakeResponse(body=payload))).get_snapshot()
+
+
+def test_error_source_is_classified_before_empty_balance() -> None:
+    payload = dashboard(source="error", observed_at=NOW.timestamp())
+    payload["balance"] = {}
+
+    with pytest.raises(UsageMonitorSourceUnavailableError):
+        client(FakeTransport(FakeResponse(body=payload))).get_snapshot()
+
+
 @pytest.mark.parametrize("timeout", [float("nan"), float("inf"), float("-inf")])
 def test_timeout_must_be_finite(timeout: float) -> None:
     with pytest.raises(ValueError, match="finite"):

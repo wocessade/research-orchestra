@@ -25,12 +25,20 @@ from bogda_console.contracts.models import (
     ScientificSummary,
     SourceMeta,
     SourceMode,
+    DecisionCenterSnapshot,
+    ModelBudgetSnapshot,
+    ModelPolicySnapshot,
+    RunPreparationPreview,
+    WorkloadEstimate,
+    AllowedRunPreferences,
 )
 from bogda_console.contracts.ports import (
     AutonomyPolicyPort,
     PowerStatusPort,
     PrefectQueryPort,
     RunResultPort,
+    ModelControlQueryPort,
+    ModelControlUnavailable,
 )
 from bogda_console.services.errors import ServiceError, SourceUnavailable
 from bogda_console.services.snapshots import LastGoodReader, SourceRead
@@ -49,12 +57,14 @@ class QueryService:
         power: PowerStatusPort,
         now: Callable[[], datetime] | None = None,
         policy: AutonomyPolicyPort | None = None,
+        model_control: ModelControlQueryPort | None = None,
     ) -> None:
         self.settings = settings
         self.prefect = prefect
         self.results = results
         self.power = power
         self.policy = policy
+        self.model_control = model_control
         self._now = now or (lambda: datetime.now(UTC))
         self._readers: dict[str, LastGoodReader[Any]] = {}
 
@@ -77,10 +87,68 @@ class QueryService:
                 canPauseWorkQueue=enabled,
                 canReviewScientificResult=self.settings.review_enabled,
                 canSetAutonomyMode=self.settings.autonomy_writes_enabled,
+                canResolveModelDecision=self.settings.model_control_enabled,
+                canSetModelPolicy=self.settings.model_control_enabled,
+                canPreparePaidRun=self.settings.model_control_enabled,
             ),
             sources={},
             errors=[],
         )
+
+    def _model_source(self) -> SourceMeta:
+        now = self._now()
+        return SourceMeta(
+            source="modelControl",
+            sourceMode=SourceMode.MOCK if self.settings.profile == "mock-all" else SourceMode.REAL,
+            observedAt=now if self.settings.profile == "mock-all" else None,
+            receivedAt=now,
+            lastSuccessfulAt=now if self.settings.profile == "mock-all" else None,
+            staleAfterSeconds=120,
+            freshness=Freshness.FRESH if self.settings.profile == "mock-all" else Freshness.UNAVAILABLE,
+        )
+
+    def _require_model_control(self) -> ModelControlQueryPort:
+        if self.model_control is None:
+            raise ServiceError(ApiErrorCode.MODEL_CONTROL_UNAVAILABLE, "model-control backend is not wired", source="modelControl", retryable=False, status_code=503)
+        return self.model_control
+
+    async def decisions(self) -> ApiEnvelope[DecisionCenterSnapshot]:
+        try:
+            data = await self._require_model_control().decision_center()
+        except ModelControlUnavailable as error:
+            raise ServiceError(ApiErrorCode.MODEL_CONTROL_UNAVAILABLE, str(error), source="modelControl", retryable=False, status_code=503)
+        return ApiEnvelope(data=data, sources={"modelControl": self._model_source()}, errors=[])
+
+    async def run_budget(self, run_id: str) -> ApiEnvelope[ModelBudgetSnapshot]:
+        try:
+            data = await self._require_model_control().run_budget(run_id)
+        except ModelControlUnavailable as error:
+            raise ServiceError(ApiErrorCode.MODEL_CONTROL_UNAVAILABLE, str(error), source="modelControl", retryable=False, status_code=503)
+        return ApiEnvelope(data=data, sources={"modelControl": self._model_source()}, errors=[])
+
+    async def model_policy(self, project_id: str | None = None) -> ApiEnvelope[ModelPolicySnapshot]:
+        try:
+            data = await self._require_model_control().model_policy(project_id)
+        except ModelControlUnavailable as error:
+            raise ServiceError(ApiErrorCode.MODEL_CONTROL_UNAVAILABLE, str(error), source="modelControl", retryable=False, status_code=503)
+        return ApiEnvelope(data=data, sources={"modelControl": self._model_source()}, errors=[])
+
+    async def preview_run(
+        self,
+        project_id: str,
+        intent: str,
+        requested_model_tier: str,
+        workload: WorkloadEstimate,
+        allowed_preferences: AllowedRunPreferences,
+        deadline: datetime | None,
+    ) -> ApiEnvelope[RunPreparationPreview]:
+        try:
+            data = await self._require_model_control().preview_run(
+                project_id, intent, requested_model_tier, workload, allowed_preferences, deadline
+            )
+        except ModelControlUnavailable as error:
+            raise ServiceError(ApiErrorCode.MODEL_CONTROL_UNAVAILABLE, str(error), source="modelControl", retryable=False, status_code=503)
+        return ApiEnvelope(data=data, sources={"modelControl": self._model_source()}, errors=[])
 
     async def autonomy_policy(self) -> ApiEnvelope[AutonomyPolicySnapshot]:
         if self.policy is None:

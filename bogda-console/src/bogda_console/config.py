@@ -83,3 +83,7 @@ class Settings:
     @property
     def autonomy_writes_enabled(self) -> bool:
         return self.profile == "mock-all"
+
+    @property
+    def model_control_enabled(self) -> bool:
+        return self.profile == "mock-all"

@@ -20,6 +20,9 @@ from bogda_console.contracts.models import (
     RunResultView,
     RunSummary,
     ScientificStatus,
+    DecisionCenterSnapshot,
+    ModelPolicySnapshot,
+    ModelPolicyPatch,
 )
 from bogda_console.contracts.ports import (
     AutonomyPolicyConflict,
@@ -27,6 +30,9 @@ from bogda_console.contracts.ports import (
     PrefectCommandPort,
     PrefectQueryPort,
     RunResultPort,
+    ModelControlCommandPort,
+    ModelControlConflict,
+    ModelControlUnavailable,
 )
 from bogda_console.services.errors import ServiceError
 
@@ -40,19 +46,28 @@ class CommandService:
         results: RunResultPort,
         now: Callable[[], datetime] | None = None,
         policy: AutonomyPolicyPort | None = None,
+        model_control: ModelControlCommandPort | None = None,
     ) -> None:
         self.settings = settings
         self.prefect = prefect
         self.results = results
         self.policy = policy
+        self._model_control = model_control
         self._now = now or (lambda: datetime.now(UTC))
         self._locks: dict[str, asyncio.Lock] = {}
 
     async def submit(
-        self, deployment_id: str, parameters: dict[str, Any], idempotency_key: str
+        self, deployment_id: str, parameters: dict[str, Any], idempotency_key: str,
+        run_preparation_id: str | None = None,
     ) -> CommandReceipt[RunSummary]:
         async with self._lock(f"deployment:{deployment_id}"):
             self._require_commands()
+            if run_preparation_id is not None:
+                self._require_model_control_writes()
+                await self._mutate(
+                    "modelControl",
+                    lambda: self._model_control.confirm_preparation(run_preparation_id, idempotency_key),
+                )
             if deployment_id not in self.settings.allowed_deployment_ids:
                 self._raise(ApiErrorCode.RESOURCE_NOT_ALLOWLISTED, 403, deployment_id)
             deployment = await self._pre_read(
@@ -78,6 +93,24 @@ class CommandService:
                 "prefect", lambda: self.prefect.get_run(submitted.run_id)
             )
             return self._receipt("submit", submitted.run_id, post.run)
+
+    async def resolve_decision(self, decision_id: str, action_id: str, expected_revision: int) -> CommandReceipt[DecisionCenterSnapshot]:
+        async with self._lock(f"decision:{decision_id}"):
+            self._require_model_control_writes()
+            snapshot = await self._mutate("modelControl", lambda: self._model_control.resolve_decision(decision_id, action_id, expected_revision))
+            return self._receipt("resolveDecision", decision_id, snapshot)
+
+    async def set_global_model_policy(self, patch: ModelPolicyPatch, expected_revision: int) -> CommandReceipt[ModelPolicySnapshot]:
+        async with self._lock("model-policy:global"):
+            self._require_model_control_writes()
+            snapshot = await self._mutate("modelControl", lambda: self._model_control.set_global_policy(patch, expected_revision))
+            return self._receipt("setGlobalModelPolicy", "global", snapshot)
+
+    async def set_project_model_policy(self, project_id: str, patch: ModelPolicyPatch | None, expected_revision: int) -> CommandReceipt[ModelPolicySnapshot]:
+        async with self._lock(f"model-policy:project:{project_id}"):
+            self._require_model_control_writes()
+            snapshot = await self._mutate("modelControl", lambda: self._model_control.set_project_policy(project_id, patch, expected_revision))
+            return self._receipt("setProjectModelPolicy", project_id, snapshot)
 
     async def cancel(
         self, run_id: str, expected_command_version: str
@@ -392,12 +425,19 @@ class CommandService:
         if not self.settings.autonomy_writes_enabled:
             self._raise(ApiErrorCode.RESOURCE_NOT_ALLOWLISTED, 403, "autonomy policy writes disabled")
 
+    def _require_model_control_writes(self) -> None:
+        if not self.settings.model_control_enabled:
+            self._raise(ApiErrorCode.RESOURCE_NOT_ALLOWLISTED, 403, "model controls disabled")
+        if self._model_control is None:
+            self._raise(ApiErrorCode.MODEL_CONTROL_UNAVAILABLE, 503, "model-control backend is not wired", source="modelControl")
+
     @staticmethod
     def _unavailable_code(source: str) -> ApiErrorCode:
         return {
             "prefect": ApiErrorCode.PREFECT_UNAVAILABLE,
             "runResult": ApiErrorCode.RUN_RESULT_UNAVAILABLE,
             "autonomyPolicy": ApiErrorCode.AUTONOMY_POLICY_UNAVAILABLE,
+            "modelControl": ApiErrorCode.MODEL_CONTROL_UNAVAILABLE,
         }.get(source, ApiErrorCode.INTERNAL_ERROR)
 
     def _receipt(self, command: str, resource_id: str, snapshot: Any):
@@ -432,6 +472,10 @@ class CommandService:
                 error.current,
                 source="autonomyPolicy",
             )
+        except ModelControlConflict as error:
+            self._raise(ApiErrorCode.RESOURCE_CHANGED, 409, "resource changed after the action was opened", error.current, source="modelControl")
+        except ModelControlUnavailable as error:
+            self._raise(ApiErrorCode.MODEL_CONTROL_UNAVAILABLE, 503, str(error), source="modelControl")
         except (ConnectionError, TimeoutError, httpx.RequestError) as error:
             self._raise(self._unavailable_code(source), 503, str(error), source=source)
         except Exception as error:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal
 
 from fastapi import APIRouter, Query, Request
@@ -26,10 +27,37 @@ from bogda_console.contracts.models import (
     SetGlobalAutonomyRequest,
     SetProjectAutonomyRequest,
     SubmitRequest,
+    AllowedRunPreferences,
+    WorkloadEstimate,
+    ModelPolicyPatch,
+    WireModel,
+    DecisionCenterSnapshot,
+    ModelBudgetSnapshot,
+    ModelPolicySnapshot,
+    RunPreparationPreview,
 )
 
 
 router = APIRouter(prefix="/api/v1")
+
+
+class DecisionRequest(WireModel):
+    action_id: str
+    expected_revision: int
+
+
+class ModelPolicyRequest(WireModel):
+    patch: ModelPolicyPatch | None
+    expected_revision: int
+
+
+class RunPreparationPreviewRequest(WireModel):
+    project_id: str
+    intent: str
+    requested_model_tier: str
+    workload: WorkloadEstimate
+    allowed_preferences: AllowedRunPreferences
+    deadline: datetime | None = None
 
 
 def queries(request: Request):
@@ -110,6 +138,33 @@ async def autonomy_policy(request: Request):
     return await queries(request).autonomy_policy()
 
 
+@router.get("/decisions", response_model=ApiEnvelope[DecisionCenterSnapshot])
+async def decisions(request: Request):
+    return await queries(request).decisions()
+
+
+@router.get("/runs/{run_id}/model-budget", response_model=ApiEnvelope[ModelBudgetSnapshot])
+async def run_model_budget(run_id: str, request: Request):
+    return await queries(request).run_budget(run_id)
+
+
+@router.get("/model-policy", response_model=ApiEnvelope[ModelPolicySnapshot])
+async def model_policy(request: Request, project_id: str | None = Query(default=None, alias="projectId")):
+    return await queries(request).model_policy(project_id)
+
+
+@router.post("/run-preparations/preview", response_model=ApiEnvelope[RunPreparationPreview])
+async def preview_run(body: RunPreparationPreviewRequest, request: Request):
+    return await queries(request).preview_run(
+        body.project_id,
+        body.intent,
+        body.requested_model_tier,
+        body.workload,
+        body.allowed_preferences,
+        body.deadline,
+    )
+
+
 def commands(request: Request):
     return request.app.state.container.commands
 
@@ -125,7 +180,7 @@ def command_envelope(receipt):
 async def submit(deployment_id: str, body: SubmitRequest, request: Request):
     return command_envelope(
         await commands(request).submit(
-            deployment_id, body.parameters, body.idempotency_key
+            deployment_id, body.parameters, body.idempotency_key, body.run_preparation_id
         )
     )
 
@@ -234,6 +289,21 @@ async def set_project_autonomy(project_id: str, body: SetProjectAutonomyRequest,
             project_id, body.mode, body.expected_revision
         )
     )
+
+
+@router.post("/decisions/{decision_id}", response_model=ApiEnvelope)
+async def resolve_decision(decision_id: str, body: DecisionRequest, request: Request):
+    return command_envelope(await commands(request).resolve_decision(decision_id, body.action_id, body.expected_revision))
+
+
+@router.post("/model-policy/global", response_model=ApiEnvelope)
+async def set_global_model_policy(body: ModelPolicyRequest, request: Request):
+    return command_envelope(await commands(request).set_global_model_policy(body.patch, body.expected_revision))
+
+
+@router.post("/model-policy/projects/{project_id}", response_model=ApiEnvelope)
+async def set_project_model_policy(project_id: str, body: ModelPolicyRequest, request: Request):
+    return command_envelope(await commands(request).set_project_model_policy(project_id, body.patch, body.expected_revision))
 
 
 class ScenarioRequest(BaseModel):

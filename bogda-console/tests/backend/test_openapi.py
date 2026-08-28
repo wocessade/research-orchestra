@@ -10,6 +10,10 @@ def test_openapi_contains_every_canonical_wire_schema() -> None:
         "ApiError",
         "AutonomyPolicySnapshot",
         "CapabilitySnapshot",
+        "DecisionCenterSnapshot",
+        "ModelBudgetSnapshot",
+        "ModelPolicySnapshot",
+        "RunPreparationPreview",
         "DeploymentSummary",
         "InfrastructureView",
         "OverviewSnapshot",
@@ -31,3 +35,5 @@ def test_openapi_keeps_command_and_review_request_bodies_closed() -> None:
     assert paths["/api/v1/runs/{run_id}/cancel"]["post"]["requestBody"]
     assert paths["/api/v1/runs/{run_id}/reviews"]["post"]["requestBody"]
     assert paths["/api/v1/runs/{run_id}/checkpoints"]["post"]["requestBody"]
+    assert paths["/api/v1/run-preparations/preview"]["post"]["requestBody"]
+    assert paths["/api/v1/model-policy/global"]["post"]["requestBody"]

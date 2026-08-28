@@ -76,6 +76,7 @@ class ApiErrorCode(StrEnum):
     RUN_RESULT_UNAVAILABLE = "RUN_RESULT_UNAVAILABLE"
     POWER_UNAVAILABLE = "POWER_UNAVAILABLE"
     AUTONOMY_POLICY_UNAVAILABLE = "AUTONOMY_POLICY_UNAVAILABLE"
+    MODEL_CONTROL_UNAVAILABLE = "MODEL_CONTROL_UNAVAILABLE"
     PROJECT_CONTEXT_UNAVAILABLE = "PROJECT_CONTEXT_UNAVAILABLE"
     RESULT_MISSING = "RESULT_MISSING"
     RESULT_INVALID = "RESULT_INVALID"
@@ -330,6 +331,9 @@ class CapabilitySnapshot(WireModel):
     can_pause_work_queue: bool
     can_review_scientific_result: bool
     can_set_autonomy_mode: bool
+    can_resolve_model_decision: bool
+    can_set_model_policy: bool
+    can_prepare_paid_run: bool
 
 
 class RunFilters(WireModel):
@@ -342,6 +346,7 @@ class RunFilters(WireModel):
 class SubmitRequest(WireModel):
     parameters: dict[str, Any] = Field(default_factory=dict)
     idempotency_key: str = Field(min_length=1)
+    run_preparation_id: str | None = None
 
 
 class ExpectedVersionRequest(WireModel):

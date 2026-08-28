@@ -16,6 +16,7 @@ from bogda.contracts.tasks import (
     TaskIntent,
 )
 from bogda.contracts.budgets import BudgetSource, RunBudgetEnvelope
+from bogda.contracts.events import RunEventType, RunEventV1
 
 __all__ = [
     "ArtifactRecord",
@@ -33,4 +34,6 @@ __all__ = [
     "TaskIntent",
     "BudgetSource",
     "RunBudgetEnvelope",
+    "RunEventType",
+    "RunEventV1",
 ]

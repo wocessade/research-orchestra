@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Self
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, ConfigDict, model_validator
 
 
 class TaskIntent(StrEnum):
@@ -32,6 +32,8 @@ class PricePreference(StrEnum):
 
 
 class SchedulePolicy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     earliest_start: datetime | None = None
     deadline: datetime | None = None
     price_preference: PricePreference = PricePreference.CHEAPEST_BEFORE_DEADLINE

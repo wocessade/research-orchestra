@@ -1,7 +1,7 @@
 from datetime import datetime
 
 import pytest
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 
 from bogda.contracts import (
     ExecutorKind,
@@ -18,6 +18,26 @@ def test_task_axes_have_stable_wire_values() -> None:
     ]
     assert [item.value for item in ModelTier] == ["auto", "flash", "pro"]
     assert [item.value for item in ExecutorKind] == ["dsh", "shell"]
+
+
+def test_price_preference_has_stable_wire_values() -> None:
+    assert [item.value for item in PricePreference] == [
+        "immediate", "cheapest_before_deadline"
+    ]
+
+
+@pytest.mark.parametrize(
+    "contract",
+    [TaskIntent, ModelTier, ExecutorKind, PricePreference],
+)
+def test_task_contracts_reject_unknown_values_at_pydantic_boundary(contract) -> None:
+    with pytest.raises(ValidationError):
+        TypeAdapter(contract).validate_python("unknown")
+
+
+def test_schedule_policy_rejects_unknown_fields() -> None:
+    with pytest.raises(ValidationError, match="extra"):
+        SchedulePolicy(unexpected="value")
 
 
 def test_schedule_policy_requires_aware_ordered_times() -> None:

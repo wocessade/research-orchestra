@@ -62,8 +62,8 @@ Phase B ends with a fake-provider integration acceptance test and a local read-o
 **Verification:**
 
 ```powershell
-uv run --python 3.11 pytest tests/budget/test_pricing.py -q
-uv run --python 3.11 pytest tests/contracts tests/budget/test_pricing.py -q
+uv run --extra dev --python 3.11 pytest tests/budget/test_pricing.py -q
+uv run --extra dev --python 3.11 pytest tests/contracts tests/budget/test_pricing.py -q
 git diff --check
 ```
 
@@ -105,8 +105,8 @@ Commit: `feat(bogda): add versioned DeepSeek pricing catalog`
 **Verification:**
 
 ```powershell
-uv run --python 3.11 pytest tests/budget/test_usage.py -q
-uv run --python 3.11 pytest tests/budget -q
+uv run --extra dev --python 3.11 pytest tests/budget/test_usage.py -q
+uv run --extra dev --python 3.11 pytest tests/budget -q
 git diff --check
 ```
 
@@ -148,8 +148,8 @@ The estimator must define documented default contingency factors by intent/tier,
 **Verification:**
 
 ```powershell
-uv run --python 3.11 pytest tests/budget/test_estimation.py -q
-uv run --python 3.11 pytest tests/contracts tests/budget -q
+uv run --extra dev --python 3.11 pytest tests/budget/test_estimation.py -q
+uv run --extra dev --python 3.11 pytest tests/contracts tests/budget -q
 git diff --check
 ```
 
@@ -192,8 +192,8 @@ Commit: `feat(bogda): estimate workload aware budgets`
 **Verification:**
 
 ```powershell
-uv run --python 3.11 pytest tests/budget/test_ledger.py tests/budget/test_guard.py -q
-uv run --python 3.11 pytest tests/budget -q
+uv run --extra dev --python 3.11 pytest tests/budget/test_ledger.py tests/budget/test_guard.py -q
+uv run --extra dev --python 3.11 pytest tests/budget -q
 git diff --check
 ```
 
@@ -235,8 +235,8 @@ Commit: `feat(bogda): add budget guard and reservation ledger`
 **Verification:**
 
 ```powershell
-uv run --python 3.11 pytest tests/events/test_jsonl.py tests/budget/test_service.py -q
-uv run --python 3.11 pytest tests/contracts tests/budget tests/events -q
+uv run --extra dev --python 3.11 pytest tests/events/test_jsonl.py tests/budget/test_service.py -q
+uv run --extra dev --python 3.11 pytest tests/contracts tests/budget tests/events -q
 git diff --check
 ```
 
@@ -272,7 +272,7 @@ Commit: `feat(bogda): persist budget admission events`
 **Final verification:**
 
 ```powershell
-uv run --python 3.11 pytest -q
+uv run --extra dev --python 3.11 pytest -q
 D:\pythonProject\bogda\.venv\Scripts\python.exe -m unittest tests.test_taskfile -q
 git diff --check
 git status --short --branch

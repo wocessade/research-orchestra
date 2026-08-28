@@ -243,6 +243,33 @@ async def test_preview_contains_frozen_autonomy_workload_schedule_and_allowed_pr
     assert preview.scheduled_start is None
 
 
+def test_budget_can_preserve_unavailable_effective_tier() -> None:
+    budget = ModelBudgetSnapshot(
+        runId="blocked-1", projectId="p1", state="awaiting-approval", currency="CNY",
+        expectedCost=Decimal("1"), authorizedCeiling=Decimal("2"), usedCost=Decimal("0"),
+        reservedCost=Decimal("0"), remainingCost=Decimal("2"), decisionId="d1", revision=0,
+        intent="decide", requestedModelTier="pro", effectiveModelTier=None,
+        effectiveAutonomyMode="supervised", pricePeriod="off-peak",
+    )
+    assert budget.effective_model_tier is None
+
+
+@pytest.mark.asyncio
+async def test_mock_fallback_requires_pro_and_explicit_flash_downgrade() -> None:
+    adapter = MockModelControlAdapter()
+    workload = WorkloadEstimate(inputTokens=1, outputTokens=1, expectedCalls=1, runtimeMinutes=1)
+    no_downgrade = AllowedRunPreferences(
+        preferOffPeak=True, allowAutoUpgrade=True, allowFlashDowngrade=False, autoResume=True
+    )
+    blocked = await adapter.preview_run("p1", "decide", "pro", workload, no_downgrade)
+    assert blocked.effective_model_tier == "pro"
+    assert blocked.fallback_model_tier is None
+
+    flash = await adapter.preview_run("p1", "explore", "flash", workload, no_downgrade)
+    assert flash.effective_model_tier == "flash"
+    assert flash.fallback_model_tier is None
+
+
 def test_workload_safety_margin_cannot_underbudget() -> None:
     with pytest.raises(ValidationError):
         ModelPolicySnapshot(

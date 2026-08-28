@@ -97,6 +97,7 @@ class MockModelControlAdapter:
     ) -> RunPreparationPreview:
         policy = await self.model_policy(project_id)
         effective = "pro" if requested_model_tier == "pro" else "flash"
+        fallback = "flash" if effective == "pro" and allowed_preferences.allow_flash_downgrade else None
         preparation_id = f"prep_{uuid4().hex}"
         budget = ModelBudgetSnapshot(
             runId=preparation_id, projectId=project_id, state=BudgetState.READY,
@@ -108,7 +109,7 @@ class MockModelControlAdapter:
         preview = RunPreparationPreview(
             preparationId=preparation_id, projectId=project_id, intent=intent,
             requestedModelTier=requested_model_tier, effectiveModelTier=effective,
-            effectiveAutonomyMode="supervised", fallbackModelTier="flash", pricePeriod="off-peak",
+            effectiveAutonomyMode="supervised", fallbackModelTier=fallback, pricePeriod="off-peak",
             scheduledStart=None, workload=workload, allowedPreferences=allowed_preferences,
             deadline=deadline, budget=budget, policyRevision=policy.revision,
         )

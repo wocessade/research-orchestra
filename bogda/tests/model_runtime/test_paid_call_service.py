@@ -3,7 +3,9 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from hashlib import sha256
+from itertools import count
 from pathlib import Path
+from threading import Event, Lock, Thread
 from typing import Callable
 
 import pytest
@@ -39,6 +41,7 @@ from bogda.model_runtime import (
     PaidModelClockError,
     PaidModelEventError,
     PaidModelExecutionError,
+    PromptArtifactV1,
 )
 
 
@@ -61,11 +64,14 @@ class MemorySink(RunEventSink):
 
 
 class FakeUsage:
+    def __init__(self, balance: Decimal = Decimal("10")) -> None:
+        self.balance = balance
+
     def get_snapshot(self) -> UsageSnapshotV1:
         return UsageSnapshotV1(
             provider="deepseek",
             available=True,
-            total_balance=Decimal("10"),
+            total_balance=self.balance,
             currency="CNY",
             observed_at=NOW - timedelta(seconds=30),
             source_status=UsageSourceStatus.UP,
@@ -82,6 +88,35 @@ class FakeExecutor:
         if isinstance(self.result, BaseException):
             raise self.result
         return self.result
+
+
+class FirstCallBlockingArchive:
+    def __init__(self, root: Path) -> None:
+        self.root = root
+        self.first_entered = Event()
+        self.release_first = Event()
+        self.calls = 0
+        self._lock = Lock()
+
+    def archive(self, run_id: str, call_id: str, prompt: str) -> PromptArtifactV1:
+        with self._lock:
+            self.calls += 1
+            call_number = self.calls
+        if call_number == 1:
+            self.first_entered.set()
+            assert self.release_first.wait(5), "first archive call was not released"
+        return PromptArtifactV1(
+            path=str(self.root / run_id / f"{call_id}.prompt.md"),
+            sha256=sha256(prompt.encode()).hexdigest(),
+        )
+
+
+class FailFirstBudgetReleasedSink(MemorySink):
+    def append(self, event) -> None:
+        if event.event is RunEventType.BUDGET_RELEASED and not self.failed:
+            self.failed = True
+            raise OSError("terminal event sentinel")
+        super().append(event)
 
 
 def usage(*, actual_cost: str | None = "0.25", reference: str = "receipt-1"):
@@ -127,11 +162,17 @@ def service_for(
     *,
     sink: MemorySink | None = None,
     service_clock: Callable[[], datetime] | None = None,
+    archive=None,
+    usage_port: FakeUsage | None = None,
+    id_factory: Callable[[], str] | None = None,
 ):
     actual_sink = sink or MemorySink()
-    ledger = SingleFlightBudgetLedger(clock=lambda: NOW, id_factory=lambda: "reservation-1")
+    ledger = SingleFlightBudgetLedger(
+        clock=lambda: NOW,
+        id_factory=id_factory or (lambda: "reservation-1"),
+    )
     budget = BudgetAdmissionService(
-        usage=FakeUsage(),
+        usage=usage_port or FakeUsage(),
         guard=BudgetGuard(ledger, now=NOW),
         ledger=ledger,
         event_sink=actual_sink,
@@ -140,7 +181,7 @@ def service_for(
     executor = FakeExecutor(result)
     service = PaidModelCallService(
         router=ModelRouter(),
-        archive=FilePromptArchive(tmp_path / "archive"),
+        archive=archive or FilePromptArchive(tmp_path / "archive"),
         budget=budget,
         event_sink=actual_sink,
         executor=executor,
@@ -401,6 +442,110 @@ def test_reconcile_terminal_event_failure_blocks_duplicate_paid_execution(
 
     assert ledger.lookup("reservation-1").state.value == "reconciled"
     assert repeated.status is PaidCallStatus.RECONCILIATION_REQUIRED
+    assert len(executor.calls) == 1
+
+
+def test_overlapping_same_call_cannot_execute_twice_after_terminal_event_failure(
+    tmp_path: Path,
+) -> None:
+    archive = FirstCallBlockingArchive(tmp_path / "archive")
+    sink = FailFirstBudgetReleasedSink()
+    reservation_numbers = count(1)
+    service, _, ledger, executor = service_for(
+        tmp_path,
+        finished_result(),
+        sink=sink,
+        archive=archive,
+        id_factory=lambda: f"reservation-{next(reservation_numbers)}",
+    )
+    results = {}
+    errors = {}
+    done = {name: Event() for name in ("first", "overlap")}
+
+    def invoke(name: str, attempt: str) -> None:
+        try:
+            results[name] = service.execute(
+                "run-1",
+                "call-1",
+                request(),
+                PROMPT,
+                tmp_path / attempt,
+                pro_available=True,
+                allow_low_risk_fallback=False,
+            )
+        except BaseException as error:
+            errors[name] = error
+        finally:
+            done[name].set()
+
+    first = Thread(target=invoke, args=("first", "attempt-first"))
+    overlap = Thread(target=invoke, args=("overlap", "attempt-overlap"))
+    first.start()
+    assert archive.first_entered.wait(5), "first call did not reach the archive"
+    overlap.start()
+    assert done["overlap"].wait(5), "overlapping call did not finish"
+    archive.release_first.set()
+    assert done["first"].wait(5), "first call did not finish"
+    first.join()
+    overlap.join()
+
+    assert len(executor.calls) == 1
+    assert archive.calls == 1
+    event_types = [event.event for event in sink.events]
+    assert event_types.count(RunEventType.ROUTE_SELECTED) == 1
+    assert event_types.count(RunEventType.BUDGET_SNAPSHOT) == 1
+    assert [result.status for result in results.values()] == [
+        PaidCallStatus.RECONCILIATION_REQUIRED
+    ]
+    assert len(errors) == 1
+    assert isinstance(next(iter(errors.values())), PaidModelBudgetError)
+    assert ledger.lookup("reservation-1").state.value == "reconciled"
+
+
+def test_pro_required_releases_claim_for_later_re_evaluation(tmp_path: Path) -> None:
+    service, _, _, executor = service_for(tmp_path, finished_result())
+    pro_request = request(intent=TaskIntent.AUDIT, tier=ModelTier.PRO)
+
+    first = service.execute(
+        "run-1", "call-1", pro_request, PROMPT, tmp_path / "attempt-first",
+        pro_available=False, allow_low_risk_fallback=False,
+    )
+    retried = service.execute(
+        "run-1", "call-1", pro_request, PROMPT, tmp_path / "attempt-retry",
+        pro_available=True, allow_low_risk_fallback=False,
+    )
+
+    assert first.status is PaidCallStatus.PRO_REQUIRED
+    assert retried.status is PaidCallStatus.FINISHED
+    assert len(executor.calls) == 1
+
+
+def test_budget_paused_releases_claim_for_later_re_evaluation(tmp_path: Path) -> None:
+    usage_port = FakeUsage()
+    service, _, _, executor = service_for(
+        tmp_path, finished_result(), usage_port=usage_port
+    )
+    paused = request()
+    paused = paused.model_copy(
+        update={
+            "budget": paused.budget.model_copy(
+                update={"minimum_remaining": Decimal("9")}
+            )
+        }
+    )
+
+    first = service.execute(
+        "run-1", "call-1", paused, PROMPT, tmp_path / "attempt-first",
+        pro_available=True, allow_low_risk_fallback=False,
+    )
+    usage_port.balance = Decimal("20")
+    retried = service.execute(
+        "run-1", "call-1", paused, PROMPT, tmp_path / "attempt-retry",
+        pro_available=True, allow_low_risk_fallback=False,
+    )
+
+    assert first.status is PaidCallStatus.BUDGET_PAUSED
+    assert retried.status is PaidCallStatus.FINISHED
     assert len(executor.calls) == 1
 
 

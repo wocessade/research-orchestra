@@ -114,7 +114,7 @@ class PaidModelCallService:
         self._executor = executor
         self._clock = clock or (lambda: datetime.now(timezone.utc))
         self._timeout_seconds = timeout_seconds
-        self._call_states: dict[tuple[str, str], PaidCallStatus] = {}
+        self._call_states: dict[tuple[str, str], PaidCallStatus | object] = {}
         self._state_lock = RLock()
 
     def _now(self) -> datetime:
@@ -154,15 +154,20 @@ class PaidModelCallService:
             usage_reference=usage_reference,
         )
 
-    def _prior_state(self, run_id: str, call_id: str) -> PaidCallStatus | None:
+    def _claim(self, run_id: str, call_id: str) -> object | None:
+        claim = object()
         with self._state_lock:
-            state = self._call_states.get((run_id, call_id))
-        if state in {
-            PaidCallStatus.USAGE_UNKNOWN,
-            PaidCallStatus.RECONCILIATION_REQUIRED,
-        }:
-            return state
-        return None
+            key = (run_id, call_id)
+            if key in self._call_states:
+                return None
+            self._call_states[key] = claim
+        return claim
+
+    def _clear_initial_claim(self, run_id: str, call_id: str, claim: object) -> None:
+        with self._state_lock:
+            key = (run_id, call_id)
+            if self._call_states.get(key) is claim:
+                self._call_states.pop(key)
 
     def _remember(self, run_id: str, call_id: str, status: PaidCallStatus) -> None:
         with self._state_lock:
@@ -183,13 +188,37 @@ class PaidModelCallService:
         pro_available: bool,
         allow_low_risk_fallback: bool,
     ) -> PaidCallResult:
-        prior = self._prior_state(run_id, call_id)
-        if prior is not None:
+        claim = self._claim(run_id, call_id)
+        if claim is None:
             return self._result(
                 PaidCallStatus.RECONCILIATION_REQUIRED,
                 requested_tier=request.budget.requested_tier,
                 effective_tier=None,
             )
+        try:
+            return self._execute_claimed(
+                run_id,
+                call_id,
+                request,
+                prompt,
+                attempt_dir,
+                pro_available=pro_available,
+                allow_low_risk_fallback=allow_low_risk_fallback,
+            )
+        finally:
+            self._clear_initial_claim(run_id, call_id, claim)
+
+    def _execute_claimed(
+        self,
+        run_id: str,
+        call_id: str,
+        request: JobRequest,
+        prompt: str,
+        attempt_dir: Path,
+        *,
+        pro_available: bool,
+        allow_low_risk_fallback: bool,
+    ) -> PaidCallResult:
 
         try:
             decision = self._router.select(
@@ -280,6 +309,9 @@ class PaidModelCallService:
                     pricing_version=request.budget.pricing_version,
                 )
             except Exception:
+                self._remember(
+                    run_id, call_id, PaidCallStatus.RECONCILIATION_REQUIRED
+                )
                 raise PaidModelCompensationError("reservation compensation failed") from None
             if isinstance(error, PaidModelRuntimeError):
                 raise

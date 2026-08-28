@@ -475,7 +475,7 @@ class ModelBudgetSnapshot(ImmutableWireModel):
     revision: int = Field(ge=0)
     intent: Literal["execute", "brief", "explore", "decide", "audit"] = "execute"
     requested_model_tier: Literal["auto", "flash", "pro"] = "auto"
-    effective_model_tier: Literal["flash", "pro"] | None = "flash"
+    effective_model_tier: Literal["flash", "pro"] | None = None
     effective_autonomy_mode: AutonomyMode = AutonomyMode.SUPERVISED
     price_period: Literal["peak", "off-peak"] = "off-peak"
     scheduled_start: datetime | None = None

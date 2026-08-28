@@ -254,6 +254,15 @@ def test_budget_can_preserve_unavailable_effective_tier() -> None:
     assert budget.effective_model_tier is None
 
 
+def test_budget_omitted_effective_tier_is_unknown_not_fabricated_flash() -> None:
+    budget = ModelBudgetSnapshot(
+        runId="omitted-1", projectId="p1", state="awaiting-approval", currency="CNY",
+        expectedCost=Decimal("1"), authorizedCeiling=Decimal("2"), usedCost=Decimal("0"),
+        reservedCost=Decimal("0"), remainingCost=Decimal("2"), decisionId="d1", revision=0,
+    )
+    assert budget.effective_model_tier is None
+
+
 @pytest.mark.asyncio
 async def test_mock_fallback_requires_pro_and_explicit_flash_downgrade() -> None:
     adapter = MockModelControlAdapter()

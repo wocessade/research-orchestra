@@ -249,7 +249,7 @@ git commit -m "feat(bogda): add dsh paid call adapter"
 
 **Files:**
 - Create: `bogda/src/bogda/model_runtime/service.py`
-- Create: `bogda/tests/model_runtime/test_service.py`
+- Create: `bogda/tests/model_runtime/test_paid_call_service.py`
 - Modify: `bogda/src/bogda/model_runtime/__init__.py`
 - Modify: `bogda/src/bogda/contracts/events.py`
 - Modify: `bogda/tests/contracts/test_events.py`
@@ -287,7 +287,7 @@ Also test archive failure before admission, route pause before admission, budget
 
 - [ ] **Step 2: Run focused tests and verify RED**
 
-Run: `uv run --extra dev --python 3.11 pytest tests/model_runtime/test_service.py tests/contracts/test_events.py -q`
+Run: `uv run --extra dev --python 3.11 pytest tests/model_runtime/test_paid_call_service.py tests/contracts/test_events.py -q`
 
 Expected: missing service/types and any new event invariant failures.
 
@@ -313,7 +313,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```powershell
-git add bogda/src/bogda/model_runtime/service.py bogda/src/bogda/model_runtime/__init__.py bogda/src/bogda/contracts/events.py bogda/tests/model_runtime/test_service.py bogda/tests/contracts/test_events.py
+git add bogda/src/bogda/model_runtime/service.py bogda/src/bogda/model_runtime/__init__.py bogda/src/bogda/contracts/events.py bogda/tests/model_runtime/test_paid_call_service.py bogda/tests/contracts/test_events.py
 git commit -m "feat(bogda): coordinate paid model calls"
 ```
 

@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from hashlib import sha256
 from pathlib import Path
+from typing import Callable
 
 import pytest
 
@@ -33,8 +34,11 @@ from bogda.model_runtime import (
     ModelCallResult,
     ModelRouter,
     PaidCallStatus,
+    PaidModelBudgetError,
     PaidModelCallService,
+    PaidModelClockError,
     PaidModelEventError,
+    PaidModelExecutionError,
 )
 
 
@@ -69,12 +73,14 @@ class FakeUsage:
 
 
 class FakeExecutor:
-    def __init__(self, result: ModelCallResult) -> None:
+    def __init__(self, result: ModelCallResult | BaseException) -> None:
         self.result = result
         self.calls = []
 
     def invoke(self, request):
         self.calls.append(request)
+        if isinstance(self.result, BaseException):
+            raise self.result
         return self.result
 
 
@@ -115,7 +121,13 @@ def request(
     )
 
 
-def service_for(tmp_path: Path, result: ModelCallResult, *, sink: MemorySink | None = None):
+def service_for(
+    tmp_path: Path,
+    result: ModelCallResult | BaseException,
+    *,
+    sink: MemorySink | None = None,
+    service_clock: Callable[[], datetime] | None = None,
+):
     actual_sink = sink or MemorySink()
     ledger = SingleFlightBudgetLedger(clock=lambda: NOW, id_factory=lambda: "reservation-1")
     budget = BudgetAdmissionService(
@@ -132,7 +144,7 @@ def service_for(tmp_path: Path, result: ModelCallResult, *, sink: MemorySink | N
         budget=budget,
         event_sink=actual_sink,
         executor=executor,
-        clock=lambda: NOW,
+        clock=service_clock or (lambda: NOW),
     )
     return service, actual_sink, ledger, executor
 
@@ -303,6 +315,149 @@ def test_unknown_usage_keeps_reservation_and_repeat_requires_reconciliation(tmp_
         RunEventType.MODEL_CALL_STARTED,
         RunEventType.MODEL_CALL_USAGE_UNKNOWN,
     ]
+
+
+def test_executor_exception_blocks_same_call_retry(tmp_path: Path) -> None:
+    service, _, ledger, executor = service_for(
+        tmp_path, RuntimeError("executor secret sentinel")
+    )
+
+    with pytest.raises(PaidModelExecutionError):
+        service.execute(
+            "run-1", "call-1", request(), PROMPT, tmp_path / "attempt",
+            pro_available=True, allow_low_risk_fallback=False,
+        )
+    repeated = service.execute(
+        "run-1", "call-1", request(), "different prompt", tmp_path / "attempt-2",
+        pro_available=True, allow_low_risk_fallback=False,
+    )
+
+    assert repeated.status is PaidCallStatus.RECONCILIATION_REQUIRED
+    assert ledger.active_total == Decimal("2")
+    assert len(executor.calls) == 1
+
+
+def test_usage_unknown_event_failure_blocks_same_call_retry(tmp_path: Path) -> None:
+    sink = MemorySink(fail_on=5)
+    service, _, ledger, executor = service_for(
+        tmp_path,
+        ModelCallResult(outcome=ModelCallOutcome.USAGE_UNKNOWN),
+        sink=sink,
+    )
+
+    with pytest.raises(PaidModelEventError):
+        service.execute(
+            "run-1", "call-1", request(), PROMPT, tmp_path / "attempt",
+            pro_available=True, allow_low_risk_fallback=False,
+        )
+    repeated = service.execute(
+        "run-1", "call-1", request(), PROMPT, tmp_path / "attempt-2",
+        pro_available=True, allow_low_risk_fallback=False,
+    )
+
+    assert repeated.status is PaidCallStatus.RECONCILIATION_REQUIRED
+    assert ledger.active_total == Decimal("2")
+    assert len(executor.calls) == 1
+
+
+def test_finished_event_failure_blocks_same_call_retry(tmp_path: Path) -> None:
+    sink = MemorySink(fail_on=5)
+    service, _, ledger, executor = service_for(
+        tmp_path, finished_result(), sink=sink
+    )
+
+    with pytest.raises(PaidModelEventError):
+        service.execute(
+            "run-1", "call-1", request(), PROMPT, tmp_path / "attempt",
+            pro_available=True, allow_low_risk_fallback=False,
+        )
+    repeated = service.execute(
+        "run-1", "call-1", request(), PROMPT, tmp_path / "attempt-2",
+        pro_available=True, allow_low_risk_fallback=False,
+    )
+
+    assert repeated.status is PaidCallStatus.RECONCILIATION_REQUIRED
+    assert ledger.active_total == Decimal("2")
+    assert len(executor.calls) == 1
+
+
+def test_reconcile_terminal_event_failure_blocks_duplicate_paid_execution(
+    tmp_path: Path,
+) -> None:
+    sink = MemorySink(fail_on=6)
+    service, _, ledger, executor = service_for(
+        tmp_path, finished_result(), sink=sink
+    )
+
+    with pytest.raises(PaidModelBudgetError):
+        service.execute(
+            "run-1", "call-1", request(), PROMPT, tmp_path / "attempt",
+            pro_available=True, allow_low_risk_fallback=False,
+        )
+    repeated = service.execute(
+        "run-1", "call-1", request(), PROMPT, tmp_path / "attempt-2",
+        pro_available=True, allow_low_risk_fallback=False,
+    )
+
+    assert ledger.lookup("reservation-1").state.value == "reconciled"
+    assert repeated.status is PaidCallStatus.RECONCILIATION_REQUIRED
+    assert len(executor.calls) == 1
+
+
+def test_started_clock_failure_releases_before_executor(tmp_path: Path) -> None:
+    class FailingStartedClock:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def __call__(self) -> datetime:
+            self.calls += 1
+            if self.calls == 2:
+                raise RuntimeError("clock secret sentinel")
+            return NOW
+
+    service, sink, ledger, executor = service_for(
+        tmp_path, finished_result(), service_clock=FailingStartedClock()
+    )
+
+    with pytest.raises(PaidModelClockError) as raised:
+        service.execute(
+            "run-1", "call-1", request(), PROMPT, tmp_path / "attempt",
+            pro_available=True, allow_low_risk_fallback=False,
+        )
+
+    assert "clock secret sentinel" not in str(raised.value)
+    assert ledger.active_total == Decimal("0")
+    assert executor.calls == []
+    assert sink.events[-1].event is RunEventType.BUDGET_RELEASED
+
+
+def test_provider_exact_cost_ignores_impossible_local_cache_split(
+    tmp_path: Path,
+) -> None:
+    provider_usage = DshTokenUsageV1(
+        input_tokens=2,
+        cache_read_tokens=3,
+        output_tokens=1,
+        actual_cost_cny="0.125",
+        reference="provider-exact",
+    )
+    service, _, ledger, _ = service_for(
+        tmp_path,
+        ModelCallResult(
+            outcome=ModelCallOutcome.FINISHED,
+            output="answer",
+            usage=provider_usage,
+        ),
+    )
+
+    result = service.execute(
+        "run-1", "call-1", request(), PROMPT, tmp_path / "attempt",
+        pro_available=True, allow_low_risk_fallback=False,
+    )
+
+    assert result.status is PaidCallStatus.FINISHED
+    assert result.actual_cost_cny == Decimal("0.125")
+    assert ledger.active_total == Decimal("0")
 
 
 def test_impossible_receipt_retains_reservation_without_guessing_cost(tmp_path: Path) -> None:

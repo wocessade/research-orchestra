@@ -168,6 +168,10 @@ class PaidModelCallService:
         with self._state_lock:
             self._call_states[(run_id, call_id)] = status
 
+    def _clear(self, run_id: str, call_id: str) -> None:
+        with self._state_lock:
+            self._call_states.pop((run_id, call_id), None)
+
     def execute(
         self,
         run_id: str,
@@ -267,7 +271,7 @@ class PaidModelCallService:
                     reason="model_call_started",
                 )
             )
-        except PaidModelEventError:
+        except Exception as error:
             try:
                 self._budget.release(
                     reservation.id,
@@ -277,7 +281,11 @@ class PaidModelCallService:
                 )
             except Exception:
                 raise PaidModelCompensationError("reservation compensation failed") from None
-            raise
+            if isinstance(error, PaidModelRuntimeError):
+                raise
+            raise PaidModelEventError("model call start event failed") from None
+
+        self._remember(run_id, call_id, PaidCallStatus.RECONCILIATION_REQUIRED)
 
         try:
             result = self._executor.invoke(
@@ -303,6 +311,7 @@ class PaidModelCallService:
                 )
             except Exception:
                 raise PaidModelBudgetError("reservation release failed") from None
+            self._clear(run_id, call_id)
             return self._result(
                 PaidCallStatus.FAILED_NOT_STARTED,
                 requested_tier=decision.requested_tier,
@@ -327,7 +336,6 @@ class PaidModelCallService:
                     reason="usage_unknown",
                 )
             )
-            self._remember(run_id, call_id, PaidCallStatus.USAGE_UNKNOWN)
             return self._result(
                 PaidCallStatus.USAGE_UNKNOWN,
                 requested_tier=decision.requested_tier,
@@ -339,10 +347,10 @@ class PaidModelCallService:
         usage = result.usage
         assert usage is not None
         try:
-            if usage.cache_read_tokens > usage.input_tokens:
-                raise ValueError("cache usage counts are impossible")
             actual_cost = usage.actual_cost_cny
             if actual_cost is None:
+                if usage.cache_read_tokens > usage.input_tokens:
+                    raise ValueError("cache usage counts are impossible")
                 pricing_now = self._now()
                 actual_cost = estimate_token_cost(
                     decision.effective_tier,
@@ -355,7 +363,6 @@ class PaidModelCallService:
             if not isinstance(actual_cost, Decimal) or not actual_cost.is_finite() or actual_cost < 0:
                 raise ValueError("local pricing did not produce an exact cost")
         except Exception:
-            self._remember(run_id, call_id, PaidCallStatus.RECONCILIATION_REQUIRED)
             return self._result(
                 PaidCallStatus.RECONCILIATION_REQUIRED,
                 requested_tier=decision.requested_tier,
@@ -391,6 +398,7 @@ class PaidModelCallService:
             )
         except Exception:
             raise PaidModelBudgetError("reservation reconciliation failed") from None
+        self._clear(run_id, call_id)
         return self._result(
             PaidCallStatus.FINISHED,
             requested_tier=decision.requested_tier,

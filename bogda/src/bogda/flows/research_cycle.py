@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 from uuid import UUID
 
 from prefect import flow
 from prefect.artifacts import Artifact
 from prefect.context import get_run_context
 from prefect.states import Cancelled
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from bogda.agents.contracts import AgentBudget, ExperimentProposal, ResearchPlan
 from bogda.agents.coordinator import (
@@ -18,9 +18,12 @@ from bogda.agents.coordinator import (
 )
 from bogda.artifacts import save_run_result
 from bogda.contracts import (
+    ArtifactSpec,
     AutonomyMode,
+    ExecutorKind,
     ExecutionStatus,
     JobRequest,
+    ResourceClass,
     ScientificStatus,
 )
 from bogda.contracts.decisions import CheckpointKind
@@ -74,9 +77,49 @@ class ResearchCycleInput(BaseModel):
         TOOL_PROPOSE_EXPERIMENT,
     )
 
+    @model_validator(mode="after")
+    def validate_executor(self) -> Self:
+        if self.job_request.executor is not ExecutorKind.SHELL:
+            raise ValueError("research cycle requires executor=shell")
+        return self
+
+
+class LegacyResearchCycleInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    job_id: str
+    project_id: str
+    goal: str = Field(min_length=1)
+    autonomy_mode: AutonomyMode
+    budget: AgentBudget
+    allowed_tools: tuple[str, ...] = (
+        TOOL_WRITE_PLAN,
+        TOOL_PROPOSE_EXPERIMENT,
+    )
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    expected_artifacts: tuple[ArtifactSpec, ...] = ()
+
+    def to_current(self) -> ResearchCycleInput:
+        return ResearchCycleInput(
+            job_request=JobRequest(
+                job_id=self.job_id,
+                project_id=self.project_id,
+                task_type="research-cycle",
+                resource_class=ResourceClass.CPU,
+                autonomy_mode=self.autonomy_mode,
+                parameters=self.parameters,
+                expected_artifacts=self.expected_artifacts,
+            ),
+            goal=self.goal,
+            coordinator_budget=self.budget,
+            allowed_tools=self.allowed_tools,
+        )
+
 
 def cycle_request_from(payload: dict[str, Any]) -> ResearchCycleInput:
-    return ResearchCycleInput.model_validate(payload)
+    if "job_request" in payload:
+        return ResearchCycleInput.model_validate(payload)
+    return LegacyResearchCycleInput.model_validate(payload).to_current()
 
 
 def _pause(run_id: str, kind: CheckpointKind, mode: AutonomyMode) -> None:

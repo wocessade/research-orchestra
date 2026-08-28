@@ -1,6 +1,8 @@
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from bogda.agents.contracts import AgentBudget
 from bogda.agents.coordinator import TOOL_PROPOSE_EXPERIMENT, TOOL_WRITE_PLAN
 from bogda.contracts import (
@@ -73,6 +75,52 @@ def test_cycle_input_preserves_canonical_job_request_axes(tmp_path) -> None:
         max_cost_cny="10.0",
         allowed_experiment_types=("shell",),
     ).max_cost_cny
+
+
+def test_cycle_input_adapts_legacy_flat_payload_with_conservative_axes(tmp_path) -> None:
+    current = cycle_request(tmp_path, ["python", "-V"])
+    job = current["job_request"]
+    legacy = {
+        "job_id": job["job_id"],
+        "project_id": job["project_id"],
+        "goal": current["goal"],
+        "autonomy_mode": job["autonomy_mode"],
+        "budget": current["coordinator_budget"],
+        "allowed_tools": current["allowed_tools"],
+        "parameters": job["parameters"],
+        "expected_artifacts": job["expected_artifacts"],
+    }
+
+    parsed = research_cycle.cycle_request_from(legacy)
+
+    assert parsed.job_request.job_id == "cycle-1"
+    assert parsed.job_request.intent is TaskIntent.EXECUTE
+    assert parsed.job_request.model_tier is ModelTier.AUTO
+    assert parsed.job_request.executor is ExecutorKind.SHELL
+    assert parsed.job_request.policy_revision == 0
+    assert parsed.coordinator_budget.max_steps == 8
+
+
+def test_cycle_input_rejects_dsh_before_coordinator_work(tmp_path) -> None:
+    payload = cycle_request(tmp_path, ["python", "-V"])
+    payload["job_request"].update(
+        {
+            "executor": "dsh",
+            "model_tier": "pro",
+            "budget": {
+                "expected_cost": "1",
+                "authorized_ceiling": "2",
+                "minimum_remaining": "10",
+                "requested_tier": "pro",
+                "fallback_tier": "flash",
+                "budget_source": "project",
+                "pricing_version": "deepseek-cn-2026-08-28",
+            },
+        }
+    )
+
+    with pytest.raises(ValueError, match="research cycle requires executor=shell"):
+        research_cycle.cycle_request_from(payload)
 
 
 def cooperating_model() -> ScriptedModel:

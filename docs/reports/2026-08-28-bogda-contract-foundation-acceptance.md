@@ -65,10 +65,10 @@ uv run --python 3.11 pytest tests/contracts -q
 # 63 passed in 0.22s
 
 uv run --python 3.11 pytest -m "not integration" -q
-# 253 passed, 10 skipped, 1 deselected in 9.19s
+# 255 passed, 10 skipped, 1 deselected in 7.92s
 
 uv run --python 3.11 pytest -m integration -v
-# 1 passed, 263 deselected in 23.96s
+# 1 passed, 265 deselected in 23.22s
 ```
 
 From `orchestra/broker/`, using the Bogda Python 3.11 virtual environment because the Windows `python` alias is unavailable:
@@ -106,5 +106,6 @@ The next plan should implement `UsagePort`, a versioned DeepSeek pricing catalog
 
 - The shell adapter rejects non-shell requests before creating attempt directories or launching subprocesses.
 - Research-cycle input now carries a canonical `JobRequest` plus a separately named `coordinator_budget`; request axes and policy revision survive the consumer boundary.
+- Existing flat research-cycle payloads remain accepted through an explicit `LegacyResearchCycleInput` adapter and receive conservative shell defaults; canonical dsh payloads are rejected before coordinator work.
 - `RunBudgetEnvelope` schema-version input is exact-integer v1, consistent with `JobRequest` and `RunEventV1`.
 - Whitespace-only `call_id` values are rejected and every ordinary budget lifecycle event has smoke coverage.

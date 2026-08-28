@@ -25,6 +25,8 @@ from bogda_console.contracts.models import (
     ModelPolicySnapshot,
     ModelPolicyPatch,
     RunPreparationPreview,
+    WorkloadEstimate,
+    AllowedRunPreferences,
 )
 
 
@@ -105,6 +107,8 @@ class ModelControlQueryPort(Protocol):
         project_id: str,
         intent: str,
         requested_model_tier: str,
+        workload: WorkloadEstimate,
+        allowed_preferences: AllowedRunPreferences,
         deadline: datetime | None = None,
     ) -> RunPreparationPreview: ...
 

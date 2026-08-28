@@ -10,6 +10,7 @@ from bogda_console.adapters.mock_model_control import MockModelControlAdapter
 from bogda_console.adapters.unwired_model_control import UnwiredModelControlAdapter
 from bogda_console.contracts.models import (
     BudgetState,
+    AllowedRunPreferences,
     DecisionAction,
     DecisionCenterSnapshot,
     DecisionItem,
@@ -21,6 +22,8 @@ from bogda_console.contracts.models import (
     ModelPolicyPatch,
     ModelPolicySnapshot,
     PriceCatalog,
+    RunPreparationPreview,
+    WorkloadEstimate,
 )
 from bogda_console.contracts.ports import (
     ModelControlConflict,
@@ -135,12 +138,21 @@ async def test_policy_patch_changes_authoritative_value_and_preserves_inherited_
 
     with pytest.raises(ValidationError):
         ModelPolicyPatch.model_validate({"surprise": True})
+    with pytest.raises(ValidationError):
+        ModelPolicyPatch.model_validate({"defaultModelTier": None})
+    with pytest.raises(ValidationError):
+        ModelPolicyPatch()
 
 
 @pytest.mark.asyncio
 async def test_preview_confirmation_is_opaque_and_idempotent() -> None:
     adapter = MockModelControlAdapter()
-    preview = await adapter.preview_run("project-1", "explore", "auto", DEADLINE)
+    preview = await adapter.preview_run(
+        "project-1", "explore", "auto",
+        WorkloadEstimate(inputTokens=1, outputTokens=1, expectedCalls=1, runtimeMinutes=1),
+        AllowedRunPreferences(preferOffPeak=True, allowAutoUpgrade=True, allowFlashDowngrade=True, autoResume=True),
+        DEADLINE,
+    )
     first = await adapter.confirm_preparation(preview.preparation_id, "idem-1")
     second = await adapter.confirm_preparation(preview.preparation_id, "idem-1")
     assert first == second
@@ -174,6 +186,18 @@ def test_decision_kinds_actions_and_budget_operational_fields_are_typed() -> Non
     )
     assert budget.events[0].event_type == "budget_paused"
     assert "prompt" not in budget.events[0].model_dump()
+    unavailable = RunPreparationPreview.model_validate(
+        {"preparation_id": "p1", "project_id": "p1", "intent": "decide",
+         "requested_model_tier": "pro", "effective_model_tier": None, "fallback_model_tier": None,
+         "effective_autonomy_mode": "supervised", "price_period": "off-peak",
+         "workload": {"input_tokens": 1, "output_tokens": 1, "expected_calls": 1, "runtime_minutes": 1},
+         "allowed_preferences": {"prefer_off_peak": True, "allow_auto_upgrade": False,
+                                  "allow_flash_downgrade": False, "auto_resume": False},
+         "budget": budget, "policy_revision": 0}
+    )
+    assert unavailable.effective_model_tier is None
+    assert unavailable.fallback_model_tier is None
+    assert ModelEventRow(eventId="e2", eventType="model_call_usage_unknown", occurredAt=DEADLINE)
 
 
 @pytest.mark.asyncio
@@ -203,12 +227,30 @@ def test_policy_and_preview_include_safety_catalog_workload_and_preference_field
 @pytest.mark.asyncio
 async def test_preview_contains_frozen_autonomy_workload_schedule_and_allowed_preferences() -> None:
     adapter = MockModelControlAdapter()
-    preview = await adapter.preview_run("project-1", "explore", "pro", DEADLINE)
+    workload = WorkloadEstimate(inputTokens=321, outputTokens=654, expectedCalls=7, runtimeMinutes=19)
+    preferences = AllowedRunPreferences(
+        preferOffPeak=False, allowAutoUpgrade=False, allowFlashDowngrade=True, autoResume=False
+    )
+    preview = await adapter.preview_run(
+        "project-1", "explore", "pro", workload=workload, allowed_preferences=preferences, deadline=DEADLINE
+    )
     assert preview.effective_autonomy_mode == "supervised"
     assert preview.fallback_model_tier == "flash"
     assert preview.price_period in {"peak", "off-peak"}
     assert preview.workload.expected_calls >= 1
-    assert preview.allowed_preferences.prefer_off_peak is True
+    assert preview.workload == workload
+    assert preview.allowed_preferences == preferences
+    assert preview.scheduled_start is None
+
+
+def test_workload_safety_margin_cannot_underbudget() -> None:
+    with pytest.raises(ValidationError):
+        ModelPolicySnapshot(
+            projectId="p1", source="global", inheritsGlobal=True, defaultModelTier="auto",
+            allowAutoUpgrade=True, allowFlashDowngrade=True, preferOffPeak=True, autoResume=True,
+            minimumRemaining=Decimal("10"), workloadSafetyMargin=Decimal("0.99"), criticalNotifications=True,
+            priceCatalog=PriceCatalog(status="ready"), revision=0,
+        )
 
 
 @pytest.mark.asyncio

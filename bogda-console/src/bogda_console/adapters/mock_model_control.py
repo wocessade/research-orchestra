@@ -16,6 +16,8 @@ from bogda_console.contracts.models import (
     PriceCatalog,
     HardSafetyBaselines,
     RunPreparationPreview,
+    WorkloadEstimate,
+    AllowedRunPreferences,
     UrgencyGroup,
 )
 from bogda_console.contracts.ports import ModelControlConflict
@@ -89,7 +91,10 @@ class MockModelControlAdapter:
             return self._policy(project_id, "project", values, False)
         return self._policy(project_id, "global", dict(self._global), True)
 
-    async def preview_run(self, project_id: str, intent: str, requested_model_tier: str, deadline=None) -> RunPreparationPreview:
+    async def preview_run(
+        self, project_id: str, intent: str, requested_model_tier: str,
+        workload: WorkloadEstimate, allowed_preferences: AllowedRunPreferences, deadline=None,
+    ) -> RunPreparationPreview:
         policy = await self.model_policy(project_id)
         effective = "pro" if requested_model_tier == "pro" else "flash"
         preparation_id = f"prep_{uuid4().hex}"
@@ -104,8 +109,7 @@ class MockModelControlAdapter:
             preparationId=preparation_id, projectId=project_id, intent=intent,
             requestedModelTier=requested_model_tier, effectiveModelTier=effective,
             effectiveAutonomyMode="supervised", fallbackModelTier="flash", pricePeriod="off-peak",
-            scheduledStart=deadline, workload={"inputTokens": 1000, "outputTokens": 500, "expectedCalls": 1, "runtimeMinutes": 5},
-            allowedPreferences={"preferOffPeak": True, "allowAutoUpgrade": True, "allowFlashDowngrade": True, "autoResume": True},
+            scheduledStart=None, workload=workload, allowedPreferences=allowed_preferences,
             deadline=deadline, budget=budget, policyRevision=policy.revision,
         )
         self._preparations[preparation_id] = preview

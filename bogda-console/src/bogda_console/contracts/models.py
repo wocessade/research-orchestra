@@ -447,7 +447,7 @@ class ModelEventRow(ImmutableWireModel):
     event_type: Literal[
         "budget_snapshot", "budget_reserved", "budget_released", "route_selected",
         "tier_upgrade_requested", "tier_downgraded", "model_call_started",
-        "model_call_finished", "budget_paused", "budget_resumed", "budget_override_approved",
+        "model_call_finished", "model_call_usage_unknown", "budget_paused", "budget_resumed", "budget_override_approved",
     ]
     occurred_at: datetime
     summary: str | None = None
@@ -517,7 +517,13 @@ class ModelPolicyPatch(ImmutableWireModel):
     auto_resume: bool | None = None
     minimum_remaining: Decimal | None = Field(default=None, ge=0)
     critical_notifications: bool | None = None
-    workload_safety_margin: Decimal | None = Field(default=None, ge=0)
+    workload_safety_margin: Decimal | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def require_actual_change(self) -> "ModelPolicyPatch":
+        if not self.model_fields_set or any(getattr(self, name) is None for name in self.model_fields_set):
+            raise ValueError("policy patch must contain at least one non-null field")
+        return self
 
 
 class WorkloadEstimate(ImmutableWireModel):
@@ -546,7 +552,7 @@ class ModelPolicySnapshot(ImmutableWireModel):
     minimum_remaining: Decimal = Field(ge=0)
     usage_snapshot_stale_after_seconds: int = Field(default=120, ge=1)
     critical_notifications: bool
-    workload_safety_margin: Decimal = Field(ge=0)
+    workload_safety_margin: Decimal = Field(default=Decimal("1"), ge=1)
     price_catalog: PriceCatalog
     hard_safety_baselines: HardSafetyBaselines = HardSafetyBaselines()
     revision: int = Field(ge=0)
@@ -557,9 +563,9 @@ class RunPreparationPreview(ImmutableWireModel):
     project_id: str = Field(min_length=1)
     intent: Literal["execute", "brief", "explore", "decide", "audit"]
     requested_model_tier: Literal["auto", "flash", "pro"]
-    effective_model_tier: Literal["flash", "pro"]
+    effective_model_tier: Literal["flash", "pro"] | None
     effective_autonomy_mode: AutonomyMode
-    fallback_model_tier: Literal["flash", "pro"]
+    fallback_model_tier: Literal["flash"] | None
     price_period: Literal["peak", "off-peak"]
     scheduled_start: datetime | None = None
     workload: WorkloadEstimate

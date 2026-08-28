@@ -5,6 +5,7 @@ from prefect.states import StateType
 
 from bogda.contracts import (
     AutonomyMode,
+    ExecutorKind,
     ExecutionStatus,
     JobRequest,
     ResourceClass,
@@ -71,6 +72,8 @@ def fake_artifacts(monkeypatch, stored: dict):
 
 
 def test_supervised_and_manual_require_type_b_gates_autonomous_does_not() -> None:
+    assert request().executor is ExecutorKind.SHELL
+    assert request().budget is None
     assert research_checkpoint.required_checkpoints(AutonomyMode.AUTONOMOUS) == ()
     assert CheckpointKind.EXPERIMENT_APPROVAL in research_checkpoint.required_checkpoints(
         AutonomyMode.SUPERVISED

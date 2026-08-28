@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal, Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from bogda.contracts.budgets import RunBudgetEnvelope
+from bogda.contracts.tasks import ExecutorKind, ModelTier, SchedulePolicy, TaskIntent
 
 
 class AutonomyMode(StrEnum):
@@ -49,15 +52,35 @@ class ArtifactRecord(BaseModel):
 
 
 class JobRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal[1] = 1
     job_id: str
     project_id: str
     task_type: str
     resource_class: ResourceClass
     autonomy_mode: AutonomyMode
     policy_revision: int = Field(default=0, ge=0)
+    intent: TaskIntent = TaskIntent.EXECUTE
+    model_tier: ModelTier = ModelTier.AUTO
+    executor: ExecutorKind = ExecutorKind.SHELL
+    budget: RunBudgetEnvelope | None = None
+    schedule_policy: SchedulePolicy = Field(default_factory=SchedulePolicy)
     parameters: dict[str, Any] = Field(default_factory=dict)
     retryable: bool = False
     expected_artifacts: tuple[ArtifactSpec, ...] = ()
+
+    @model_validator(mode="after")
+    def validate_paid_execution(self) -> Self:
+        if self.executor is ExecutorKind.DSH and self.budget is None:
+            raise ValueError("dsh requests require a budget envelope")
+        if (
+            self.budget is not None
+            and self.model_tier is not ModelTier.AUTO
+            and self.budget.requested_tier is not self.model_tier
+        ):
+            raise ValueError("model_tier must match budget.requested_tier")
+        return self
 
 
 class RunResult(BaseModel):

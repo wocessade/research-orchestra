@@ -1,6 +1,6 @@
 import json
 
-from bogda.contracts import AutonomyMode
+from bogda.contracts import AutonomyMode, ExecutorKind, ModelTier, TaskIntent
 from bogda.control import cli
 from bogda.policy import PolicyStore
 
@@ -51,4 +51,8 @@ def test_demo_request_freezes_resolved_mode_and_policy_revision(tmp_path) -> Non
 
     assert request.autonomy_mode is AutonomyMode.MANUAL
     assert request.policy_revision == 1
+    assert request.intent is TaskIntent.EXECUTE
+    assert request.model_tier is ModelTier.AUTO
+    assert request.executor is ExecutorKind.SHELL
+    assert request.budget is None
     assert store.resolve_mode("bogda").effective_mode is AutonomyMode.AUTONOMOUS

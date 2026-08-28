@@ -4,8 +4,10 @@ import pytest
 
 from bogda.contracts import (
     AutonomyMode,
+    ExecutorKind,
     ExecutionStatus,
     JobRequest,
+    ModelTier,
     ResourceClass,
     RunResult,
     ScientificStatus,
@@ -33,6 +35,14 @@ def request(retryable: bool = False) -> JobRequest:
 def test_retry_count_is_zero_by_default_and_one_when_declared() -> None:
     assert shell_job.retry_count(request()) == 0
     assert shell_job.retry_count(request(retryable=True)) == 1
+
+
+def test_shell_request_keeps_conservative_execution_axes() -> None:
+    shell_request = request()
+
+    assert shell_request.executor is ExecutorKind.SHELL
+    assert shell_request.model_tier is ModelTier.AUTO
+    assert shell_request.budget is None
 
 
 def test_apply_review_changes_scientific_state_without_execution_state() -> None:

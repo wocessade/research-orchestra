@@ -12,6 +12,7 @@ from bogda.artifacts import artifact_key, load_run_result
 from bogda.contracts import (
     ArtifactSpec,
     AutonomyMode,
+    ExecutorKind,
     JobRequest,
     ResourceClass,
     RunResult,
@@ -38,6 +39,10 @@ def test_local_vertical_slice(tmp_path) -> None:
             },
             expected_artifacts=(ArtifactSpec(path="result.txt"),),
         )
+
+        assert request.schema_version == 1
+        assert request.executor is ExecutorKind.SHELL
+        assert request.budget is None
 
         completed_state = run_shell_job(
             request.model_dump(mode="json"),

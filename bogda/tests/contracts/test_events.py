@@ -211,7 +211,26 @@ def test_explainable_budget_snapshot_requires_reason_when_decided() -> None:
         event(event="budget_snapshot", budget_decision="allow")
 
 
-@pytest.mark.parametrize("field", ["actual_cost_cny", "released_cny", "overspend_cny"])
+@pytest.mark.parametrize(
+    "field",
+    [
+        "active_reservations_cny",
+        "requested_reservation_cny",
+        "actual_cost_cny",
+        "released_cny",
+        "overspend_cny",
+    ],
+)
 def test_additive_accounting_fields_reject_floats(field: str) -> None:
     with pytest.raises(ValidationError, match="money values must not be floats"):
         event(**{field: 1.25})
+
+
+def test_accounting_axes_serialize_as_decimal_strings() -> None:
+    created = event(
+        active_reservations_cny="1.00",
+        requested_reservation_cny="2.50",
+    )
+    payload = created.model_dump(mode="json")
+    assert payload["active_reservations_cny"] == "1.00"
+    assert payload["requested_reservation_cny"] == "2.50"

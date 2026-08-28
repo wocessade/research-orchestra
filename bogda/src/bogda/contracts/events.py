@@ -47,6 +47,8 @@ class RunEventV1(BaseModel):
     reason: str | None = None
     balance_cny: Decimal | None = Field(default=None, ge=0)
     reserved_cny: Decimal | None = Field(default=None, ge=0)
+    active_reservations_cny: Decimal | None = Field(default=None, ge=0)
+    requested_reservation_cny: Decimal | None = Field(default=None, ge=0)
     minimum_remaining_cny: Decimal | None = Field(default=None, ge=0)
     snapshot_age_seconds: int | None = Field(default=None, ge=0)
     reservation_id: str | None = None
@@ -69,6 +71,8 @@ class RunEventV1(BaseModel):
     @field_validator(
         "balance_cny",
         "reserved_cny",
+        "active_reservations_cny",
+        "requested_reservation_cny",
         "minimum_remaining_cny",
         "actual_cost_cny",
         "released_cny",
@@ -81,7 +85,13 @@ class RunEventV1(BaseModel):
             raise ValueError("money values must not be floats")
         return value
 
-    @field_serializer("balance_cny", "reserved_cny", "minimum_remaining_cny")
+    @field_serializer(
+        "balance_cny",
+        "reserved_cny",
+        "active_reservations_cny",
+        "requested_reservation_cny",
+        "minimum_remaining_cny",
+    )
     def serialize_money(self, value: Decimal | None) -> str | None:
         return None if value is None else format(value, "f")
 

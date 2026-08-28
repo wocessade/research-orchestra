@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from decimal import Decimal
+from threading import RLock
 from typing import Callable
 
 from bogda.budget.guard import BudgetDecision, BudgetDecisionKind, BudgetGuard
@@ -79,6 +80,13 @@ def _intent(value: object) -> TaskIntent:
         raise BudgetAdmissionError("intent is invalid") from None
 
 
+def _tier(value: object) -> ModelTier:
+    try:
+        return value if isinstance(value, ModelTier) else ModelTier(value)
+    except (TypeError, ValueError):
+        raise BudgetAdmissionError("requested tier is invalid") from None
+
+
 def _stable_monitor_reason(error: UsageMonitorError) -> str:
     if isinstance(error, (UsageSnapshotStaleError, UsageSnapshotFutureError)):
         return "usage_snapshot_not_fresh"
@@ -86,7 +94,12 @@ def _stable_monitor_reason(error: UsageMonitorError) -> str:
 
 
 class BudgetAdmissionService:
-    """Coordinate usage, guard, atomic ledger mutation, and event persistence."""
+    """Coordinate usage, guard, atomic ledger mutation, and event persistence.
+
+    Terminal delivery tracking is process-local. Cross-process exactly-once
+    delivery requires a durable outbox or sink implementation, which is a
+    later replacement point for this Phase B service.
+    """
 
     def __init__(
         self,
@@ -112,6 +125,11 @@ class BudgetAdmissionService:
         self._ledger = ledger
         self._event_sink = event_sink
         self._clock = clock or (lambda: datetime.now(timezone.utc))
+        self._terminal_lock = RLock()
+        self._delivered_terminal_events: dict[tuple[object, ...], RunEventV1] = {}
+        self._terminal_contexts: dict[
+            tuple[object, ...], tuple[TaskIntent, ModelTier]
+        ] = {}
 
     def _now(self) -> datetime:
         try:
@@ -127,18 +145,26 @@ class BudgetAdmissionService:
         except Exception:
             raise BudgetEventWriteError("event write failed") from None
 
-    def _snapshot(self) -> tuple[UsageSnapshotV1 | None, str | None]:
+    def _snapshot(
+        self,
+    ) -> tuple[UsageSnapshotV1 | None, str | None, BudgetDecisionKind | None]:
         try:
             snapshot = self._usage.get_snapshot()
         except UsageMonitorError as error:
-            return None, _stable_monitor_reason(error)
+            reason = _stable_monitor_reason(error)
+            kind = (
+                BudgetDecisionKind.STALE_USAGE_SNAPSHOT
+                if reason == "usage_snapshot_not_fresh"
+                else None
+            )
+            return None, reason, kind
         except Exception:
-            return None, "usage_monitor_error"
+            return None, "usage_monitor_error", None
         if snapshot is None:
-            return None, "usage_snapshot_unavailable"
+            return None, "usage_snapshot_unavailable", None
         if not isinstance(snapshot, UsageSnapshotV1):
-            return None, "usage_snapshot_invalid"
-        return snapshot, None
+            return None, "usage_snapshot_invalid", None
+        return snapshot, None, None
 
     @staticmethod
     def _snapshot_age(snapshot: UsageSnapshotV1 | None, now: datetime) -> int | None:
@@ -162,9 +188,12 @@ class BudgetAdmissionService:
         reason: str | None = None,
         reservation_id: str | None = None,
         reserved_cny: Decimal | None = None,
+        active_reservations_cny: Decimal | None = None,
+        requested_reservation_cny: Decimal | None = None,
         actual_cost_cny: Decimal | None = None,
         released_cny: Decimal | None = None,
         overspend_cny: Decimal | None = None,
+        budget_decision: str | None = None,
     ) -> RunEventV1:
         return RunEventV1(
             event=event,
@@ -174,7 +203,9 @@ class BudgetAdmissionService:
             requested_tier=requested_tier,
             reason=reason or decision.reason,
             balance_cny=decision.balance,
-            reserved_cny=reserved_cny if reserved_cny is not None else decision.active_reservations,
+            reserved_cny=reserved_cny,
+            active_reservations_cny=active_reservations_cny,
+            requested_reservation_cny=requested_reservation_cny,
             minimum_remaining_cny=decision.minimum_remaining,
             snapshot_age_seconds=decision.snapshot_age
             if decision.snapshot_age is not None
@@ -184,7 +215,61 @@ class BudgetAdmissionService:
             released_cny=released_cny,
             overspend_cny=overspend_cny,
             pricing_version=decision.pricing_version,
-            budget_decision=decision.kind.value,
+            budget_decision=budget_decision,
+        )
+
+    @staticmethod
+    def _terminal_key(operation: str, reservation: Reservation) -> tuple[object, ...]:
+        return (
+            operation,
+            reservation.id,
+            reservation.run_id,
+            reservation.state,
+            reservation.reserved,
+            reservation.actual_cost,
+            reservation.released_amount,
+            reservation.overspend,
+            reservation.updated_at,
+        )
+
+    @staticmethod
+    def _terminal_event(
+        *,
+        reservation: Reservation,
+        intent: TaskIntent,
+        requested_tier: ModelTier,
+        operation: str,
+    ) -> RunEventV1:
+        decision = BudgetDecision(
+            allowed=True,
+            kind=BudgetDecisionKind.ALLOW,
+            reason=("budget_released" if operation == "release" else "budget_reconciled"),
+            balance=None,
+            active_reservations=Decimal("0"),
+            minimum_remaining=None,
+            available_to_start=None,
+            requested_reservation=reservation.reserved,
+            snapshot_age=None,
+            ledger_revision=0,
+            pricing_version=None,
+        )
+        return BudgetAdmissionService._event_context(
+            run_id=reservation.run_id,
+            intent=intent,
+            requested_tier=requested_tier,
+            now=reservation.updated_at,
+            decision=decision,
+            snapshot=None,
+            event=RunEventType.BUDGET_RELEASED,
+            reason=decision.reason,
+            reservation_id=reservation.id,
+            reserved_cny=reservation.reserved,
+            active_reservations_cny=Decimal("0"),
+            requested_reservation_cny=reservation.reserved,
+            actual_cost_cny=reservation.actual_cost,
+            released_cny=reservation.released_amount,
+            overspend_cny=reservation.overspend,
+            budget_decision=None,
         )
 
     def _conflict_decision(self, decision: BudgetDecision) -> BudgetDecision:
@@ -211,7 +296,7 @@ class BudgetAdmissionService:
             raise BudgetAdmissionError("budget envelope is invalid")
         requested = envelope.authorized_ceiling if reservation_cny is None else reservation_cny
         now = self._now()
-        snapshot, monitor_reason = self._snapshot()
+        snapshot, monitor_reason, monitor_kind = self._snapshot()
         try:
             decision = self._guard.evaluate(
                 snapshot=snapshot,
@@ -221,7 +306,14 @@ class BudgetAdmissionService:
             )
         except Exception:
             raise BudgetAdmissionError("budget evaluation failed") from None
-        if monitor_reason is not None and decision.reason == "usage_snapshot_unavailable":
+        if monitor_kind is not None:
+            decision = replace(
+                decision,
+                allowed=False,
+                kind=monitor_kind,
+                reason=monitor_reason or "usage_snapshot_not_fresh",
+            )
+        elif monitor_reason is not None and decision.reason == "usage_snapshot_unavailable":
             decision = replace(decision, reason=monitor_reason)
 
         snapshot_event = self._event_context(
@@ -232,6 +324,10 @@ class BudgetAdmissionService:
             decision=decision,
             snapshot=snapshot,
             event=RunEventType.BUDGET_SNAPSHOT,
+            reserved_cny=None,
+            active_reservations_cny=decision.active_reservations,
+            requested_reservation_cny=decision.requested_reservation,
+            budget_decision=decision.kind.value,
         )
         # This is deliberately before every possible reserve call.
         self._append(snapshot_event)
@@ -246,7 +342,10 @@ class BudgetAdmissionService:
                     decision=decision,
                     snapshot=snapshot,
                     event=RunEventType.BUDGET_PAUSED,
-                    reserved_cny=decision.requested_reservation,
+                    reserved_cny=None,
+                    active_reservations_cny=decision.active_reservations,
+                    requested_reservation_cny=decision.requested_reservation,
+                    budget_decision=decision.kind.value,
                 )
             )
             return BudgetAdmissionResult(decision=decision)
@@ -278,7 +377,10 @@ class BudgetAdmissionService:
                     decision=conflict,
                     snapshot=snapshot,
                     event=RunEventType.BUDGET_PAUSED,
-                    reserved_cny=conflict.requested_reservation,
+                    reserved_cny=None,
+                    active_reservations_cny=conflict.active_reservations,
+                    requested_reservation_cny=conflict.requested_reservation,
+                    budget_decision=conflict.kind.value,
                 )
             )
             return BudgetAdmissionResult(decision=conflict)
@@ -297,6 +399,9 @@ class BudgetAdmissionService:
                     event=RunEventType.BUDGET_RESERVED,
                     reservation_id=reservation.id,
                     reserved_cny=reservation.reserved,
+                    active_reservations_cny=decision.active_reservations,
+                    requested_reservation_cny=decision.requested_reservation,
+                    budget_decision=decision.kind.value,
                 )
             )
         except BudgetEventWriteError:
@@ -311,98 +416,103 @@ class BudgetAdmissionService:
         self,
         reservation_id: str,
         *,
-        intent: TaskIntent | None = None,
-        requested_tier: ModelTier | None = None,
+        intent: TaskIntent,
+        requested_tier: ModelTier,
     ) -> Reservation:
-        before = self._ledger.lookup(reservation_id)
-        before_revision = self._ledger.revision
-        if before.state is ReservationState.RELEASED:
-            return before
-        now = self._now()
-        try:
-            released = self._ledger.release(reservation_id, now=now)
-        except Exception:
-            raise BudgetAdmissionError("reservation release failed") from None
-        if self._ledger.revision == before_revision:
-            return released
-        decision = BudgetDecision(
-            allowed=True,
-            kind=BudgetDecisionKind.ALLOW,
-            reason="budget_released",
-            balance=None,
-            active_reservations=Decimal("0"),
-            minimum_remaining=None,
-            available_to_start=None,
-            requested_reservation=released.reserved,
-            snapshot_age=None,
-            ledger_revision=before_revision,
-            pricing_version=None,
-        )
-        self._append(
-            self._event_context(
-                run_id=released.run_id,
-                intent=_intent(intent or TaskIntent.AUDIT),
-                requested_tier=requested_tier or ModelTier.FLASH,
-                now=now,
-                decision=decision,
-                snapshot=None,
-                event=RunEventType.BUDGET_RELEASED,
-                reservation_id=released.id,
-                reserved_cny=released.reserved,
-                released_cny=released.released_amount,
+        intent = _intent(intent)
+        requested_tier = _tier(requested_tier)
+        with self._terminal_lock:
+            before = self._ledger.lookup(reservation_id)
+            if before.state is ReservationState.RECONCILED:
+                raise BudgetAdmissionError("reconciled reservation cannot be released")
+            if before.state is ReservationState.RELEASED:
+                self._append_terminal_event(
+                    before,
+                    intent=intent,
+                    requested_tier=requested_tier,
+                    operation="release",
+                )
+                return before
+
+            now = self._now()
+            try:
+                released = self._ledger.release(reservation_id, now=now)
+            except Exception:
+                raise BudgetAdmissionError("reservation release failed") from None
+            self._append_terminal_event(
+                released,
+                intent=intent,
+                requested_tier=requested_tier,
+                operation="release",
             )
-        )
-        return released
+            return released
 
     def reconcile(
         self,
         reservation_id: str,
         actual_cost_cny: Decimal,
         *,
-        intent: TaskIntent | None = None,
-        requested_tier: ModelTier | None = None,
+        intent: TaskIntent,
+        requested_tier: ModelTier,
     ) -> Reservation:
-        before = self._ledger.lookup(reservation_id)
-        before_revision = self._ledger.revision
-        if before.state is ReservationState.RECONCILED and before.actual_cost == actual_cost_cny:
-            return before
-        now = self._now()
-        try:
-            reconciled = self._ledger.reconcile(reservation_id, actual_cost_cny, now=now)
-        except Exception:
-            raise BudgetAdmissionError("reservation reconciliation failed") from None
-        if self._ledger.revision == before_revision:
-            return reconciled
-        decision = BudgetDecision(
-            allowed=True,
-            kind=BudgetDecisionKind.ALLOW,
-            reason="budget_reconciled",
-            balance=None,
-            active_reservations=Decimal("0"),
-            minimum_remaining=None,
-            available_to_start=None,
-            requested_reservation=reconciled.reserved,
-            snapshot_age=None,
-            ledger_revision=before_revision,
-            pricing_version=None,
-        )
-        self._append(
-            self._event_context(
-                run_id=reconciled.run_id,
-                intent=_intent(intent or TaskIntent.AUDIT),
-                requested_tier=requested_tier or ModelTier.FLASH,
-                now=now,
-                decision=decision,
-                snapshot=None,
-                event=RunEventType.BUDGET_RELEASED,
-                reservation_id=reconciled.id,
-                reserved_cny=reconciled.reserved,
-                actual_cost_cny=reconciled.actual_cost,
-                released_cny=reconciled.released_amount,
-                overspend_cny=reconciled.overspend,
+        intent = _intent(intent)
+        requested_tier = _tier(requested_tier)
+        with self._terminal_lock:
+            before = self._ledger.lookup(reservation_id)
+            if before.state is ReservationState.RELEASED:
+                raise BudgetAdmissionError("released reservation cannot be reconciled")
+            if before.state is ReservationState.RECONCILED:
+                if before.actual_cost != actual_cost_cny:
+                    raise BudgetAdmissionError("reconciliation conflicts with recorded cost")
+                self._append_terminal_event(
+                    before,
+                    intent=intent,
+                    requested_tier=requested_tier,
+                    operation="reconcile",
+                )
+                return before
+
+            now = self._now()
+            try:
+                reconciled = self._ledger.reconcile(
+                    reservation_id, actual_cost_cny, now=now
+                )
+            except Exception:
+                raise BudgetAdmissionError("reservation reconciliation failed") from None
+            self._append_terminal_event(
+                reconciled,
+                intent=intent,
+                requested_tier=requested_tier,
+                operation="reconcile",
             )
+            return reconciled
+
+    def _append_terminal_event(
+        self,
+        reservation: Reservation,
+        *,
+        intent: TaskIntent,
+        requested_tier: ModelTier,
+        operation: str,
+    ) -> None:
+        key = self._terminal_key(operation, reservation)
+        delivered = self._delivered_terminal_events.get(key)
+        context = self._terminal_contexts.get(key)
+        if delivered is not None:
+            context = (delivered.intent, delivered.requested_tier)
+        if context is not None and context != (intent, requested_tier):
+            raise BudgetAdmissionError("terminal event context conflicts")
+        self._terminal_contexts.setdefault(key, (intent, requested_tier))
+        if key in self._delivered_terminal_events:
+            return
+        event = self._terminal_event(
+            reservation=reservation,
+            intent=intent,
+            requested_tier=requested_tier,
+            operation=operation,
         )
-        return reconciled
+        self._append(event)
+        self._delivered_terminal_events[key] = event
 
 
 __all__ = [

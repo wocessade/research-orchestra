@@ -33,6 +33,8 @@ from bogda_console.contracts.ports import (
     ModelControlCommandPort,
     ModelControlConflict,
     ModelControlUnavailable,
+    ModelControlNotFound,
+    ModelControlNotApplicable,
 )
 from bogda_console.services.errors import ServiceError
 
@@ -62,12 +64,6 @@ class CommandService:
     ) -> CommandReceipt[RunSummary]:
         async with self._lock(f"deployment:{deployment_id}"):
             self._require_commands()
-            if run_preparation_id is not None:
-                self._require_model_control_writes()
-                await self._mutate(
-                    "modelControl",
-                    lambda: self._model_control.confirm_preparation(run_preparation_id, idempotency_key),
-                )
             if deployment_id not in self.settings.allowed_deployment_ids:
                 self._raise(ApiErrorCode.RESOURCE_NOT_ALLOWLISTED, 403, deployment_id)
             deployment = await self._pre_read(
@@ -83,6 +79,12 @@ class CommandService:
                         409,
                         "dorm-x86 concurrency limit must equal one",
                     )
+            if run_preparation_id is not None:
+                self._require_model_control_writes()
+                await self._mutate(
+                    "modelControl",
+                    lambda: self._model_control.confirm_preparation(run_preparation_id, idempotency_key),
+                )
             submitted = await self._mutate(
                 "prefect",
                 lambda: self.prefect.submit_registered_deployment(
@@ -94,10 +96,10 @@ class CommandService:
             )
             return self._receipt("submit", submitted.run_id, post.run)
 
-    async def resolve_decision(self, decision_id: str, action_id: str, expected_revision: int) -> CommandReceipt[DecisionCenterSnapshot]:
+    async def resolve_decision(self, decision_id: str, action_id: str, expected_revision: int, rationale: str | None = None) -> CommandReceipt[DecisionCenterSnapshot]:
         async with self._lock(f"decision:{decision_id}"):
             self._require_model_control_writes()
-            snapshot = await self._mutate("modelControl", lambda: self._model_control.resolve_decision(decision_id, action_id, expected_revision))
+            snapshot = await self._mutate("modelControl", lambda: self._model_control.resolve_decision(decision_id, action_id, expected_revision, rationale))
             return self._receipt("resolveDecision", decision_id, snapshot)
 
     async def set_global_model_policy(self, patch: ModelPolicyPatch, expected_revision: int) -> CommandReceipt[ModelPolicySnapshot]:
@@ -474,6 +476,10 @@ class CommandService:
             )
         except ModelControlConflict as error:
             self._raise(ApiErrorCode.RESOURCE_CHANGED, 409, "resource changed after the action was opened", error.current, source="modelControl")
+        except ModelControlNotFound as error:
+            self._raise(ApiErrorCode.NOT_FOUND, 404, str(error), source="modelControl")
+        except ModelControlNotApplicable as error:
+            self._raise(ApiErrorCode.COMMAND_NOT_APPLICABLE, 409, str(error), source="modelControl")
         except ModelControlUnavailable as error:
             self._raise(ApiErrorCode.MODEL_CONTROL_UNAVAILABLE, 503, str(error), source="modelControl")
         except (ConnectionError, TimeoutError, httpx.RequestError) as error:

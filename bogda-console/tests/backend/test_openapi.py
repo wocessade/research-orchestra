@@ -37,3 +37,21 @@ def test_openapi_keeps_command_and_review_request_bodies_closed() -> None:
     assert paths["/api/v1/runs/{run_id}/checkpoints"]["post"]["requestBody"]
     assert paths["/api/v1/run-preparations/preview"]["post"]["requestBody"]
     assert paths["/api/v1/model-policy/global"]["post"]["requestBody"]
+
+
+def test_openapi_model_control_mutations_use_typed_receipts() -> None:
+    schemas = create_app(Settings.from_env({})).openapi()["components"]["schemas"]
+    decision_envelope = schemas["ApiEnvelope_CommandReceipt_DecisionCenterSnapshot__"]
+    policy_envelope = schemas["ApiEnvelope_CommandReceipt_ModelPolicySnapshot__"]
+    assert decision_envelope["properties"]["data"]["anyOf"][0]["$ref"].endswith(
+        "CommandReceipt_DecisionCenterSnapshot_"
+    )
+    assert policy_envelope["properties"]["data"]["anyOf"][0]["$ref"].endswith(
+        "CommandReceipt_ModelPolicySnapshot_"
+    )
+    assert schemas["CommandReceipt_DecisionCenterSnapshot_"]["properties"]["snapshot"]["$ref"].endswith(
+        "DecisionCenterSnapshot"
+    )
+    assert schemas["CommandReceipt_ModelPolicySnapshot_"]["properties"]["snapshot"]["$ref"].endswith(
+        "ModelPolicySnapshot"
+    )

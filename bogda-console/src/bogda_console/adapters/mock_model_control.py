@@ -20,7 +20,7 @@ from bogda_console.contracts.models import (
     AllowedRunPreferences,
     UrgencyGroup,
 )
-from bogda_console.contracts.ports import ModelControlConflict
+from bogda_console.contracts.ports import ModelControlConflict, ModelControlNotApplicable, ModelControlNotFound
 
 
 class MockModelControlAdapter:
@@ -41,7 +41,7 @@ class MockModelControlAdapter:
                 projectId="project-1", runId="run-1", reason="Preparation needs owner approval",
                 risk="budget", estimatedCost=Decimal("1.00"), deadline=None,
                 evidence=[EvidenceReference(kind="run", refId="run-1", label="Run")],
-                actions=(DecisionAction(actionId="approve", label="Approve", costImpact="Uses budget"),),
+                actions=(DecisionAction(actionId="approve", label="Approve", costImpact="Uses budget", requiresRationale=True),),
                 revision=0, logSummary="Awaiting owner decision.",
             )
             ,"decision-usage-unknown": DecisionItem(
@@ -66,13 +66,14 @@ class MockModelControlAdapter:
         )}
         self._preparations: dict[str, RunPreparationPreview] = {}
         self._confirmations: dict[str, tuple[str, str]] = {}
+        self._decision_rationales: dict[str, str] = {}
 
     async def decision_center(self) -> DecisionCenterSnapshot:
         return DecisionCenterSnapshot(items=list(self._items.values()), revision=self._revision)
 
     async def run_budget(self, run_id: str) -> ModelBudgetSnapshot:
         if run_id not in self._budgets:
-            raise KeyError(run_id)
+            raise ModelControlNotFound(run_id)
         return self._budgets[run_id]
 
     def _policy(self, project_id: str | None, source: str, values: dict[str, object], inherits: bool) -> ModelPolicySnapshot:
@@ -116,13 +117,20 @@ class MockModelControlAdapter:
         self._preparations[preparation_id] = preview
         return preview
 
-    async def resolve_decision(self, decision_id: str, action_id: str, expected_revision: int) -> DecisionCenterSnapshot:
+    async def resolve_decision(self, decision_id: str, action_id: str, expected_revision: int, rationale: str | None = None) -> DecisionCenterSnapshot:
+        item = self._items.get(decision_id)
+        if item is None:
+            raise ModelControlNotFound(decision_id)
         current = await self.decision_center()
         if expected_revision != self._revision:
             raise ModelControlConflict(current)
-        item = self._items.get(decision_id)
-        if item is None or action_id not in {action.action_id for action in item.actions}:
+        action = next((action for action in item.actions if action.action_id == action_id), None)
+        if action is None:
             raise ModelControlConflict(current)
+        if action.requires_rationale and (not rationale or not rationale.strip()):
+            raise ModelControlNotApplicable("rationale is required for this action")
+        if rationale is not None:
+            self._decision_rationales[decision_id] = rationale.strip()
         del self._items[decision_id]
         self._revision += 1
         return await self.decision_center()
@@ -147,7 +155,9 @@ class MockModelControlAdapter:
         return await self.model_policy(project_id)
 
     async def confirm_preparation(self, preparation_id: str, idempotency_key: str) -> RunPreparationPreview:
-        preview = self._preparations[preparation_id]
+        preview = self._preparations.get(preparation_id)
+        if preview is None:
+            raise ModelControlNotFound(preparation_id)
         prior = self._confirmations.get(preparation_id)
         if prior is not None:
             if prior[0] != idempotency_key:

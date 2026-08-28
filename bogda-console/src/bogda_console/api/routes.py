@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Literal
 
 from fastapi import APIRouter, Query, Request
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from bogda_console.contracts.models import (
     ApiEnvelope,
@@ -42,19 +42,25 @@ router = APIRouter(prefix="/api/v1")
 
 
 class DecisionRequest(WireModel):
-    action_id: str
+    action_id: str = Field(min_length=1)
+    expected_revision: int = Field(ge=0)
+    rationale: str | None = None
+
+
+class GlobalModelPolicyRequest(WireModel):
+    patch: ModelPolicyPatch
     expected_revision: int
 
 
-class ModelPolicyRequest(WireModel):
+class ProjectModelPolicyRequest(WireModel):
     patch: ModelPolicyPatch | None
     expected_revision: int
 
 
 class RunPreparationPreviewRequest(WireModel):
     project_id: str
-    intent: str
-    requested_model_tier: str
+    intent: Literal["execute", "brief", "explore", "decide", "audit"]
+    requested_model_tier: Literal["auto", "flash", "pro"]
     workload: WorkloadEstimate
     allowed_preferences: AllowedRunPreferences
     deadline: datetime | None = None
@@ -291,18 +297,18 @@ async def set_project_autonomy(project_id: str, body: SetProjectAutonomyRequest,
     )
 
 
-@router.post("/decisions/{decision_id}", response_model=ApiEnvelope)
+@router.post("/decisions/{decision_id}", response_model=ApiEnvelope[CommandReceipt[DecisionCenterSnapshot]])
 async def resolve_decision(decision_id: str, body: DecisionRequest, request: Request):
-    return command_envelope(await commands(request).resolve_decision(decision_id, body.action_id, body.expected_revision))
+    return command_envelope(await commands(request).resolve_decision(decision_id, body.action_id, body.expected_revision, body.rationale))
 
 
-@router.post("/model-policy/global", response_model=ApiEnvelope)
-async def set_global_model_policy(body: ModelPolicyRequest, request: Request):
+@router.post("/model-policy/global", response_model=ApiEnvelope[CommandReceipt[ModelPolicySnapshot]])
+async def set_global_model_policy(body: GlobalModelPolicyRequest, request: Request):
     return command_envelope(await commands(request).set_global_model_policy(body.patch, body.expected_revision))
 
 
-@router.post("/model-policy/projects/{project_id}", response_model=ApiEnvelope)
-async def set_project_model_policy(project_id: str, body: ModelPolicyRequest, request: Request):
+@router.post("/model-policy/projects/{project_id}", response_model=ApiEnvelope[CommandReceipt[ModelPolicySnapshot]])
+async def set_project_model_policy(project_id: str, body: ProjectModelPolicyRequest, request: Request):
     return command_envelope(await commands(request).set_project_model_policy(project_id, body.patch, body.expected_revision))
 
 

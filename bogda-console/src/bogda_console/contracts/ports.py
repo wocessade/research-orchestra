@@ -93,6 +93,14 @@ class ModelControlConflict(Exception):
         self.current = current
 
 
+class ModelControlNotFound(Exception):
+    pass
+
+
+class ModelControlNotApplicable(Exception):
+    pass
+
+
 class ModelControlUnavailable(Exception):
     pass
 
@@ -115,7 +123,7 @@ class ModelControlQueryPort(Protocol):
 
 @runtime_checkable
 class ModelControlCommandPort(Protocol):
-    async def resolve_decision(self, decision_id: str, action_id: str, expected_revision: int) -> DecisionCenterSnapshot: ...
+    async def resolve_decision(self, decision_id: str, action_id: str, expected_revision: int, rationale: str | None = None) -> DecisionCenterSnapshot: ...
     async def set_global_policy(self, patch: ModelPolicyPatch, expected_revision: int) -> ModelPolicySnapshot: ...
     async def set_project_policy(self, project_id: str, patch: ModelPolicyPatch | None, expected_revision: int) -> ModelPolicySnapshot: ...
     async def confirm_preparation(self, preparation_id: str, idempotency_key: str) -> RunPreparationPreview: ...

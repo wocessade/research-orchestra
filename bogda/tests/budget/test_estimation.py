@@ -12,6 +12,7 @@ from bogda.budget.estimation import (
     WorkloadEstimate,
     WorkloadEstimator,
 )
+from bogda.budget.pricing import PricePeriod
 from bogda.contracts import BudgetSource, ModelTier, TaskIntent
 
 
@@ -58,6 +59,17 @@ def test_total_tokens_are_priced_once_and_retries_use_average_call_cost() -> Non
 
     assert result.expected_cost == Decimal("15")
     assert result.retry_reserve == Decimal("7.5")
+
+
+def test_token_workload_requires_a_nonzero_baseline_even_with_retries() -> None:
+    with pytest.raises(ValueError, match="baseline"):
+        TokenWorkload(
+            expected_calls=1,
+            cache_hit_input_tokens=0,
+            cache_miss_input_tokens=0,
+            output_tokens=0,
+            allowed_retries=1,
+        )
 
 
 def test_claimed_cache_hits_require_verified_evidence_and_are_floor_capped() -> None:
@@ -150,6 +162,16 @@ def test_injected_policy_must_cover_exactly_all_concrete_pairs() -> None:
         )
 
 
+def test_contingency_factors_cannot_underfund_the_expected_cost() -> None:
+    with pytest.raises(ValueError, match="at least 1"):
+        WorkloadEstimator(
+            contingency_policy={
+                **dict(DEFAULT_CONTINGENCY_POLICY),
+                (TaskIntent.EXECUTE, ModelTier.FLASH): Decimal("0.5"),
+            }
+        )
+
+
 def test_contingency_policy_is_immutable() -> None:
     assert isinstance(DEFAULT_CONTINGENCY_POLICY, MappingProxyType)
     with pytest.raises(TypeError):
@@ -172,6 +194,25 @@ def test_p90_raises_ceiling_before_retry_reserve_is_added() -> None:
     assert result.retry_reserve == Decimal("1.5")
     assert result.authorized_ceiling == Decimal("11.5")
     assert result.historical_p90_cost == Decimal("10")
+
+
+def test_manual_estimate_rejects_an_authorized_ceiling_below_expected_cost() -> None:
+    with pytest.raises(ValueError, match="authorized_ceiling"):
+        WorkloadEstimate(
+            intent=TaskIntent.EXECUTE,
+            tier=ModelTier.FLASH,
+            workload=workload(),
+            effective_cache_hit_input_tokens=0,
+            effective_cache_miss_input_tokens=1_000_000,
+            effective_output_tokens=1_000_000,
+            expected_cost=Decimal("1.50"),
+            retry_reserve=Decimal("0"),
+            contingency_factor=Decimal("1"),
+            historical_p90_cost=None,
+            authorized_ceiling=Decimal("0.75"),
+            period=PricePeriod.OFF_PEAK,
+            pricing_version="test-pricing",
+        )
 
 
 def test_peak_crossing_window_uses_peak_without_time_charge() -> None:

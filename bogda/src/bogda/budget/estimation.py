@@ -73,6 +73,8 @@ class TokenWorkload:
         _require_count(self.cache_miss_input_tokens, "cache_miss_input_tokens")
         _require_count(self.output_tokens, "output_tokens")
         _require_count(self.allowed_retries, "allowed_retries")
+        if self.total_input_tokens + self.output_tokens == 0:
+            raise ValueError("baseline workload must contain at least one token")
 
     @property
     def total_input_tokens(self) -> int:
@@ -146,8 +148,8 @@ def _validate_policy(
             raise ValueError("contingency_policy must not contain AUTO")
         actual_pairs.add((intent, tier))
         normalized[(intent, tier)] = _require_decimal(factor, "contingency factor")
-        if normalized[(intent, tier)] <= 0:
-            raise ValueError("contingency factors must be positive")
+        if normalized[(intent, tier)] < 1:
+            raise ValueError("contingency factors must be at least 1")
     missing = concrete_pairs - actual_pairs
     extra = actual_pairs - concrete_pairs
     if missing:
@@ -208,6 +210,8 @@ class WorkloadEstimate:
             value = _require_decimal(getattr(self, name), name, non_negative=True)
             if name == "contingency_factor" and value <= 0:
                 raise ValueError("contingency_factor must be positive")
+        if self.authorized_ceiling < self.expected_cost:
+            raise ValueError("authorized_ceiling must be >= expected_cost")
         if self.historical_p90_cost is not None:
             _require_decimal(
                 self.historical_p90_cost, "historical_p90_cost", non_negative=True

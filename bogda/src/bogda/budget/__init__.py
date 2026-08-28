@@ -29,6 +29,13 @@ from bogda.budget.usage import (
     require_fresh_snapshot,
     snapshot_age_seconds,
 )
+from bogda.budget.estimation import (
+    DEFAULT_CONTINGENCY_POLICY,
+    HistoricalUsageProfile,
+    TokenWorkload,
+    WorkloadEstimate,
+    WorkloadEstimator,
+)
 
 __all__ = [
     "DEEPSEEK_CN_2026_08_28",
@@ -58,4 +65,9 @@ __all__ = [
     "UsageTransport",
     "require_fresh_snapshot",
     "snapshot_age_seconds",
+    "DEFAULT_CONTINGENCY_POLICY",
+    "HistoricalUsageProfile",
+    "TokenWorkload",
+    "WorkloadEstimate",
+    "WorkloadEstimator",
 ]

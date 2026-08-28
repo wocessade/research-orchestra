@@ -8,6 +8,7 @@ from prefect import flow
 from prefect.artifacts import Artifact
 from prefect.context import get_run_context
 from prefect.states import Cancelled
+from pydantic import BaseModel, ConfigDict, Field
 
 from bogda.agents.contracts import AgentBudget, ExperimentProposal, ResearchPlan
 from bogda.agents.coordinator import (
@@ -17,11 +18,9 @@ from bogda.agents.coordinator import (
 )
 from bogda.artifacts import save_run_result
 from bogda.contracts import (
-    ArtifactSpec,
     AutonomyMode,
     ExecutionStatus,
     JobRequest,
-    ResourceClass,
     ScientificStatus,
 )
 from bogda.contracts.decisions import CheckpointKind
@@ -64,20 +63,20 @@ def save_proposal(run_id: str, proposal: ExperimentProposal) -> None:
     ).create()
 
 
-def job_request_from(payload: dict[str, Any]) -> JobRequest:
-    artifacts = tuple(
-        ArtifactSpec.model_validate(item)
-        for item in payload.get("expected_artifacts", ())
+class ResearchCycleInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    job_request: JobRequest
+    goal: str = Field(min_length=1)
+    coordinator_budget: AgentBudget
+    allowed_tools: tuple[str, ...] = (
+        TOOL_WRITE_PLAN,
+        TOOL_PROPOSE_EXPERIMENT,
     )
-    return JobRequest(
-        job_id=payload["job_id"],
-        project_id=payload["project_id"],
-        task_type="research-cycle",
-        resource_class=ResourceClass.CPU,
-        autonomy_mode=AutonomyMode(payload["autonomy_mode"]),
-        parameters=payload.get("parameters") or {},
-        expected_artifacts=artifacts,
-    )
+
+
+def cycle_request_from(payload: dict[str, Any]) -> ResearchCycleInput:
+    return ResearchCycleInput.model_validate(payload)
 
 
 def _pause(run_id: str, kind: CheckpointKind, mode: AutonomyMode) -> None:
@@ -104,19 +103,16 @@ def run_research_cycle(
     attempts_root: str,
     model: Any,
 ) -> dict[str, Any]:
-    parsed = job_request_from(request)
+    cycle = cycle_request_from(request)
+    parsed = cycle.job_request
     run_id = str(get_run_context().flow_run.id)
-    budget = AgentBudget.model_validate(request["budget"])
-    allowed_tools = tuple(
-        request.get("allowed_tools") or (TOOL_WRITE_PLAN, TOOL_PROPOSE_EXPERIMENT)
-    )
     coordinator = Coordinator(
-        budget=budget,
-        allowed_tools=allowed_tools,
+        budget=cycle.coordinator_budget,
+        allowed_tools=cycle.allowed_tools,
         model=model,
     )
     try:
-        plan = coordinator.draft_plan(request["goal"])
+        plan = coordinator.draft_plan(cycle.goal)
         save_plan(run_id, plan)
         _pause(run_id, CheckpointKind.PLAN_APPROVAL, parsed.autonomy_mode)
         if coordinator.exhausted:
@@ -125,7 +121,7 @@ def run_research_cycle(
         proposal = coordinator.propose_experiment(plan)
         save_proposal(run_id, proposal)
         _pause(run_id, CheckpointKind.EXPERIMENT_APPROVAL, parsed.autonomy_mode)
-        if proposal.experiment_type not in budget.allowed_experiment_types:
+        if proposal.experiment_type not in cycle.coordinator_budget.allowed_experiment_types:
             return _payload("disallowed_experiment")
 
         result = run_shell(parsed, Path(attempts_root), run_id)

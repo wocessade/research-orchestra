@@ -18,7 +18,7 @@ Phase A is accepted for planning Phase B. It does not authorize live DeepSeek us
 | 3 — versioned `JobRequest` | `c743757`, `25e012c` | Approved after strict-version/budget fix |
 | 4 — Orchestra compatibility | `173daaf`, `f430969` | Approved after structural/path-safety fix |
 | 5 — structured run events | `1bdb165` | Approved |
-| 6 — documentation and acceptance | Commit containing this report, subject `docs(bogda): accept contract foundation` | Self-referential commit SHA is recorded by Git and the final handoff ledger |
+| 6 — documentation and acceptance | `a150e5d`, `147dc64` | Acceptance report plus boundary clarification |
 
 ## Public schema-v1 contracts
 
@@ -62,13 +62,13 @@ From `bogda/`:
 
 ```powershell
 uv run --python 3.11 pytest tests/contracts -q
-# 54 passed in 0.19s
+# 63 passed in 0.22s
 
 uv run --python 3.11 pytest -m "not integration" -q
-# 242 passed, 10 skipped, 1 deselected in 6.47s
+# 253 passed, 10 skipped, 1 deselected in 9.19s
 
 uv run --python 3.11 pytest -m integration -v
-# 1 passed, 252 deselected in 20.26s
+# 1 passed, 263 deselected in 23.96s
 ```
 
 From `orchestra/broker/`, using the Bogda Python 3.11 virtual environment because the Windows `python` alias is unavailable:
@@ -102,7 +102,9 @@ Phase B may consume these stable signatures:
 
 The next plan should implement `UsagePort`, a versioned DeepSeek pricing catalog, workload estimation, `BudgetGuard`, and reservation/release semantics. It must retain stale-balance fail-closed behavior, peak/off-peak pricing in Asia/Shanghai, workload/runtime-aware budgets, and mandatory structured event emission. Phase B requires a new plan based on these actual interfaces; it is not started by this acceptance.
 
-## Non-blocking hardening backlog
+## Whole-branch review closure
 
-- Reject whitespace-only `call_id` values before the runtime writer is introduced.
-- Add per-event smoke tests for the remaining ordinary budget lifecycle event types.
+- The shell adapter rejects non-shell requests before creating attempt directories or launching subprocesses.
+- Research-cycle input now carries a canonical `JobRequest` plus a separately named `coordinator_budget`; request axes and policy revision survive the consumer boundary.
+- `RunBudgetEnvelope` schema-version input is exact-integer v1, consistent with `JobRequest` and `RunEventV1`.
+- Whitespace-only `call_id` values are rejected and every ordinary budget lifecycle event has smoke coverage.

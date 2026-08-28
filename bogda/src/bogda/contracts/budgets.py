@@ -35,6 +35,13 @@ class RunBudgetEnvelope(BaseModel):
     budget_source: BudgetSource
     pricing_version: str = Field(min_length=1)
 
+    @field_validator("schema_version", mode="before")
+    @classmethod
+    def validate_schema_version_type(cls, value: object) -> object:
+        if type(value) is not int:
+            raise ValueError("schema_version must be an integer")
+        return value
+
     @field_validator(
         "expected_cost", "authorized_ceiling", "minimum_remaining", mode="before"
     )

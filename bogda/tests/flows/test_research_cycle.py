@@ -3,7 +3,14 @@ from types import SimpleNamespace
 
 from bogda.agents.contracts import AgentBudget
 from bogda.agents.coordinator import TOOL_PROPOSE_EXPERIMENT, TOOL_WRITE_PLAN
-from bogda.contracts import AutonomyMode, ExecutionStatus, ScientificStatus
+from bogda.contracts import (
+    AutonomyMode,
+    ExecutionStatus,
+    ExecutorKind,
+    ModelTier,
+    ScientificStatus,
+    TaskIntent,
+)
 from bogda.contracts.decisions import CheckpointKind
 from bogda.flows import research_cycle
 
@@ -23,20 +30,49 @@ class ScriptedModel:
 
 def cycle_request(tmp_path: Path, argv: list[str], artifacts: tuple[str, ...] = ("result.txt",)) -> dict:
     return {
-        "job_id": "cycle-1",
-        "project_id": "bogda",
+        "job_request": {
+            "job_id": "cycle-1",
+            "project_id": "bogda",
+            "task_type": "research-cycle",
+            "resource_class": "cpu",
+            "autonomy_mode": AutonomyMode.SUPERVISED.value,
+            "policy_revision": 7,
+            "intent": "audit",
+            "model_tier": "auto",
+            "executor": "shell",
+            "schedule_policy": {
+                "earliest_start": "2026-08-28T20:00:00+08:00"
+            },
+            "parameters": {"argv": argv},
+            "expected_artifacts": [{"path": path} for path in artifacts],
+        },
         "goal": "measure ridge",
-        "autonomy_mode": AutonomyMode.SUPERVISED.value,
-        "budget": AgentBudget(
+        "coordinator_budget": AgentBudget(
             max_steps=8,
             max_model_calls=8,
             max_cost_cny="10.0",
             allowed_experiment_types=("shell",),
         ).model_dump(mode="json"),
         "allowed_tools": [TOOL_WRITE_PLAN, TOOL_PROPOSE_EXPERIMENT],
-        "parameters": {"argv": argv},
-        "expected_artifacts": [{"path": path} for path in artifacts],
     }
+
+
+def test_cycle_input_preserves_canonical_job_request_axes(tmp_path) -> None:
+    parsed = research_cycle.cycle_request_from(
+        cycle_request(tmp_path, ["python", "-V"])
+    )
+
+    assert parsed.job_request.policy_revision == 7
+    assert parsed.job_request.intent is TaskIntent.AUDIT
+    assert parsed.job_request.model_tier is ModelTier.AUTO
+    assert parsed.job_request.executor is ExecutorKind.SHELL
+    assert parsed.job_request.schedule_policy.earliest_start is not None
+    assert parsed.coordinator_budget.max_cost_cny == AgentBudget(
+        max_steps=8,
+        max_model_calls=8,
+        max_cost_cny="10.0",
+        allowed_experiment_types=("shell",),
+    ).max_cost_cny
 
 
 def cooperating_model() -> ScriptedModel:
@@ -150,8 +186,8 @@ def test_budget_wall_does_not_loop_or_self_approve(monkeypatch, tmp_path) -> Non
     monkeypatch.setattr(research_cycle, "save_proposal", lambda *_args, **_kwargs: None)
 
     request = cycle_request(tmp_path, ["python", "-V"])
-    request["budget"]["max_steps"] = 1
-    request["budget"]["max_model_calls"] = 1
+    request["coordinator_budget"]["max_steps"] = 1
+    request["coordinator_budget"]["max_model_calls"] = 1
     returned = research_cycle.run_research_cycle.fn(
         request,
         str(tmp_path),

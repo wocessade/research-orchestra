@@ -45,3 +45,9 @@ def test_budget_rejects_float_money_input() -> None:
 def test_budget_rejects_unknown_fields() -> None:
     with pytest.raises(ValidationError, match="extra_forbidden"):
         envelope(unexpected="rejected")
+
+
+@pytest.mark.parametrize("schema_version", [True, "1", 1.0, 2])
+def test_budget_schema_version_is_strictly_v1(schema_version: object) -> None:
+    with pytest.raises(ValidationError):
+        envelope(schema_version=schema_version)

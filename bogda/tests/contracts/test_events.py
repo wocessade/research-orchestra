@@ -51,6 +51,9 @@ def test_model_call_event_requires_call_id() -> None:
         )
 
     with pytest.raises(ValidationError, match="call_id is required"):
+        event(event="model_call_started", call_id=" \t ")
+
+    with pytest.raises(ValidationError, match="call_id is required"):
         RunEventV1(
             event="model_call_finished",
             run_id="run-123",
@@ -141,3 +144,17 @@ def test_event_allows_only_references_for_prompt_and_usage_data() -> None:
 def test_event_rejects_secret_bearing_fields(secret_field: str) -> None:
     with pytest.raises(ValidationError, match="extra_forbidden"):
         event(**{secret_field: "do-not-store"})
+
+
+@pytest.mark.parametrize(
+    "event_name",
+    [
+        "budget_reserved",
+        "budget_released",
+        "budget_paused",
+        "budget_resumed",
+        "budget_override_approved",
+    ],
+)
+def test_ordinary_budget_lifecycle_events_are_constructible(event_name: str) -> None:
+    assert event(event=event_name).event is RunEventType(event_name)

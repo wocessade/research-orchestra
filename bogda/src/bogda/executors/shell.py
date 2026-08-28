@@ -3,7 +3,7 @@ from pathlib import Path
 import subprocess
 
 from bogda.artifacts.validation import validate_artifacts
-from bogda.contracts import ExecutionStatus, JobRequest, RunResult
+from bogda.contracts import ExecutorKind, ExecutionStatus, JobRequest, RunResult
 
 
 def run_shell(
@@ -12,6 +12,9 @@ def run_shell(
     run_id: str,
     attempt: int = 1,
 ) -> RunResult:
+    if request.executor is not ExecutorKind.SHELL:
+        raise ValueError("shell executor requires executor=shell")
+
     resolved_attempts_root = attempts_root.resolve()
     attempt_dir = (
         resolved_attempts_root

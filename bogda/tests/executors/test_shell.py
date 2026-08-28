@@ -5,8 +5,10 @@ import pytest
 from bogda.contracts import (
     ArtifactSpec,
     AutonomyMode,
+    ExecutorKind,
     ExecutionStatus,
     JobRequest,
+    ModelTier,
     ResourceClass,
 )
 from bogda.executors.shell import run_shell
@@ -127,3 +129,31 @@ def test_shell_executor_does_not_hide_unexpected_executor_errors(
 
     with pytest.raises(RuntimeError, match="executor bug"):
         run_shell(request, tmp_path, "run-7")
+
+
+def test_shell_executor_rejects_dsh_request_before_creating_attempt(tmp_path) -> None:
+    request = JobRequest(
+        job_id="job-dsh",
+        project_id="project-1",
+        task_type="research",
+        resource_class=ResourceClass.CPU,
+        autonomy_mode=AutonomyMode.SUPERVISED,
+        executor=ExecutorKind.DSH,
+        model_tier=ModelTier.PRO,
+        budget={
+            "expected_cost": "1",
+            "authorized_ceiling": "2",
+            "minimum_remaining": "10",
+            "requested_tier": "pro",
+            "fallback_tier": "flash",
+            "budget_source": "project",
+            "pricing_version": "deepseek-cn-2026-08-28",
+        },
+        parameters={"argv": [sys.executable, "-c", "raise SystemExit(99)"]},
+    )
+    attempts_root = tmp_path / "attempts"
+
+    with pytest.raises(ValueError, match="shell executor requires executor=shell"):
+        run_shell(request, attempts_root, "run-dsh")
+
+    assert not attempts_root.exists()

@@ -80,7 +80,7 @@ class RunEventV1(BaseModel):
         if self.event in {
             RunEventType.MODEL_CALL_STARTED,
             RunEventType.MODEL_CALL_FINISHED,
-        } and not self.call_id:
+        } and (not self.call_id or not self.call_id.strip()):
             raise ValueError("call_id is required for model call events")
         if self.event in {
             RunEventType.TIER_UPGRADE_REQUESTED,

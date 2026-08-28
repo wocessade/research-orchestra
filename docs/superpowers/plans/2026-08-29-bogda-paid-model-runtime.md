@@ -38,7 +38,7 @@
 - Consumes: `ModelTier` and caller-selected archive root; audited time remains `RunEventV1.occurred_at`.
 - Produces: `PromptArtifactV1`, `DshTokenUsageV1`, `ModelCallOutcome`, `ModelCallRequest`, `ModelCallResult`, `ModelExecutionPort`, `UsageReceiptPort`, `PromptArchivePort`, and `FilePromptArchive.archive(run_id, call_id, prompt)`.
 
-- [ ] **Step 1: Write failing contract and archive tests**
+- [x] **Step 1: Write failing contract and archive tests**
 
 ```python
 def test_archive_writes_exact_prompt_and_returns_hash(tmp_path):
@@ -61,13 +61,13 @@ def test_usage_rejects_float_and_serializes_decimal_cost_as_string():
                         output_tokens=1, actual_cost_cny=0.1)
 ```
 
-- [ ] **Step 2: Run the focused tests and verify RED**
+- [x] **Step 2: Run the focused tests and verify RED**
 
 Run: `uv run --extra dev --python 3.11 pytest tests/model_runtime/test_archive.py -q`
 
 Expected: collection fails because `bogda.model_runtime` does not exist.
 
-- [ ] **Step 3: Implement strict, focused contracts**
+- [x] **Step 3: Implement strict, focused contracts**
 
 ```python
 class ModelCallOutcome(StrEnum):
@@ -95,13 +95,13 @@ class PromptArchivePort(Protocol):
 
 `FilePromptArchive` stores `{root}/{run_id}/{call_id}.prompt.md`, rejects path separators in identifiers, writes UTF-8 through exclusive create, and returns the existing artifact only when its SHA-256 equals the requested prompt. It does not scan for hypothetical secret formats; callers must provide a secret-free research prompt.
 
-- [ ] **Step 4: Run focused and contract regressions**
+- [x] **Step 4: Run focused and contract regressions**
 
 Run: `uv run --extra dev --python 3.11 pytest tests/model_runtime/test_archive.py tests/contracts -q`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add bogda/src/bogda/model_runtime bogda/tests/model_runtime/test_archive.py
@@ -121,7 +121,7 @@ git commit -m "feat(bogda): archive paid model prompts"
 - Consumes: `JobRequest.intent`, `JobRequest.model_tier`, `JobRequest.budget.requested_tier`, `fallback_tier`, Pro availability, and low-risk fallback policy.
 - Produces: `ModelRouter.select(request, *, pro_available, allow_low_risk_fallback) -> RouteDecision` with stable `RouteDecisionKind` values `selected`, `downgraded`, and `pro_required`.
 
-- [ ] **Step 1: Write the routing matrix tests**
+- [x] **Step 1: Write the routing matrix tests**
 
 ```python
 @pytest.mark.parametrize("intent", [TaskIntent.DECIDE, TaskIntent.AUDIT])
@@ -142,13 +142,13 @@ def test_low_risk_pro_can_use_explicit_frozen_flash_fallback(intent):
 
 Also test explicit Flash, available Pro, disabled fallback, missing budget, and that `model_tier=auto` uses the concrete tier already frozen in the envelope. For `auto` + `decide/audit`, a Flash envelope is invalid; explicit `model_tier=flash` remains a human lock and is not rewritten.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 Run: `uv run --extra dev --python 3.11 pytest tests/model_runtime/test_routing.py -q`
 
 Expected: import failure for the new router.
 
-- [ ] **Step 3: Implement one centralized policy table**
+- [x] **Step 3: Implement one centralized policy table**
 
 ```python
 LOW_RISK_FALLBACK_INTENTS = frozenset({
@@ -166,13 +166,13 @@ def select(self, request: JobRequest, *, pro_available: bool,
 
 Do not inspect Orchestra routing JSON at runtime and do not make model tier change autonomy or tool permissions.
 
-- [ ] **Step 4: Run focused and existing task-contract tests**
+- [x] **Step 4: Run focused and existing task-contract tests**
 
 Run: `uv run --extra dev --python 3.11 pytest tests/model_runtime/test_routing.py tests/contracts/test_models.py tests/contracts/test_tasks.py -q`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add bogda/src/bogda/model_runtime/routing.py bogda/src/bogda/model_runtime/__init__.py bogda/tests/model_runtime/test_routing.py
@@ -194,7 +194,7 @@ git commit -m "feat(bogda): route frozen model tiers"
 - Consumes: `ModelCallRequest`, explicit Flash/Pro patch paths, `dsh --profile headless`, caller-selected attempt directory, optional `UsageReceiptPort.read(attempt_dir)`.
 - Produces: `DshCliAdapter.invoke(request) -> ModelCallResult` and `JsonUsageReceiptReader.read(attempt_dir) -> DshTokenUsageV1 | None` for a provider-neutral optional `usage.json` sidecar.
 
-- [ ] **Step 1: Write argv, output, timeout, and usage tests with a fake command runner**
+- [x] **Step 1: Write argv, output, timeout, and usage tests with a fake command runner**
 
 ```python
 def test_flash_invocation_uses_owned_patch_and_never_shell_string(tmp_path):
@@ -213,13 +213,13 @@ def test_nonzero_after_spawn_is_usage_unknown_without_receipt(tmp_path):
 
 Test missing executable as `NOT_STARTED`, timeout after spawn as `USAGE_UNKNOWN`, missing patch as validation failure before runner invocation, exact stdout artifact, bounded stderr artifact, and a structured fake receipt round-trip. Tests must not invoke real dsh.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 Run: `uv run --extra dev --python 3.11 pytest tests/model_runtime/test_dsh.py -q`
 
 Expected: import failure.
 
-- [ ] **Step 3: Implement the adapter without importing Orchestra**
+- [x] **Step 3: Implement the adapter without importing Orchestra**
 
 ```python
 argv = [self.command, "--profile", self.profile,
@@ -230,13 +230,13 @@ completed = self.runner.run(argv, cwd=request.attempt_dir,
 
 The Bogda-owned YAML overlays preserve the current abstract Flash/Pro mapping but are maintained independently. The adapter never dumps composed dsh config, environment variables, or credentials. A successful process without a receipt is still `USAGE_UNKNOWN`, not a zero-cost success; `FINISHED` requires a valid receipt.
 
-- [ ] **Step 4: Run focused and shell-executor regressions**
+- [x] **Step 4: Run focused and shell-executor regressions**
 
 Run: `uv run --extra dev --python 3.11 pytest tests/model_runtime/test_dsh.py tests/executors -q`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add bogda/src/bogda/model_runtime/dsh.py bogda/src/bogda/model_runtime/__init__.py bogda/config/dsh-patches bogda/tests/model_runtime/test_dsh.py
@@ -258,7 +258,7 @@ git commit -m "feat(bogda): add dsh paid call adapter"
 - Consumes: `ModelRouter`, `PromptArchivePort`, `BudgetAdmissionService`, shared `RunEventSink`, `ModelExecutionPort`, `estimate_token_cost`, and the frozen `JobRequest`.
 - Produces: `PaidModelCallService.execute(run_id, call_id, request, prompt, attempt_dir, *, pro_available, allow_low_risk_fallback) -> PaidCallResult`.
 
-- [ ] **Step 1: Write event-order and failure-semantics tests**
+- [x] **Step 1: Write event-order and failure-semantics tests**
 
 ```python
 def test_finished_call_archives_then_reserves_then_reconciles():
@@ -285,13 +285,13 @@ def test_unknown_usage_keeps_reservation_and_forbids_retry():
 
 Also test archive failure before admission, route pause before admission, budget denial before executor, model-start event failure compensation, `NOT_STARTED` release, exact receipt cost reconciliation, event payload prompt hash/path without prompt text, and secret-free exception representations.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 Run: `uv run --extra dev --python 3.11 pytest tests/model_runtime/test_paid_call_service.py tests/contracts/test_events.py -q`
 
 Expected: missing service/types and any new event invariant failures.
 
-- [ ] **Step 3: Implement one explicit state machine**
+- [x] **Step 3: Implement one explicit state machine**
 
 ```text
 route -> archive -> admit -> model_call_started -> invoke
@@ -304,13 +304,13 @@ route -> archive -> admit -> model_call_started -> invoke
 
 The service also exposes `record_budget_resume(run_id, call_id, request)` to append one `BUDGET_RESUMED` event after Prefect returns from a real suspension and before the same frozen request is re-evaluated.
 
-- [ ] **Step 4: Run model-runtime, budget, event, and contract regressions**
+- [x] **Step 4: Run model-runtime, budget, event, and contract regressions**
 
 Run: `uv run --extra dev --python 3.11 pytest tests/model_runtime tests/budget tests/events tests/contracts -q`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add bogda/src/bogda/model_runtime/service.py bogda/src/bogda/model_runtime/__init__.py bogda/src/bogda/contracts/events.py bogda/tests/model_runtime/test_paid_call_service.py bogda/tests/contracts/test_events.py
@@ -330,7 +330,7 @@ git commit -m "feat(bogda): coordinate paid model calls"
 - Consumes: `PaidModelCallService`, serialized `JobRequest`, prompt, call id, attempt directory, and `prefect.flow_runs.suspend_flow_run`.
 - Produces: `run_paid_model_call(...)` with `persist_result=True` and an injectable `BudgetSuspender` for deterministic tests.
 
-- [ ] **Step 1: Write suspend/resume tests**
+- [x] **Step 1: Write suspend/resume tests**
 
 ```python
 def test_budget_pause_suspends_without_sleep_then_rechecks_same_request():
@@ -348,13 +348,13 @@ def test_unknown_usage_returns_reconciliation_required_without_suspend_or_retry(
 
 Also assert scheduled/Pro-required/budget-paused statuses remain distinct and no `time.sleep` or polling loop exists.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 Run: `uv run --extra dev --python 3.11 pytest tests/flows/test_paid_model_call.py -q`
 
 Expected: module missing.
 
-- [ ] **Step 3: Implement a thin Prefect adapter**
+- [x] **Step 3: Implement a thin Prefect adapter**
 
 ```python
 class PrefectBudgetSuspender:
@@ -369,13 +369,13 @@ def run_paid_model_call(...):
 
 Use deterministic numbered keys per in-flow suspension round. This phase proves the resumable boundary with fakes; it does not register or deploy the flow.
 
-- [ ] **Step 4: Run flow and runtime regressions**
+- [x] **Step 4: Run flow and runtime regressions**
 
 Run: `uv run --extra dev --python 3.11 pytest tests/flows tests/model_runtime -q`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add bogda/src/bogda/flows/paid_model_call.py bogda/src/bogda/flows/__init__.py bogda/tests/flows/test_paid_model_call.py
@@ -396,7 +396,7 @@ git commit -m "feat(bogda): suspend paid calls on budget gates"
 - Consumes: all Phase C public ports and existing Phase B budget/event kernel.
 - Produces: fake-provider acceptance evidence and the exact Phase D/frontend handoff boundary.
 
-- [ ] **Step 1: Add end-to-end fake scenarios**
+- [x] **Step 1: Add end-to-end fake scenarios**
 
 ```text
 1. Auto/Flash call: prompt archive -> route -> reserve -> fake dsh -> exact usage -> reconcile.
@@ -407,17 +407,17 @@ git commit -m "feat(bogda): suspend paid calls on budget gates"
 6. Prompt archive failure produces no reservation and no executor call.
 ```
 
-- [ ] **Step 2: Run focused acceptance**
+- [x] **Step 2: Run focused acceptance**
 
 Run: `uv run --extra dev --python 3.11 pytest tests/integration/test_paid_model_runtime.py -q`
 
 Expected: all six scenarios PASS without network or real dsh.
 
-- [ ] **Step 3: Document ownership and operational limits**
+- [x] **Step 3: Document ownership and operational limits**
 
 README/report must state concrete ports, event order, patch ownership, exact unknown-usage recovery rule, Prefect suspend deployment prerequisites, local recovery commands, and these exclusions: no live call, no deployment, no frontend, no production writer, no cross-process exactly-once.
 
-- [ ] **Step 4: Run full compatibility verification**
+- [x] **Step 4: Run full compatibility verification**
 
 Run:
 
@@ -434,12 +434,22 @@ git status --short --branch
 
 Expected: Bogda and Orchestra suites pass; no forbidden runtime imports; diff check clean; only authorized Phase C files differ from the fork point.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add bogda/tests/integration/test_paid_model_runtime.py bogda/README.md docs/reports/2026-08-29-bogda-paid-model-runtime-acceptance.md docs/superpowers/plans/2026-08-29-bogda-paid-model-runtime.md
 git commit -m "docs(bogda): accept paid model runtime phase"
 ```
+
+#### Task 6 evidence — 2026-08-29
+
+- Fake-only acceptance: `uv run --extra dev --python 3.11 pytest tests/integration/test_paid_model_runtime.py -q` — `6 passed in 2.22s`.
+- Affected broad: `uv run --extra dev --python 3.11 pytest --import-mode=importlib tests/integration tests/flows tests/model_runtime tests/budget tests/events tests/contracts -q` — `373 passed, 1 skipped in 24.41s`.
+- Final default Bogda suite (run once): `uv run --extra dev --python 3.11 pytest -q` — `545 passed, 11 skipped in 24.92s`.
+- Orchestra compatibility: worktree Bogda Python running `python -m unittest tests.test_taskfile -q` — `25 tests`, `OK`.
+- Forbidden runtime import scan: no `orchestra` or `usage-monitor` imports under `bogda/src`.
+- `git diff --check`: clean. Fork point is `ac334d08a29390f5dcf063bca5643569136130c3`; the Phase C branch delta is limited to the approved runtime, tests, plan, and acceptance documentation, with the Task 6 acceptance test/report and deferred register added in this task.
+- TDD note: the acceptance layer was added after Tasks 1–5 were already implemented and reviewed, so the honest initial focused run was already green (`6 passed`); no production code was written or altered in Task 6 to manufacture a feature-red cycle.
 
 ## Review and Stop Gate
 

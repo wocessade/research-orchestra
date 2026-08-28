@@ -62,7 +62,7 @@ Prefect Completed means the command ran and required artifacts exist. Scientific
 
 ## Current scope
 
-Implemented: local shell flow, attempt directories, required artifact checks, versioned RunResult artifacts, and separate scientific review status.
+Implemented: local shell flow, attempt directories, required artifact checks, versioned RunResult artifacts, separate scientific review status, and the Phase C paid-model runtime. The Phase C acceptance is local and fake-only; it does not claim Gate 6/7 or production readiness.
 
 ## Intelligent collaboration contracts
 
@@ -124,6 +124,37 @@ On stale or insufficient balance, preserve the artifacts and event log, obtain a
 Phase C consumes the existing `JobRequest` fields `intent`, `model_tier`, `budget`, `schedule_policy`, and `executor`, and calls the admission boundary above before a paid dsh call. Phase C must add the dsh adapter, model routing, prompt archive, actual usage reconciliation, and Prefect pause/resume wiring without changing the envelope semantics. Those integrations are not implemented here.
 
 Phase B acceptance used fake usage providers and local JSONL only. It did not run dsh, archive prompts, wire Prefect pause/resume, add frontend windows or switches, deploy, call a live API, change systemd/Prefect/device state, or mutate production data.
+
+## Phase C paid-model runtime (accepted locally)
+
+The runtime keeps policy, persistence, execution, budget admission, and Prefect orchestration separate:
+
+- `bogda.model_runtime.contracts` owns `ModelCallRequest`, `ModelCallResult`, `DshTokenUsageV1`, and the provider-neutral execution, receipt, and archive ports.
+- `bogda.model_runtime.archive` owns `FilePromptArchive`, which writes `{archive_root}/{run_id}/{call_id}.prompt.md` as a UTF-8 research artifact and returns its SHA-256 reference.
+- `bogda.model_runtime.routing` owns the frozen Flash/Pro policy. `auto` consumes the concrete tier already frozen in `RunBudgetEnvelope`; `decide` and `audit` never silently downgrade, while an explicit frozen Flash fallback is limited to `execute`, `brief`, and `explore`.
+- `bogda.model_runtime.dsh` owns the concrete `dsh --profile headless --patch ... <prompt>` adapter and the optional `attempt_dir/usage.json` receipt. Its Bogda-owned overlays are `config/dsh-patches/flash.yml` and `pro.yml`; stdout and bounded stderr are written to the attempt directory.
+- `bogda.model_runtime.service` owns the one-call state machine and event-safe reservation lifecycle. It uses the Phase B `BudgetAdmissionService` and emits `RunEventV1` through the caller-selected sink.
+- `bogda.flows.paid_model_call` is the thin Prefect boundary. It uses `suspend_flow_run` for recoverable budget pauses and re-evaluates the same parsed request after resume.
+
+For an admitted call, the observable event order is `route_selected` (or `tier_downgraded`) → prompt archive → `budget_snapshot` → `budget_reserved` → `model_call_started` → `model_call_finished` or `model_call_usage_unknown` → `budget_released` (the last event carries reconciliation facts when applicable). A Pro-required route emits `tier_upgrade_requested` before any archive or reservation. A budget pause emits `budget_paused`; a real Prefect resume is recorded as `budget_resumed` before the unchanged request is evaluated again. Ordinary events carry only prompt hashes/artifact paths and usage references, never full prompts, model output, credentials, or authorization headers.
+
+If a call may have started but usage is absent, the result is `usage_unknown`: the reservation remains active and the same `run_id`/`call_id` is blocked with `reconciliation_required`. It is not zero usage and must be manually reconciled before retry. `not_started` is the separate safe path that releases its reservation. The current `SingleFlightBudgetLedger`, paid-call claim, terminal-event delivery tracking, and JSONL sink are process-local; they do not provide cross-process exactly-once recovery.
+
+Local recovery and verification use the frozen request and fake ports:
+
+~~~powershell
+Set-Location D:\pythonProject\.worktrees\bogda-paid-model-runtime\bogda
+uv run --extra dev --python 3.11 pytest tests/integration/test_paid_model_runtime.py -q
+uv run --extra dev --python 3.11 pytest --import-mode=importlib tests/integration tests/flows tests/model_runtime tests/budget tests/events tests/contracts -q
+~~~
+
+The real Prefect boundary additionally requires a registered deployment, a worker able to resume suspended runs, durable result/event/artifact storage, and a fresh usage/balance source. Those prerequisites are intentionally not configured or exercised here.
+
+## Phase D/E and Gate 6 handoff
+
+Stage D owns the owner-facing decision center and runtime windows: requested/effective tier, budget and price window, pause reason, recovery action, prompt/artifact references, and the non-disableable safety constraints. Stage E owns read-only usage wiring, constrained dsh/DeepSeek smoke, Prefect deployment/resume verification, durable accounting/outbox work, runtime artifact lifecycle, and production operations. Gate 6 follows those local stages with owner-approved shadow/production checks and rollback evidence. The Phase C handoff is documented in [`docs/reports/2026-08-29-bogda-paid-model-runtime-acceptance.md`](../docs/reports/2026-08-29-bogda-paid-model-runtime-acceptance.md) and the required follow-up register in [`docs/reports/2026-08-29-bogda-deferred-work-register.md`](../docs/reports/2026-08-29-bogda-deferred-work-register.md).
+
+Explicit exclusions for this phase: no live dsh or DeepSeek call, no deployment or Prefect server mutation, no frontend, no production writer, no secrets or production credentials, no cross-process exactly-once ledger/outbox, no 3100/3101 cutover, no Gate 6/7 declaration, and no push, merge, or cleanup.
 
 ## Pi-bundle operations
 

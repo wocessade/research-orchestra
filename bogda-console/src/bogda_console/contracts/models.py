@@ -385,6 +385,16 @@ class BudgetState(StrEnum):
     USAGE_UNKNOWN = "usage-unknown"
 
 
+class DecisionKind(StrEnum):
+    PLAN_APPROVAL = "plan-approval"
+    SCIENTIFIC_RESULT = "scientific-result"
+    BUDGET_INCREASE = "budget-increase"
+    PRO_UNAVAILABLE = "pro-unavailable"
+    PEAK_OVERRIDE = "peak-override"
+    USAGE_UNKNOWN = "usage-unknown"
+    EXTERNAL_ACTION = "external-action"
+
+
 class UrgencyGroup(StrEnum):
     NEEDS_OWNER_NOW = "needs-owner-now"
     HAS_DEADLINE = "has-deadline"
@@ -397,6 +407,7 @@ class DecisionAction(ImmutableWireModel):
     cost_impact: str = Field(min_length=1)
     quality_impact: str | None = None
     irreversible_consequence: str | None = None
+    requires_rationale: bool = False
     requires_confirmation: bool = True
 
 
@@ -409,6 +420,8 @@ class EvidenceReference(ImmutableWireModel):
 
 class DecisionItem(ImmutableWireModel):
     decision_id: str = Field(min_length=1)
+    decision_kind: DecisionKind
+    title: str = Field(min_length=1)
     urgency_group: UrgencyGroup
     project_id: str = Field(min_length=1)
     run_id: str | None = None
@@ -416,8 +429,8 @@ class DecisionItem(ImmutableWireModel):
     risk: str = Field(min_length=1)
     estimated_cost: Decimal = Field(ge=0)
     deadline: datetime | None = None
-    evidence: list[EvidenceReference] = Field(default_factory=list)
-    actions: list[DecisionAction] = Field(min_length=1)
+    evidence: tuple[EvidenceReference, ...] = ()
+    actions: tuple[DecisionAction, ...] = Field(min_length=1)
     revision: int = Field(ge=0)
     log_summary: str = Field(min_length=1)
 
@@ -425,8 +438,27 @@ class DecisionItem(ImmutableWireModel):
 
 
 class DecisionCenterSnapshot(ImmutableWireModel):
-    items: list[DecisionItem] = Field(default_factory=list)
+    items: tuple[DecisionItem, ...] = ()
     revision: int = Field(ge=0)
+
+
+class ModelEventRow(ImmutableWireModel):
+    event_id: str = Field(min_length=1)
+    event_type: Literal[
+        "budget_snapshot", "budget_reserved", "budget_released", "route_selected",
+        "tier_upgrade_requested", "tier_downgraded", "model_call_started",
+        "model_call_finished", "budget_paused", "budget_resumed", "budget_override_approved",
+    ]
+    occurred_at: datetime
+    summary: str | None = None
+
+    _event_utc = field_validator("occurred_at")(_utc_datetime)
+
+
+class ModelArtifactReference(ImmutableWireModel):
+    artifact_id: str = Field(min_length=1)
+    kind: str = Field(min_length=1)
+    uri: str = Field(min_length=1)
 
 
 class ModelBudgetSnapshot(ImmutableWireModel):
@@ -441,6 +473,65 @@ class ModelBudgetSnapshot(ImmutableWireModel):
     remaining_cost: Decimal = Field(ge=0)
     decision_id: str | None = None
     revision: int = Field(ge=0)
+    intent: Literal["execute", "brief", "explore", "decide", "audit"] = "execute"
+    requested_model_tier: Literal["auto", "flash", "pro"] = "auto"
+    effective_model_tier: Literal["flash", "pro"] = "flash"
+    effective_autonomy_mode: AutonomyMode = AutonomyMode.SUPERVISED
+    price_period: Literal["peak", "off-peak"] = "off-peak"
+    scheduled_start: datetime | None = None
+    pause_reason: str | None = None
+    recovery_conditions: tuple[str, ...] = ()
+    events: tuple[ModelEventRow, ...] = ()
+    artifacts: tuple[ModelArtifactReference, ...] = ()
+
+    _scheduled_utc = field_validator("scheduled_start")(_utc_datetime)
+
+
+class HardSafetyBaselines(ImmutableWireModel):
+    usage_snapshot_fail_closed: bool = True
+    minimum_remaining_enforced: bool = True
+    decide_audit_no_silent_downgrade: bool = True
+    human_scientific_judgment: bool = True
+    human_external_actions: bool = True
+    unknown_usage_recovery_gate: bool = True
+    structured_event_log: bool = True
+    prompt_archiving_required: bool = True
+    budget_increase_approval_required: bool = True
+
+
+class PriceCatalog(ImmutableWireModel):
+    status: Literal["ready", "stale", "missing", "invalid"]
+    version: str | None = None
+    source: str | None = None
+    effective_at: datetime | None = None
+    review_by: datetime | None = None
+
+    _catalog_dates_utc = field_validator("effective_at", "review_by")(_utc_datetime)
+
+
+class ModelPolicyPatch(ImmutableWireModel):
+    default_model_tier: Literal["auto", "flash", "pro"] | None = None
+    allow_auto_upgrade: bool | None = None
+    allow_flash_downgrade: bool | None = None
+    prefer_off_peak: bool | None = None
+    auto_resume: bool | None = None
+    minimum_remaining: Decimal | None = Field(default=None, ge=0)
+    critical_notifications: bool | None = None
+    workload_safety_margin: Decimal | None = Field(default=None, ge=0)
+
+
+class WorkloadEstimate(ImmutableWireModel):
+    input_tokens: int = Field(ge=0)
+    output_tokens: int = Field(ge=0)
+    expected_calls: int = Field(ge=1)
+    runtime_minutes: int = Field(ge=0)
+
+
+class AllowedRunPreferences(ImmutableWireModel):
+    prefer_off_peak: bool
+    allow_auto_upgrade: bool
+    allow_flash_downgrade: bool
+    auto_resume: bool
 
 
 class ModelPolicySnapshot(ImmutableWireModel):
@@ -453,8 +544,11 @@ class ModelPolicySnapshot(ImmutableWireModel):
     prefer_off_peak: bool
     auto_resume: bool
     minimum_remaining: Decimal = Field(ge=0)
-    usage_snapshot_stale_after_seconds: int = Field(ge=1)
-    hard_safety_baselines: dict[str, Any] = Field(default_factory=dict)
+    usage_snapshot_stale_after_seconds: int = Field(default=120, ge=1)
+    critical_notifications: bool
+    workload_safety_margin: Decimal = Field(ge=0)
+    price_catalog: PriceCatalog
+    hard_safety_baselines: HardSafetyBaselines = HardSafetyBaselines()
     revision: int = Field(ge=0)
 
 
@@ -464,6 +558,12 @@ class RunPreparationPreview(ImmutableWireModel):
     intent: Literal["execute", "brief", "explore", "decide", "audit"]
     requested_model_tier: Literal["auto", "flash", "pro"]
     effective_model_tier: Literal["flash", "pro"]
+    effective_autonomy_mode: AutonomyMode
+    fallback_model_tier: Literal["flash", "pro"]
+    price_period: Literal["peak", "off-peak"]
+    scheduled_start: datetime | None = None
+    workload: WorkloadEstimate
+    allowed_preferences: AllowedRunPreferences
     deadline: datetime | None = None
     budget: ModelBudgetSnapshot
     policy_revision: int = Field(ge=0)
@@ -471,6 +571,7 @@ class RunPreparationPreview(ImmutableWireModel):
     confirmed_at: datetime | None = None
 
     _preview_deadline_aware = field_validator("deadline", "confirmed_at")(_utc_datetime)
+    _preview_start_aware = field_validator("scheduled_start")(_utc_datetime)
 
 
 class SetGlobalAutonomyRequest(WireModel):

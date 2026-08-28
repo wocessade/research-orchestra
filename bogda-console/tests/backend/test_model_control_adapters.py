@@ -13,9 +13,14 @@ from bogda_console.contracts.models import (
     DecisionAction,
     DecisionCenterSnapshot,
     DecisionItem,
+    DecisionKind,
     EvidenceReference,
     ModelBudgetSnapshot,
+    ModelArtifactReference,
+    ModelEventRow,
+    ModelPolicyPatch,
     ModelPolicySnapshot,
+    PriceCatalog,
 )
 from bogda_console.contracts.ports import (
     ModelControlConflict,
@@ -29,6 +34,8 @@ DEADLINE = datetime(2026, 8, 30, 12, 0, tzinfo=UTC)
 def test_wire_models_are_closed_camel_case_and_money_is_a_json_string() -> None:
     item = DecisionItem(
         decisionId="decision-1",
+        decisionKind="peak-override",
+        title="Peak run",
         urgencyGroup="needs-owner-now",
         projectId="project-1",
         runId="run-1",
@@ -75,8 +82,8 @@ async def test_mock_has_one_pending_item_and_run_budget_references_it() -> None:
     budget = await adapter.run_budget("run-1")
 
     assert isinstance(center, DecisionCenterSnapshot)
-    assert len(center.items) == 1
-    assert budget.decision_id == center.items[0].decision_id
+    assert len(center.items) >= 1
+    assert budget.decision_id == next(item for item in center.items if item.run_id == "run-1").decision_id
     assert budget.decision_id is not None
     assert not hasattr(budget, "decision")
 
@@ -85,10 +92,10 @@ async def test_mock_has_one_pending_item_and_run_budget_references_it() -> None:
 async def test_stale_revision_conflict_returns_current_authoritative_resource() -> None:
     adapter = MockModelControlAdapter()
     current = await adapter.model_policy()
-    await adapter.set_global_policy({"defaultModelTier": "flash"}, expected_revision=0)
+    await adapter.set_global_policy(ModelPolicyPatch(defaultModelTier="flash"), expected_revision=0)
 
     with pytest.raises(ModelControlConflict) as caught:
-        await adapter.set_global_policy({"defaultModelTier": "pro"}, expected_revision=0)
+        await adapter.set_global_policy(ModelPolicyPatch(defaultModelTier="pro"), expected_revision=0)
 
     assert caught.value.current == await adapter.model_policy()
     assert caught.value.current.revision == current.revision + 1
@@ -98,7 +105,7 @@ async def test_stale_revision_conflict_returns_current_authoritative_resource() 
 async def test_policy_override_exposes_source_revision_and_restore_inheritance() -> None:
     adapter = MockModelControlAdapter()
     overridden = await adapter.set_project_policy(
-        "project-1", {"defaultModelTier": "pro"}, expected_revision=0
+        "project-1", ModelPolicyPatch(defaultModelTier="pro"), expected_revision=0
     )
     project_policy = await adapter.model_policy("project-1")
     assert isinstance(project_policy, ModelPolicySnapshot)
@@ -116,6 +123,21 @@ async def test_policy_override_exposes_source_revision_and_restore_inheritance()
 
 
 @pytest.mark.asyncio
+async def test_policy_patch_changes_authoritative_value_and_preserves_inherited_project_id() -> None:
+    adapter = MockModelControlAdapter()
+    updated = await adapter.set_global_policy(
+        ModelPolicyPatch(defaultModelTier="flash"), expected_revision=0
+    )
+    assert updated.default_model_tier == "flash"
+    inherited = await adapter.model_policy("project-2")
+    assert inherited.project_id == "project-2"
+    assert inherited.source == "global"
+
+    with pytest.raises(ValidationError):
+        ModelPolicyPatch.model_validate({"surprise": True})
+
+
+@pytest.mark.asyncio
 async def test_preview_confirmation_is_opaque_and_idempotent() -> None:
     adapter = MockModelControlAdapter()
     preview = await adapter.preview_run("project-1", "explore", "auto", DEADLINE)
@@ -125,6 +147,68 @@ async def test_preview_confirmation_is_opaque_and_idempotent() -> None:
     assert preview.preparation_id.startswith("prep_")
     with pytest.raises(ModelControlConflict):
         await adapter.confirm_preparation(preview.preparation_id, "different-idem")
+
+
+def test_decision_kinds_actions_and_budget_operational_fields_are_typed() -> None:
+    item = DecisionItem(
+        decisionId="d1", decisionKind=DecisionKind.PEAK_OVERRIDE, title="Peak run",
+        urgencyGroup="has-deadline", projectId="p1", reason="Deadline is near", risk="cost",
+        estimatedCost=Decimal("1"), actions=[DecisionAction(
+            actionId="run", label="Run now", costImpact="Higher", qualityImpact="None",
+            irreversibleConsequence="Consumes budget", requiresRationale=True,
+        )], revision=0, logSummary="Log it.",
+    )
+    assert item.decision_kind == DecisionKind.PEAK_OVERRIDE.value
+    assert item.title == "Peak run"
+    assert item.actions[0].requires_rationale is True
+
+    budget = ModelBudgetSnapshot(
+        runId="r1", projectId="p1", state="scheduled-off-peak", currency="CNY",
+        expectedCost=Decimal("1"), authorizedCeiling=Decimal("2"), usedCost=Decimal("0"),
+        reservedCost=Decimal("0"), remainingCost=Decimal("2"), decisionId="d1", revision=0,
+        intent="explore", requestedModelTier="pro", effectiveModelTier="flash",
+        effectiveAutonomyMode="supervised", pricePeriod="off-peak",
+        scheduledStart=DEADLINE, recoveryConditions=("wait-for-balance",),
+        events=(ModelEventRow(eventId="e1", eventType="budget_paused", occurredAt=DEADLINE),),
+        artifacts=(ModelArtifactReference(artifactId="a1", kind="log", uri="artifact://a1"),),
+    )
+    assert budget.events[0].event_type == "budget_paused"
+    assert "prompt" not in budget.events[0].model_dump()
+
+
+@pytest.mark.asyncio
+async def test_unknown_run_is_not_fabricated_and_usage_unknown_has_canonical_decision() -> None:
+    adapter = MockModelControlAdapter()
+    with pytest.raises(KeyError):
+        await adapter.run_budget("missing")
+    budget = await adapter.run_budget("run-unknown-usage")
+    center = await adapter.decision_center()
+    assert budget.state == "usage-unknown"
+    assert budget.decision_id in {item.decision_id for item in center.items}
+
+
+def test_policy_and_preview_include_safety_catalog_workload_and_preference_fields() -> None:
+    policy = ModelPolicySnapshot(
+        projectId="p1", source="global", inheritsGlobal=True, defaultModelTier="auto",
+        allowAutoUpgrade=True, allowFlashDowngrade=True, preferOffPeak=True, autoResume=True,
+        minimumRemaining=Decimal("10"), workloadSafetyMargin=Decimal("1.2"), criticalNotifications=True,
+        usageSnapshotStaleAfterSeconds=120,
+        priceCatalog=PriceCatalog(status="ready", version="v1", source="official",
+                                   effectiveAt=DEADLINE, reviewBy=DEADLINE), revision=0,
+    )
+    assert policy.hard_safety_baselines.minimum_remaining_enforced is True
+    with pytest.raises(ValidationError):
+        ModelPolicySnapshot.model_validate({**policy.model_dump(), "hardSafetyBaselines": {"x": True}})
+
+@pytest.mark.asyncio
+async def test_preview_contains_frozen_autonomy_workload_schedule_and_allowed_preferences() -> None:
+    adapter = MockModelControlAdapter()
+    preview = await adapter.preview_run("project-1", "explore", "pro", DEADLINE)
+    assert preview.effective_autonomy_mode == "supervised"
+    assert preview.fallback_model_tier == "flash"
+    assert preview.price_period in {"peak", "off-peak"}
+    assert preview.workload.expected_calls >= 1
+    assert preview.allowed_preferences.prefer_off_peak is True
 
 
 @pytest.mark.asyncio

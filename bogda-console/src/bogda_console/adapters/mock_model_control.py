@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from copy import deepcopy
 from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
@@ -13,6 +12,9 @@ from bogda_console.contracts.models import (
     EvidenceReference,
     ModelBudgetSnapshot,
     ModelPolicySnapshot,
+    ModelPolicyPatch,
+    PriceCatalog,
+    HardSafetyBaselines,
     RunPreparationPreview,
     UrgencyGroup,
 )
@@ -32,19 +34,33 @@ class MockModelControlAdapter:
         self._projects: dict[str, dict[str, object]] = {}
         self._items: dict[str, DecisionItem] = {
             "decision-1": DecisionItem(
-                decisionId="decision-1", urgencyGroup=UrgencyGroup.NEEDS_OWNER_NOW,
+                decisionId="decision-1", decisionKind="peak-override", title="Peak run",
+                urgencyGroup=UrgencyGroup.NEEDS_OWNER_NOW,
                 projectId="project-1", runId="run-1", reason="Preparation needs owner approval",
                 risk="budget", estimatedCost=Decimal("1.00"), deadline=None,
                 evidence=[EvidenceReference(kind="run", refId="run-1", label="Run")],
-                actions=[DecisionAction(actionId="approve", label="Approve", costImpact="Uses budget")],
+                actions=(DecisionAction(actionId="approve", label="Approve", costImpact="Uses budget"),),
                 revision=0, logSummary="Awaiting owner decision.",
+            )
+            ,"decision-usage-unknown": DecisionItem(
+                decisionId="decision-usage-unknown", decisionKind="usage-unknown", title="Usage unknown",
+                urgencyGroup=UrgencyGroup.NEEDS_OWNER_NOW, projectId="project-unknown", runId="run-unknown-usage",
+                reason="The model call cost is unknown", risk="usage", estimatedCost=Decimal("0"),
+                actions=(DecisionAction(actionId="reconcile", label="Reconcile", costImpact="No new call"),),
+                revision=0, logSummary="Reconcile usage before recovery.",
             )
         }
         self._budgets = {"run-1": ModelBudgetSnapshot(
             runId="run-1", projectId="project-1", state=BudgetState.AWAITING_APPROVAL,
             currency="CNY", expectedCost=Decimal("1.00"), authorizedCeiling=Decimal("2.00"),
             usedCost=Decimal("0"), reservedCost=Decimal("0"), remainingCost=Decimal("2.00"),
-            decisionId="decision-1", revision=0,
+            decisionId="decision-1", revision=0, intent="explore", requestedModelTier="pro",
+            effectiveModelTier="flash", effectiveAutonomyMode="supervised", pricePeriod="off-peak",
+        ), "run-unknown-usage": ModelBudgetSnapshot(
+            runId="run-unknown-usage", projectId="project-unknown", state=BudgetState.USAGE_UNKNOWN,
+            currency="CNY", expectedCost=Decimal("0"), authorizedCeiling=Decimal("0"),
+            usedCost=Decimal("0"), reservedCost=Decimal("0"), remainingCost=Decimal("0"),
+            decisionId="decision-usage-unknown", revision=0,
         )}
         self._preparations: dict[str, RunPreparationPreview] = {}
         self._confirmations: dict[str, tuple[str, str]] = {}
@@ -53,18 +69,17 @@ class MockModelControlAdapter:
         return DecisionCenterSnapshot(items=list(self._items.values()), revision=self._revision)
 
     async def run_budget(self, run_id: str) -> ModelBudgetSnapshot:
-        return self._budgets.get(run_id, ModelBudgetSnapshot(
-            runId=run_id, projectId="unknown", state=BudgetState.USAGE_UNKNOWN,
-            currency="CNY", expectedCost=Decimal("0"), authorizedCeiling=Decimal("0"),
-            usedCost=Decimal("0"), reservedCost=Decimal("0"), remainingCost=Decimal("0"),
-            decisionId=None, revision=self._revision,
-        ))
+        if run_id not in self._budgets:
+            raise KeyError(run_id)
+        return self._budgets[run_id]
 
     def _policy(self, project_id: str | None, source: str, values: dict[str, object], inherits: bool) -> ModelPolicySnapshot:
         return ModelPolicySnapshot(
-            projectId=project_id if source == "project" else None, source=source,
+            projectId=project_id, source=source,
             inheritsGlobal=inherits, revision=self._revision, usageSnapshotStaleAfterSeconds=120,
-            hardSafetyBaselines={"staleUsageFailClosed": True, "minimumRemainingIsImmutablePerRun": True},
+            criticalNotifications=True, workloadSafetyMargin=Decimal("1.20"),
+            priceCatalog=PriceCatalog(status="ready", version="mock-v1", source="mock"),
+            hardSafetyBaselines=HardSafetyBaselines(),
             **values,
         )
 
@@ -82,11 +97,15 @@ class MockModelControlAdapter:
             runId=preparation_id, projectId=project_id, state=BudgetState.READY,
             currency="CNY", expectedCost=Decimal("1.00"), authorizedCeiling=Decimal("2.00"),
             usedCost=Decimal("0"), reservedCost=Decimal("0"), remainingCost=Decimal("2.00"),
-            decisionId=None, revision=self._revision,
+            decisionId=None, revision=self._revision, intent=intent, requestedModelTier=requested_model_tier,
+            effectiveModelTier=effective, effectiveAutonomyMode="supervised", pricePeriod="off-peak",
         )
         preview = RunPreparationPreview(
             preparationId=preparation_id, projectId=project_id, intent=intent,
             requestedModelTier=requested_model_tier, effectiveModelTier=effective,
+            effectiveAutonomyMode="supervised", fallbackModelTier="flash", pricePeriod="off-peak",
+            scheduledStart=deadline, workload={"inputTokens": 1000, "outputTokens": 500, "expectedCalls": 1, "runtimeMinutes": 5},
+            allowedPreferences={"preferOffPeak": True, "allowAutoUpgrade": True, "allowFlashDowngrade": True, "autoResume": True},
             deadline=deadline, budget=budget, policyRevision=policy.revision,
         )
         self._preparations[preparation_id] = preview
@@ -103,22 +122,22 @@ class MockModelControlAdapter:
         self._revision += 1
         return await self.decision_center()
 
-    async def set_global_policy(self, patch: dict[str, object], expected_revision: int) -> ModelPolicySnapshot:
+    async def set_global_policy(self, patch: ModelPolicyPatch, expected_revision: int) -> ModelPolicySnapshot:
         current = await self.model_policy()
         if expected_revision != self._revision:
             raise ModelControlConflict(current)
-        self._global.update({key: value for key, value in patch.items() if key in self._global})
+        self._global.update(patch.model_dump(exclude_unset=True))
         self._revision += 1
         return await self.model_policy()
 
-    async def set_project_policy(self, project_id: str, patch: dict[str, object] | None, expected_revision: int) -> ModelPolicySnapshot:
+    async def set_project_policy(self, project_id: str, patch: ModelPolicyPatch | None, expected_revision: int) -> ModelPolicySnapshot:
         current = await self.model_policy(project_id)
         if expected_revision != self._revision:
             raise ModelControlConflict(current)
         if patch is None:
             self._projects.pop(project_id, None)
         else:
-            self._projects[project_id] = {key: value for key, value in patch.items() if key in self._global}
+            self._projects[project_id] = patch.model_dump(exclude_unset=True)
         self._revision += 1
         return await self.model_policy(project_id)
 

@@ -48,6 +48,8 @@ export function DecisionsPage() {
   const [conflict, setConflict] = useState(false);
   const [withdrawn, setWithdrawn] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
+  const [conflictAcknowledged, setConflictAcknowledged] = useState(false);
+  const [actionUnavailable, setActionUnavailable] = useState(false);
 
   const snapshot = decisions.data?.data;
   const items = useMemo(() => uniqueDecisions(snapshot?.items ?? []), [snapshot?.items]);
@@ -66,6 +68,10 @@ export function DecisionsPage() {
         setFormError("请填写操作理由，说明你为何作出这个判断。");
         throw new Error("rationale required");
       }
+      if (conflict && !conflictAcknowledged) {
+        setFormError("请重新检查当前修订和操作后再提交。");
+        throw new Error("conflict reconfirmation required");
+      }
       setFormError(null);
       return api.command<{ command: string; resourceId: string; acceptedAt: string; snapshot: DecisionCenterSnapshot }>(
         "/api/v1/decisions/" + selected.decisionId,
@@ -80,6 +86,8 @@ export function DecisionsPage() {
       setConflict(false);
       setWithdrawn(false);
       setAcknowledged(false);
+      setConflictAcknowledged(false);
+      setActionUnavailable(false);
     },
     onError: (error) => {
       const apiError = error instanceof ApiClientError ? error.errors[0] : undefined;
@@ -90,12 +98,17 @@ export function DecisionsPage() {
       queryClient.setQueryData(["decisions"], { ...decisions.data, data: current });
       setOpenedRevision(current.revision);
       setAcknowledged(false);
+      setConflictAcknowledged(false);
       const currentItem = current.items.find((item) => item.decisionId === selected?.decisionId);
       if (currentItem) {
         setSelected(currentItem);
-        setSelectedAction(currentItem.actions.find((action) => action.actionId === selectedAction?.actionId) ?? currentItem.actions[0] ?? null);
+        const currentAction = currentItem.actions.find((action) => action.actionId === selectedAction?.actionId) ?? null;
+        setSelectedAction(currentAction);
+        setActionUnavailable(!currentAction);
         setWithdrawn(false);
       } else {
+        setSelectedAction(null);
+        setActionUnavailable(false);
         setWithdrawn(true);
       }
       setConflict(true);
@@ -115,6 +128,8 @@ export function DecisionsPage() {
     setConflict(false);
     setWithdrawn(false);
     setAcknowledged(false);
+    setConflictAcknowledged(false);
+    setActionUnavailable(false);
   }
 
   return (
@@ -152,19 +167,21 @@ export function DecisionsPage() {
       {items.length === 0 && <div className="empty-state decision-empty"><strong>当前没有待处理决策</strong><span>新的判断会从权威来源进入这里；来源故障时不会伪造空列表。</span></div>}
       {items.length > 0 && filtered.length === 0 && <div className="empty-state decision-empty"><strong>没有匹配的决策</strong><span>权威列表仍有 {items.length} 项，请调整筛选条件。</span><button type="button" className="secondary-action" onClick={() => { setProject("全部"); setRisk("全部"); }}>清除筛选</button></div>}
 
-      <ModalDialog open={Boolean(selected && selectedAction)} title={selected?.title ?? "确认决策"} onClose={() => setSelected(null)} busy={mutation.isPending} footer={<><button type="button" className="secondary-action" data-autofocus onClick={() => setSelected(null)} disabled={mutation.isPending}>返回</button><button type="button" className="primary-action" onClick={() => mutation.mutate()} disabled={withdrawn || !canResolve || mutation.isPending || Boolean(selectedAction?.requiresRationale && !rationale.trim()) || Boolean(selectedAction?.requiresConfirmation && !acknowledged)}>{mutation.isPending ? "等待权威回执…" : withdrawn ? "该决策已处理" : selectedAction?.label ?? "确认操作"}</button></>}>
-        {selected && selectedAction && <div className="decision-dialog">
+      <ModalDialog open={Boolean(selected)} title={selected?.title ?? "确认决策"} onClose={() => setSelected(null)} busy={mutation.isPending} footer={<><button type="button" className="secondary-action" data-autofocus onClick={() => setSelected(null)} disabled={mutation.isPending}>返回</button><button type="button" className="primary-action" onClick={() => mutation.mutate()} disabled={withdrawn || actionUnavailable || !selectedAction || !canResolve || mutation.isPending || Boolean(conflict && !conflictAcknowledged) || Boolean(selectedAction?.requiresRationale && !rationale.trim()) || Boolean(selectedAction?.requiresConfirmation && !acknowledged)}>{mutation.isPending ? "等待权威回执…" : withdrawn ? "该决策已处理" : actionUnavailable ? "选择当前操作" : selectedAction?.label ?? "选择当前操作"}</button></>}>
+        {selected && <div className="decision-dialog">
           {conflict && <div className="command-conflict" role="alert"><strong>决策已被其他操作修改，请重新确认。</strong><span>已载入当前权威版本；你的操作理由保留，但不会自动重放。</span></div>}
           {withdrawn && <div className="command-conflict" role="alert"><strong>该决策已被处理或撤回，请关闭此窗口。</strong><span>当前权威列表中已找不到它；你的操作理由保留，但不会自动重放。</span></div>}
+          {actionUnavailable && <div className="command-conflict" role="alert"><strong>原操作已不在当前权威选项中，请选择一个当前操作。</strong><span>旧操作不会被隐式替换，也不会自动重放。</span></div>}
           <p className="decision-revision"><span>权威列表修订 {openedRevision ?? snapshot.revision}</span> · 条目版本 {selected.revision}</p>
           <p>{selected.reason}</p>
-          <label className="decision-action-picker">选择操作<select aria-label="选择操作" value={selectedAction.actionId} onChange={(event) => { const next = selected.actions.find((action) => action.actionId === event.target.value); if (next) { setSelectedAction(next); setAcknowledged(false); setFormError(null); } }}>{selected.actions.map((action) => <option key={action.actionId} value={action.actionId}>{action.label}</option>)}</select></label>
-          <dl className="dialog-facts"><div><dt>费用影响</dt><dd>{selectedAction.costImpact}</dd></div><div><dt>质量影响</dt><dd>{selectedAction.qualityImpact ?? "未声明"}</dd></div><div><dt>风险</dt><dd>{selected.risk}</dd></div><div><dt>不可逆后果</dt><dd>{selectedAction.irreversibleConsequence ?? "未声明"}</dd></div></dl>
+          {selected.actions.length > 0 && <label className="decision-action-picker">选择操作<select aria-label="选择操作" value={selectedAction?.actionId ?? ""} onChange={(event) => { const next = selected.actions.find((action) => action.actionId === event.target.value); if (next) { setSelectedAction(next); setRationale(""); setAcknowledged(false); setConflictAcknowledged(false); setActionUnavailable(false); setFormError(null); } }}>{selectedAction === null && <option value="" disabled>请选择当前操作</option>}{selected.actions.map((action) => <option key={action.actionId} value={action.actionId}>{action.label}</option>)}</select></label>}
+          {selectedAction && <dl className="dialog-facts"><div><dt>费用影响</dt><dd>{selectedAction.costImpact}</dd></div><div><dt>质量影响</dt><dd>{selectedAction.qualityImpact ?? "未声明"}</dd></div><div><dt>风险</dt><dd>{selected.risk}</dd></div><div><dt>不可逆后果</dt><dd>{selectedAction.irreversibleConsequence ?? "未声明"}</dd></div></dl>}
           <section><h3>证据</h3><div className="evidence-chips">{selected.evidence.map((reference) => reference.uri ? <a className="evidence-chip" href={reference.uri} key={reference.kind + ":" + reference.refId}>{reference.label}</a> : <span className="evidence-chip" key={reference.kind + ":" + reference.refId}>{reference.label}</span>)}</div></section>
           <section><h3>精确日志摘要</h3><p className="log-summary">{selected.logSummary}</p></section>
           {selected.risk.toLowerCase() === "high" && <p className="decision-high-risk">高风险操作需要明确确认。</p>}
-          {selectedAction.requiresRationale && <label className="decision-rationale">操作理由<textarea aria-label="操作理由" value={rationale} onChange={(event) => setRationale(event.target.value)} placeholder="说明这次判断的依据" rows={3} required /></label>}
-          {selectedAction.requiresConfirmation && <label className="decision-acknowledgement"><input aria-label="确认不可逆后果" type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} />确认我已理解不可逆后果：{selectedAction.irreversibleConsequence ?? "该操作可能产生不可撤销影响。"}</label>}
+          {(withdrawn || actionUnavailable || selectedAction?.requiresRationale) && <label className="decision-rationale">操作理由<textarea aria-label="操作理由" value={rationale} onChange={(event) => setRationale(event.target.value)} placeholder="说明这次判断的依据" rows={3} required={Boolean(selectedAction?.requiresRationale)} /></label>}
+          {selectedAction?.requiresConfirmation && <label className="decision-acknowledgement"><input aria-label="确认不可逆后果" type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} />确认我已理解不可逆后果：{selectedAction.irreversibleConsequence ?? "该操作可能产生不可撤销影响。"}</label>}
+          {conflict && !withdrawn && selectedAction && <label className="decision-acknowledgement"><input aria-label="我已重新检查当前修订和操作" type="checkbox" checked={conflictAcknowledged} onChange={(event) => setConflictAcknowledged(event.target.checked)} />我已重新检查当前修订和操作</label>}
           {formError && <p className="command-error" role="alert">{formError}</p>}
           {!canResolve && <p className="readonly-note">{capabilities.isPending ? "正在确认操作能力，所有变更操作已停用。" : capabilities.isError || !capabilities.data?.data ? "当前无法确认操作能力，所有变更操作已停用。" : "当前 profile 为 " + (capabilities.data.data.profile ?? "readonly") + "，只读，不能处理决策。"}</p>}
         </div>}

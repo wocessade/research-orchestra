@@ -195,6 +195,29 @@ describe("owner decision runway", () => {
     expect(within(dialog).queryByRole("textbox", { name: "操作理由" })).not.toBeInTheDocument();
   });
 
+  it("clears rationale when switching to an action that does not require one", async () => {
+    const user = userEvent.setup();
+    let body: Record<string, unknown> | null = null;
+    const actions = [
+      { actionId: "approve", label: "批准执行", costImpact: "消耗 ¥1.00", qualityImpact: "保持质量", irreversibleConsequence: "会启动运行", requiresRationale: true, requiresConfirmation: true },
+      { actionId: "defer", label: "暂缓执行", costImpact: "不产生费用", qualityImpact: "等待更多证据", irreversibleConsequence: null, requiresRationale: false, requiresConfirmation: false },
+    ];
+    const routes = decisionRoutes([decision({ actions })], {
+      "/api/v1/decisions/decision-1": ({ init }: { init?: RequestInit }) => {
+        body = JSON.parse(String(init?.body));
+        return envelope({ command: "resolveDecision", resourceId: "decision-1", acceptedAt: "2026-08-29T08:00:00Z", snapshot: { items: [], revision: 1 } }, { modelControl: sourceFresh });
+      },
+    });
+    renderAppAt("/decisions", routes);
+    await user.click(await screen.findByRole("button", { name: "查看：允许高峰时段运行" }));
+    await user.type(screen.getByRole("textbox", { name: "操作理由" }), "仅适用于批准动作");
+    await user.click(screen.getByRole("checkbox", { name: /确认不可逆后果/ }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "选择操作" }), "defer");
+    expect(screen.queryByRole("textbox", { name: "操作理由" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "暂缓执行" }));
+    expect(body).toMatchObject({ actionId: "defer", expectedRevision: 0, rationale: null });
+  });
+
   it("requires explicit acknowledgement only for confirming actions", async () => {
     const user = userEvent.setup();
     renderAppAt("/decisions", decisionRoutes());
@@ -206,6 +229,49 @@ describe("owner decision runway", () => {
     expect(within(dialog).getByRole("button", { name: "允许高峰运行" })).toBeDisabled();
     await user.click(within(dialog).getByRole("checkbox", { name: /确认不可逆后果/ }));
     expect(within(dialog).getByRole("button", { name: "允许高峰运行" })).toBeEnabled();
+  });
+
+  it("requires conflict reconfirmation even when the current action needs no rationale or confirmation", async () => {
+    const user = userEvent.setup();
+    let calls = 0;
+    const actions = [{ actionId: "defer", label: "暂缓执行", costImpact: "不产生费用", qualityImpact: "等待更多证据", irreversibleConsequence: null, requiresRationale: false, requiresConfirmation: false }];
+    const current = { items: [decision({ actions, revision: 2, title: "更新后的决策" })], revision: 5 };
+    const routes = decisionRoutes([decision({ actions })], {
+      "/api/v1/decisions/decision-1": () => {
+        calls += 1;
+        if (calls === 1) return new Response(JSON.stringify(envelope(null, { modelControl: sourceFresh }, [{ code: "RESOURCE_CHANGED", message: "changed", source: "modelControl", retryable: false, details: { currentResource: current } }])), { status: 409, headers: { "Content-Type": "application/json" } });
+        return envelope({ command: "resolveDecision", resourceId: "decision-1", acceptedAt: "2026-08-29T08:00:00Z", snapshot: { items: [], revision: 6 } }, { modelControl: sourceFresh });
+      },
+    });
+    renderAppAt("/decisions", routes);
+    await user.click(await screen.findByRole("button", { name: "查看：允许高峰时段运行" }));
+    await user.click(screen.getByRole("button", { name: "暂缓执行" }));
+    expect(await screen.findByText("决策已被其他操作修改，请重新确认。")).toBeVisible();
+    expect(screen.getByRole("button", { name: "暂缓执行" })).toBeDisabled();
+    await user.click(screen.getByRole("checkbox", { name: "我已重新检查当前修订和操作" }));
+    expect(screen.getByRole("button", { name: "暂缓执行" })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "暂缓执行" }));
+    expect(calls).toBe(2);
+  });
+
+  it("requires choosing a current action when the originally selected action disappeared", async () => {
+    const user = userEvent.setup();
+    const current = { items: [decision({ actions: [{ actionId: "defer", label: "暂缓执行", costImpact: "不产生费用", qualityImpact: "等待更多证据", irreversibleConsequence: null, requiresRationale: false, requiresConfirmation: false }], revision: 2 })], revision: 5 };
+    const routes = decisionRoutes([decision()], {
+      "/api/v1/decisions/decision-1": () => new Response(JSON.stringify(envelope(null, { modelControl: sourceFresh }, [{ code: "RESOURCE_CHANGED", message: "changed", source: "modelControl", retryable: false, details: { currentResource: current } }])), { status: 409, headers: { "Content-Type": "application/json" } }),
+    });
+    renderAppAt("/decisions", routes);
+    await user.click(await screen.findByRole("button", { name: "查看：允许高峰时段运行" }));
+    await user.type(screen.getByRole("textbox", { name: "操作理由" }), "保留原判断依据");
+    await user.click(screen.getByRole("checkbox", { name: /确认不可逆后果/ }));
+    await user.click(screen.getByRole("button", { name: "允许高峰运行" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("原操作已不在当前权威选项中，请选择一个当前操作。")).toBeVisible();
+    expect(within(dialog).getByRole("button", { name: "选择当前操作" })).toBeDisabled();
+    expect(within(dialog).getByRole("textbox", { name: "操作理由" })).toHaveValue("保留原判断依据");
+    await user.selectOptions(within(dialog).getByRole("combobox", { name: "选择操作" }), "defer");
+    expect(within(dialog).getByRole("checkbox", { name: "我已重新检查当前修订和操作" })).toBeVisible();
+    expect(within(dialog).getByRole("button", { name: "暂缓执行" })).toBeDisabled();
   });
 
   it("renders authoritative non-conflict mutation errors in the dialog", async () => {

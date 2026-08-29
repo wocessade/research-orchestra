@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 
 import { api, ApiClientError } from "../api/client";
 import type { Schemas } from "../api/types";
-import { QueryLoading, SourceStrip } from "./EnvelopeState";
+import { EnvelopeErrors, QueryLoading, SourceStrip } from "./EnvelopeState";
 
 type ModelBudgetSnapshot = Schemas["ModelBudgetSnapshot"];
 
@@ -18,7 +18,6 @@ const stateCopy: Record<ModelBudgetSnapshot["state"], { label: string; recovery:
 
 const artifactKinds = new Set(["prompt", "stdout", "stderr", "receipt", "log"]);
 const usageUnknownSafety = ["必须人工核对用量后才能恢复。", "同一调用不得盲目重试。"];
-const sourceNames: Record<string, string> = { modelControl: "模型控制" };
 
 function absoluteTime(value: string | null | undefined) {
   return value ? new Date(value).toLocaleString("zh-CN", { hour12: false }) : "—";
@@ -31,7 +30,7 @@ function serverMoney(value: string, currency: string) {
 function statusCopy(snapshot: ModelBudgetSnapshot) {
   const copy = stateCopy[snapshot.state];
   const conditions = snapshot.recoveryConditions.length ? snapshot.recoveryConditions : [copy.recovery];
-  return snapshot.state === "usage-unknown" ? [...usageUnknownSafety, ...conditions] : conditions;
+  return Array.from(new Set(snapshot.state === "usage-unknown" ? [...usageUnknownSafety, ...conditions] : conditions));
 }
 
 export function RunBudgetPanel({ runId }: { runId: string }) {
@@ -49,7 +48,7 @@ export function RunBudgetPanel({ runId }: { runId: string }) {
     return <section className="detail-section run-budget-panel" aria-label="运行预算">
       <div className="detail-heading"><div><p className="page-kicker">MODEL BUDGET / UNAVAILABLE</p><h2 id="run-budget-title">运行预算暂不可用</h2></div><p>{status === 404 ? "没有找到该运行的预算审计快照。" : "保留当前判断，不以空数据替代来源故障。"}</p></div>
       {errorEnvelope?.sources && <SourceStrip sources={errorEnvelope.sources} />}
-      {errorEnvelope?.errors.length ? <div className="run-budget-errors" role="alert">{errorEnvelope.errors.map((error) => <p key={`${error.source}:${error.code}`}><strong>{sourceNames[error.source] ?? error.source} 暂不可用</strong><span>{error.message}</span></p>)}</div> : <p className="run-budget-error-detail">{query.error instanceof ApiClientError ? query.error.message : `HTTP ${status ?? "unknown"}`}</p>}
+      {errorEnvelope?.errors.length ? <EnvelopeErrors errors={errorEnvelope.errors} /> : <p className="run-budget-error-detail">{query.error instanceof ApiClientError ? query.error.message : `HTTP ${status ?? "unknown"}`}</p>}
     </section>;
   }
 
@@ -63,7 +62,7 @@ export function RunBudgetPanel({ runId }: { runId: string }) {
   return <section className="detail-section run-budget-panel" aria-label="运行预算">
     <div className="detail-heading"><div><p className="page-kicker">MODEL BUDGET / AUDIT</p><h2 id="run-budget-title">模型预算审计</h2></div><p>服务端快照 revision {snapshot.revision}；此处只读展示，不复制定价或决策状态。</p></div>
     <SourceStrip sources={envelope.sources} />
-    {envelope.errors.length > 0 && <div className="run-budget-errors" role="alert">{envelope.errors.map((error) => <p key={`${error.source}:${error.code}`}><strong>{sourceNames[error.source] ?? error.source} 暂不可用</strong><span>{error.message}</span></p>)}</div>}
+    <EnvelopeErrors errors={envelope.errors} />
     {staleSource && <p className="run-budget-source-warning" role="status">预算来源陈旧；以下内容保留为已观测快照，不代表当前余额。</p>}
     <div className={`run-budget-status run-budget-status--${snapshot.state}`}>
       <strong>{state.label}</strong><span>{statusCopy(snapshot).join("；")}</span>

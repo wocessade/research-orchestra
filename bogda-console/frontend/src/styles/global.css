@@ -121,7 +121,6 @@ h2 { margin: 0; font-size: clamp(21px, 2vw, 30px); line-height: 1.15; letter-spa
 .checkpoint-actions .primary-action { margin-top: 0; }
 .run-budget-panel .source-strip { margin-bottom: 18px; }
 .run-budget-source-warning { margin: 0 0 18px; padding: 10px 12px; color: var(--amber); background: #f8f0e3; border-left: 3px solid currentColor; }
-.run-budget-errors { margin: 0 0 18px; }.run-budget-errors p { display: flex; gap: 12px; margin: 0; padding: 12px 14px; color: var(--route); background: #f8ece9; border-left: 3px solid currentColor; }.run-budget-errors span { color: var(--note); }
 .run-budget-status { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; margin-bottom: 20px; padding: 14px 16px; background: var(--snow); border-left: 4px solid var(--conifer); }
 .run-budget-status strong { font-size: 18px; }.run-budget-status span { color: var(--note); font-size: 12px; }.run-budget-status--stale,.run-budget-status--insufficient,.run-budget-status--awaiting-approval,.run-budget-status--usage-unknown { border-color: var(--amber); }.run-budget-status--scheduled-off-peak { border-color: var(--lake); }
 .run-budget-ledger { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin: 0; background: var(--line); }

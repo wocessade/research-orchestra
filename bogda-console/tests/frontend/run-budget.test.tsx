@@ -36,8 +36,8 @@ const baseBudget: Schemas["ModelBudgetSnapshot"] = {
   ],
 };
 
-function renderBudget(budget = baseBudget, sources = { modelControl: sourceFresh }) {
-  installApi({ "/api/v1/runs/run-budget-1/model-budget": envelope(budget, sources) });
+function renderBudget(budget = baseBudget, sources = { modelControl: sourceFresh }, errors: unknown[] = []) {
+  installApi({ "/api/v1/runs/run-budget-1/model-budget": envelope(budget, sources, errors) });
   return renderWithClient(<MemoryRouter><RunBudgetPanel runId="run-budget-1" /></MemoryRouter>);
 }
 
@@ -90,12 +90,13 @@ describe("RunBudgetPanel state matrix", () => {
   });
 
   it("always shows the usage-unknown safety invariant before weak server recovery conditions", async () => {
-    renderBudget({ ...baseBudget, state: "usage-unknown", recoveryConditions: ["稍后查看余额"] });
+    renderBudget({ ...baseBudget, state: "usage-unknown", recoveryConditions: ["必须人工核对用量后才能恢复。", "同一调用不得盲目重试。", "稍后查看余额", "必须人工核对用量后才能恢复。"] });
     expect(await screen.findByText("用量未知")).toBeVisible();
     const recovery = await screen.findByRole("region", { name: "恢复条件" });
-    expect(within(recovery).getByText("必须人工核对用量后才能恢复。")).toBeVisible();
-    expect(within(recovery).getByText("同一调用不得盲目重试。")).toBeVisible();
-    expect(within(recovery).getByText("稍后查看余额")).toBeVisible();
+    expect(within(recovery).getAllByText("必须人工核对用量后才能恢复。", { exact: true })).toHaveLength(1);
+    expect(within(recovery).getAllByText("同一调用不得盲目重试。", { exact: true })).toHaveLength(1);
+    expect(within(recovery).getByText("稍后查看余额", { exact: true })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "系统不变量说明" })).toBeVisible();
   });
 
   it("keeps the usage-unknown safety invariant when the server supplies no recovery conditions", async () => {
@@ -120,6 +121,7 @@ describe("RunBudgetPanel state matrix", () => {
     expect(await screen.findByText("没有找到该运行的预算审计快照。")).toBeVisible();
     expect(screen.getByText("预算审计快照不存在")).toBeVisible();
     expect(screen.getAllByText("模型控制", { exact: false }).length).toBeGreaterThan(0);
+    expect(screen.getByText("预算审计快照不存在").closest(".source-errors")).toHaveAttribute("role", "status");
   });
 
   it("renders the authoritative 503 envelope with source metadata and unavailable copy", async () => {
@@ -134,9 +136,11 @@ describe("RunBudgetPanel state matrix", () => {
   });
 
   it("keeps a successful stale-source envelope distinct from a transport error", async () => {
-    renderBudget({ ...baseBudget, recoveryConditions: ["使用已观测快照"] }, { modelControl: sourceStale });
+    renderBudget({ ...baseBudget, recoveryConditions: ["使用已观测快照"] }, { modelControl: sourceStale }, [{ code: "MODEL_CONTROL_DELAYED", message: "审计来源延迟", source: "modelControl", retryable: true }]);
     expect(await screen.findByText("预算可用")).toBeVisible();
     expect(screen.getByText("预算来源陈旧；以下内容保留为已观测快照，不代表当前余额。")).toBeVisible();
     expect(screen.getAllByText("使用已观测快照").length).toBeGreaterThan(0);
+    expect(screen.getByText("审计来源延迟")).toBeVisible();
+    expect(screen.getByText("审计来源延迟").closest(".source-errors")).toHaveAttribute("role", "status");
   });
 });

@@ -69,7 +69,7 @@ describe("guarded commands", () => {
     expect(screen.getByLabelText("评审说明")).toHaveValue("证据链不完整");
     expect(screen.getByText("artifact-newest")).toBeVisible();
     await user.click(screen.getByRole("button", { name: "确认采用最新版本" }));
-    expect(screen.getByRole("status")).toHaveTextContent("artifact-newest");
+    expect(screen.getByText(/已确认采用最新 Artifact/)).toHaveTextContent("artifact-newest");
     expect(screen.getByLabelText("评审说明")).toHaveValue("证据链不完整");
     await user.click(screen.getByRole("button", { name: "提交评审" }));
     expect(await screen.findByText("已接受")).toBeVisible();

@@ -61,15 +61,16 @@ export function DecisionsPage() {
     () => items.filter((item) => (project === "全部" || item.projectId === project) && (risk === "全部" || item.risk === risk)),
     [items, project, risk],
   );
+  const renderedDecisionIds = filtered.map((item) => item.decisionId).join("|");
   const canResolve = capabilities.data?.data?.canResolveModelDecision === true;
 
   useEffect(() => {
-    if (!location.hash || items.length === 0) return;
+    if (!location.hash || !renderedDecisionIds) return;
     const target = document.getElementById(decodeURIComponent(location.hash.slice(1)));
     if (!(target instanceof HTMLElement)) return;
     target.focus();
     target.scrollIntoView({ block: "start" });
-  }, [items.length, location.hash]);
+  }, [location.hash, renderedDecisionIds]);
 
   const mutation = useMutation({
     mutationFn: async () => {

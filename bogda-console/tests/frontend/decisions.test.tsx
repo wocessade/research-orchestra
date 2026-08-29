@@ -31,11 +31,17 @@ function decisionRoutes(items = [decision() as Record<string, unknown>], extras:
 describe("owner decision runway", () => {
   it("binds each decision to its canonical id and focuses an async hash target", async () => {
     const scrollIntoView = vi.spyOn(HTMLElement.prototype, "scrollIntoView").mockImplementation(() => undefined);
-    renderAppAt("/decisions#decision-1", decisionRoutes());
+    renderAppAt("/decisions#decision-1", decisionRoutes([decision(), decision({ decisionId: "decision-2", projectId: "project-2", title: "另一个决策" })]));
     const item = await screen.findByTestId("decision-item-decision-1");
     expect(item).toHaveAttribute("id", "decision-1");
     expect(item).toHaveFocus();
-    expect(scrollIntoView).toHaveBeenCalled();
+    const initialCalls = scrollIntoView.mock.calls.length;
+    const user = userEvent.setup();
+    await user.selectOptions(screen.getByRole("combobox", { name: "项目" }), "project-2");
+    expect(screen.queryByTestId("decision-item-decision-1")).not.toBeInTheDocument();
+    await user.selectOptions(screen.getByRole("combobox", { name: "项目" }), "全部");
+    expect(await screen.findByTestId("decision-item-decision-1")).toHaveFocus();
+    expect(scrollIntoView.mock.calls.length).toBeGreaterThan(initialCalls);
     scrollIntoView.mockRestore();
   });
 

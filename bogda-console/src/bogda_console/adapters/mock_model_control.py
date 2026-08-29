@@ -41,7 +41,10 @@ class MockModelControlAdapter:
                 projectId="project-1", runId="run-1", reason="Preparation needs owner approval",
                 risk="budget", estimatedCost=Decimal("1.00"), deadline=None,
                 evidence=[EvidenceReference(kind="run", refId="run-1", label="Run")],
-                actions=(DecisionAction(actionId="approve", label="Approve", costImpact="Uses budget", requiresRationale=True),),
+                actions=(
+                    DecisionAction(actionId="approve", label="Approve", costImpact="Uses budget", requiresRationale=True),
+                    DecisionAction(actionId="defer", label="Defer", costImpact="No additional spend"),
+                ),
                 revision=0, logSummary="Awaiting owner decision.",
             )
             ,"decision-usage-unknown": DecisionItem(
@@ -63,6 +66,18 @@ class MockModelControlAdapter:
             currency="CNY", expectedCost=Decimal("0"), authorizedCeiling=Decimal("0"),
             usedCost=Decimal("0"), reservedCost=Decimal("0"), remainingCost=Decimal("0"),
             decisionId="decision-usage-unknown", revision=0,
+        ), "run-completed": ModelBudgetSnapshot(
+            runId="run-completed", projectId="bogda-main", state=BudgetState.READY,
+            currency="CNY", expectedCost=Decimal("1.20"), authorizedCeiling=Decimal("4.00"),
+            usedCost=Decimal("1.20"), reservedCost=Decimal("0"), remainingCost=Decimal("2.80"),
+            decisionId=None, revision=0, intent="execute", requestedModelTier="auto",
+            effectiveModelTier="flash", effectiveAutonomyMode="supervised", pricePeriod="off-peak",
+        ), "run-active": ModelBudgetSnapshot(
+            runId="run-active", projectId="bogda-main", state=BudgetState.USAGE_UNKNOWN,
+            currency="CNY", expectedCost=Decimal("0.80"), authorizedCeiling=Decimal("2.00"),
+            usedCost=Decimal("0"), reservedCost=Decimal("0.80"), remainingCost=Decimal("1.20"),
+            decisionId="decision-usage-unknown", revision=0, intent="execute", requestedModelTier="auto",
+            effectiveModelTier="flash", effectiveAutonomyMode="supervised", pricePeriod="off-peak",
         )}
         self._preparations: dict[str, RunPreparationPreview] = {}
         self._confirmations: dict[str, tuple[str, str]] = {}

@@ -15,7 +15,7 @@ test.beforeEach(async ({ page, request }) => {
 
 test("all product surfaces have no serious axe violations", async ({ page }) => {
   const assertNoErrors = collectUnexpectedBrowserErrors(page);
-  for (const path of ["/", "/runs", "/reviews", "/runs/run-completed", "/infrastructure"]) {
+  for (const path of ["/", "/runs", "/reviews", "/runs/run-completed", "/infrastructure", "/decisions", "/model-policy"]) {
     await gotoSettled(page, path);
     const results = await new AxeBuilder({ page }).analyze();
     const blocking = results.violations.filter((violation) =>
@@ -55,11 +55,11 @@ test("skip link and dialog keyboard behavior keep focus deterministic", async ({
   await gotoSettled(page, "/infrastructure");
   const opener = page.getByRole("button", { name: "提交 alpine-assay" });
   await opener.click();
-  const dialog = page.getByRole("dialog", { name: "提交 alpine-assay" });
+  const dialog = page.getByRole("dialog", { name: "准备 alpine-assay" });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole("button", { name: "返回" })).toBeFocused();
   await page.keyboard.press("Tab");
-  await expect(dialog.getByRole("button", { name: "提交运行" })).toBeFocused();
+  await expect(dialog.getByRole("button", { name: "生成服务端预览" })).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(dialog.getByRole("textbox", { name: "sample" })).toBeFocused();
   await page.keyboard.press("Escape");

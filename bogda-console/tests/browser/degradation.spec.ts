@@ -7,6 +7,17 @@ import {
   type Scenario,
 } from "./support";
 
+test("decision and policy pages stay available when Prefect infrastructure fails", async ({ page, request }) => {
+  await setScenario(request, "degraded-stale");
+  const expected = new Set(["GET /api/v1/infrastructure 503", "GET /api/v1/deployments 503"]);
+  const assertNoErrors = collectUnexpectedBrowserErrors(page, expected);
+  await gotoSettled(page, "/decisions");
+  await expect(page.getByRole("heading", { name: "决策跑道" })).toBeVisible();
+  await gotoSettled(page, "/model-policy");
+  await expect(page.getByRole("heading", { name: "模型策略" })).toBeVisible();
+  assertNoErrors();
+});
+
 test("Prefect unavailable without last-good renders an explicit failure", async ({ page, request }, testInfo) => {
   await setScenario(request, "degraded-stale");
   const expected = new Set(["GET /api/v1/infrastructure 503", "GET /api/v1/deployments 503"]);
@@ -68,7 +79,11 @@ test("offline Worker and every mock Power mode stay source-separated", async ({ 
 
 test("missing and newest-invalid RunResult are explicit", async ({ page, request }) => {
   await setScenario(request, "result-missing-invalid-conflict");
-  const assertNoErrors = collectUnexpectedBrowserErrors(page);
+  const expected = new Set([
+    "GET /api/v1/runs/run-missing/model-budget 404",
+    "GET /api/v1/runs/run-invalid/model-budget 404",
+  ]);
+  const assertNoErrors = collectUnexpectedBrowserErrors(page, expected);
   await gotoSettled(page, "/runs/run-missing");
   await expect(page.getByRole("heading", { name: "RunResult 缺失" })).toBeVisible();
   await expect(page.getByText("科研状态不可用", { exact: false })).toBeVisible();

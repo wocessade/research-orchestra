@@ -9,9 +9,11 @@ const sourceNames: Record<string, string> = {
 };
 
 export function SourceStrip({ sources }: { sources: Record<string, SourceMeta> }) {
+  const entries = Object.entries(sources);
+  if (!entries.length) return null;
   return (
-    <div className="source-strip" aria-label="数据来源">
-      {Object.entries(sources).map(([key, meta]) => <SourceNotice key={key} name={sourceNames[key] ?? key} meta={meta} />)}
+    <div className="source-strip" role="group" aria-label="数据来源">
+      {entries.map(([key, meta]) => <SourceNotice key={key} name={sourceNames[key] ?? key} meta={meta} />)}
     </div>
   );
 }

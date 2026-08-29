@@ -262,21 +262,21 @@ git commit -m "feat(console): add model policy and run preparation"
 - Produces desktop and 320/360 px interaction evidence for the decision center, run budget, policy, and guarded preparation flows.
 - Closes Stage D-only deferred items and keeps real usage, scheduler execution, durable stores/outbox, live smoke, Prefect deployment, artifact lifecycle, and production operations open for Stage E.
 
-- [ ] **Step 1: Add browser acceptance scenarios**
+- [x] **Step 1: Add browser acceptance scenarios**
 
 Exercise keyboard/focus flow, decision conflict, state-specific recovery copy, project inheritance restore, guarded run confirmation, real-profile unavailable behavior, and axe checks at desktop/mobile widths.
 
-- [ ] **Step 2: Run the focused browser scenarios**
+- [x] **Step 2: Run the focused browser scenarios**
 
 Run: `npm run test:browser -- console.spec.ts accessibility.spec.ts degradation.spec.ts`
 
 Expected: PASS with no unexpected console errors or requests.
 
-- [ ] **Step 3: Perform visual QA and remove one unnecessary visual element**
+- [x] **Step 3: Perform visual QA and remove one unnecessary visual element**
 
 Inspect decision center, run detail, and model policy at desktop and 320/360 px. Preserve visible focus, reduced-motion compatibility, no horizontal clipping, and the existing shell identity. Record the removed excess element in the acceptance report.
 
-- [ ] **Step 4: Run one final Stage D verification**
+- [x] **Step 4: Run one final Stage D verification**
 
 Run:
 

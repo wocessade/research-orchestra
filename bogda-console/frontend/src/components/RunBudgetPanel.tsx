@@ -65,7 +65,7 @@ export function RunBudgetPanel({ runId }: { runId: string }) {
     <EnvelopeErrors errors={envelope.errors} />
     {staleSource && <p className="run-budget-source-warning" role="status">预算来源陈旧；以下内容保留为已观测快照，不代表当前余额。</p>}
     <div className={`run-budget-status run-budget-status--${snapshot.state}`}>
-      <strong>{state.label}</strong><span>{statusCopy(snapshot).join("；")}</span>
+      <strong>{state.label}</strong>
     </div>
     <dl className="run-budget-ledger">
       <div><dt>请求 tier</dt><dd>{snapshot.requestedModelTier}</dd></div>

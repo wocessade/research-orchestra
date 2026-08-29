@@ -11,6 +11,8 @@ describe("run surfaces", () => {
     expect(screen.getByText("待评审")).toBeVisible();
     expect(screen.getByText("执行完成，且声明的必要产物存在；这不代表科研结论已被接受。" )).toBeVisible();
     expect(screen.queryByText(/研究成功|结论成立|验证通过/)).not.toBeInTheDocument();
+    expect(await screen.findByText("运行预算暂不可用")).toBeVisible();
+    expect(requestLog).toContain("/api/v1/runs/run-completed-unreviewed/model-budget");
   });
 
   it("sends exact execution and scientific filters", async () => {

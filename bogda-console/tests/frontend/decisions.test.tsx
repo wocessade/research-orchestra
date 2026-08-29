@@ -1,6 +1,6 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { envelope, renderAppAt, requestLog, sourceFresh, standardRoutes } from "./helpers";
 
@@ -29,6 +29,16 @@ function decisionRoutes(items = [decision() as Record<string, unknown>], extras:
 }
 
 describe("owner decision runway", () => {
+  it("binds each decision to its canonical id and focuses an async hash target", async () => {
+    const scrollIntoView = vi.spyOn(HTMLElement.prototype, "scrollIntoView").mockImplementation(() => undefined);
+    renderAppAt("/decisions#decision-1", decisionRoutes());
+    const item = await screen.findByTestId("decision-item-decision-1");
+    expect(item).toHaveAttribute("id", "decision-1");
+    expect(item).toHaveFocus();
+    expect(scrollIntoView).toHaveBeenCalled();
+    scrollIntoView.mockRestore();
+  });
+
   it("reads one canonical list, deduplicates IDs, groups by urgency, and filters by project and risk", async () => {
     const items = [
       decision(),

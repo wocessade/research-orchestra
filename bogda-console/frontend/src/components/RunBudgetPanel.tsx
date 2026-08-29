@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 
 import { api, ApiClientError } from "../api/client";
 import type { Schemas } from "../api/types";
-import { EnvelopeErrors, QueryLoading, SourceStrip } from "./EnvelopeState";
+import { QueryLoading, SourceStrip } from "./EnvelopeState";
 
 type ModelBudgetSnapshot = Schemas["ModelBudgetSnapshot"];
 
@@ -17,6 +17,8 @@ const stateCopy: Record<ModelBudgetSnapshot["state"], { label: string; recovery:
 };
 
 const artifactKinds = new Set(["prompt", "stdout", "stderr", "receipt", "log"]);
+const usageUnknownSafety = ["必须人工核对用量后才能恢复。", "同一调用不得盲目重试。"];
+const sourceNames: Record<string, string> = { modelControl: "模型控制" };
 
 function absoluteTime(value: string | null | undefined) {
   return value ? new Date(value).toLocaleString("zh-CN", { hour12: false }) : "—";
@@ -28,7 +30,8 @@ function serverMoney(value: string, currency: string) {
 
 function statusCopy(snapshot: ModelBudgetSnapshot) {
   const copy = stateCopy[snapshot.state];
-  return snapshot.recoveryConditions.length ? snapshot.recoveryConditions : [copy.recovery];
+  const conditions = snapshot.recoveryConditions.length ? snapshot.recoveryConditions : [copy.recovery];
+  return snapshot.state === "usage-unknown" ? [...usageUnknownSafety, ...conditions] : conditions;
 }
 
 export function RunBudgetPanel({ runId }: { runId: string }) {
@@ -38,14 +41,15 @@ export function RunBudgetPanel({ runId }: { runId: string }) {
     enabled: Boolean(runId),
   });
 
-  if (query.isPending) return <section className="detail-section run-budget-panel" aria-labelledby="run-budget-title"><QueryLoading /></section>;
+  if (query.isPending) return <section className="detail-section run-budget-panel" aria-label="运行预算"><QueryLoading /></section>;
 
   if (query.isError || !query.data?.data) {
     const status = query.error instanceof ApiClientError ? query.error.status : undefined;
-    return <section className="detail-section run-budget-panel" aria-labelledby="run-budget-title">
+    const errorEnvelope = query.error instanceof ApiClientError ? query.error.envelope : undefined;
+    return <section className="detail-section run-budget-panel" aria-label="运行预算">
       <div className="detail-heading"><div><p className="page-kicker">MODEL BUDGET / UNAVAILABLE</p><h2 id="run-budget-title">运行预算暂不可用</h2></div><p>{status === 404 ? "没有找到该运行的预算审计快照。" : "保留当前判断，不以空数据替代来源故障。"}</p></div>
-      {query.data?.sources && <SourceStrip sources={query.data.sources} />}
-      {query.error instanceof ApiClientError && <p className="run-budget-error-detail">{query.error.errors[0]?.message ?? `HTTP ${status ?? "unknown"}`}</p>}
+      {errorEnvelope?.sources && <SourceStrip sources={errorEnvelope.sources} />}
+      {errorEnvelope?.errors.length ? <div className="run-budget-errors" role="alert">{errorEnvelope.errors.map((error) => <p key={`${error.source}:${error.code}`}><strong>{sourceNames[error.source] ?? error.source} 暂不可用</strong><span>{error.message}</span></p>)}</div> : <p className="run-budget-error-detail">{query.error instanceof ApiClientError ? query.error.message : `HTTP ${status ?? "unknown"}`}</p>}
     </section>;
   }
 
@@ -56,10 +60,10 @@ export function RunBudgetPanel({ runId }: { runId: string }) {
   const staleSource = Object.values(envelope.sources).some((source) => source.freshness !== "fresh");
   const artifacts = snapshot.artifacts.filter((artifact) => artifactKinds.has(artifact.kind));
 
-  return <section className="detail-section run-budget-panel" aria-labelledby="run-budget-title">
+  return <section className="detail-section run-budget-panel" aria-label="运行预算">
     <div className="detail-heading"><div><p className="page-kicker">MODEL BUDGET / AUDIT</p><h2 id="run-budget-title">模型预算审计</h2></div><p>服务端快照 revision {snapshot.revision}；此处只读展示，不复制定价或决策状态。</p></div>
     <SourceStrip sources={envelope.sources} />
-    <EnvelopeErrors errors={envelope.errors} />
+    {envelope.errors.length > 0 && <div className="run-budget-errors" role="alert">{envelope.errors.map((error) => <p key={`${error.source}:${error.code}`}><strong>{sourceNames[error.source] ?? error.source} 暂不可用</strong><span>{error.message}</span></p>)}</div>}
     {staleSource && <p className="run-budget-source-warning" role="status">预算来源陈旧；以下内容保留为已观测快照，不代表当前余额。</p>}
     <div className={`run-budget-status run-budget-status--${snapshot.state}`}>
       <strong>{state.label}</strong><span>{statusCopy(snapshot).join("；")}</span>
@@ -78,7 +82,7 @@ export function RunBudgetPanel({ runId }: { runId: string }) {
       <div><dt>计划开始</dt><dd>{absoluteTime(snapshot.scheduledStart)}</dd></div>
       <div><dt>暂停原因</dt><dd>{snapshot.pauseReason ?? "—"}</dd></div>
     </dl>
-    <div className="run-budget-recovery" aria-label="恢复条件"><p className="page-kicker">RECOVERY / ONE CALL OUT</p><strong>恢复条件</strong><ul>{statusCopy(snapshot).map((condition) => <li key={condition}>{condition}</li>)}</ul>{snapshot.decisionId && <Link className="text-action" to={`/decisions#${snapshot.decisionId}`}>前往决策中心 · {snapshot.decisionId}</Link>}</div>
+    <div className="run-budget-recovery" aria-label="恢复条件" role="region"><p className="page-kicker">RECOVERY / ONE CALL OUT</p><strong>恢复条件</strong><ul>{statusCopy(snapshot).map((condition) => <li key={condition}>{condition}</li>)}</ul>{snapshot.decisionId && <Link className="text-action" to={`/decisions#${snapshot.decisionId}`}>前往决策中心 · {snapshot.decisionId}</Link>}</div>
     <div className="run-budget-audit-columns">
       <section aria-labelledby="run-budget-events-title"><div className="detail-heading"><h3 id="run-budget-events-title">结构化事件</h3><span>仅摘要</span></div>{snapshot.events.length ? <ol className="run-budget-events">{snapshot.events.map((event) => <li key={event.eventId}><time dateTime={event.occurredAt}>{absoluteTime(event.occurredAt)}</time><strong>{event.eventType}</strong><span>{event.summary ?? "—"}</span></li>)}</ol> : <p className="muted">暂无结构化事件。</p>}</section>
       <section aria-labelledby="run-budget-artifacts-title"><div className="detail-heading"><h3 id="run-budget-artifacts-title">审计引用</h3><span>metadata only</span></div>{artifacts.length ? <ul className="run-budget-artifacts">{artifacts.map((artifact) => <li key={artifact.artifactId}><span>{artifact.kind}</span><a href={artifact.uri}>{artifact.artifactId}</a></li>)}</ul> : <p className="muted">暂无允许展示的元数据引用。</p>}</section>

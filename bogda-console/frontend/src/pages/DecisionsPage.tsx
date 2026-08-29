@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "react-router-dom";
 
 import { ApiClientError, api } from "../api/client";
 import type { CapabilitySnapshot, DecisionAction, DecisionCenterSnapshot, DecisionItem } from "../api/types";
@@ -29,6 +30,7 @@ function formatDeadline(deadline: string | null | undefined) {
 }
 
 export function DecisionsPage() {
+  const location = useLocation();
   const queryClient = useQueryClient();
   const decisions = useQuery({
     queryKey: ["decisions"],
@@ -60,6 +62,14 @@ export function DecisionsPage() {
     [items, project, risk],
   );
   const canResolve = capabilities.data?.data?.canResolveModelDecision === true;
+
+  useEffect(() => {
+    if (!location.hash || items.length === 0) return;
+    const target = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+    if (!(target instanceof HTMLElement)) return;
+    target.focus();
+    target.scrollIntoView({ block: "start" });
+  }, [items.length, location.hash]);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -152,7 +162,7 @@ export function DecisionsPage() {
           const groupItems = filtered.filter((item) => item.urgencyGroup === group.key).sort((a, b) => (a.deadline ?? "9999").localeCompare(b.deadline ?? "9999"));
           return <section className={"decision-group decision-group--" + group.key} key={group.key} aria-labelledby={"decision-group-" + group.key}>
             <header className="decision-group__heading"><div><p className="page-kicker">Runway / {String(index + 1).padStart(2, "0")}</p><h2 id={"decision-group-" + group.key}>{group.label}</h2></div><span>{groupItems.length} 项 · {group.note}</span></header>
-            {groupItems.length === 0 ? <p className="decision-group__empty">这一段目前没有事项。</p> : <div className="decision-group__items">{groupItems.map((item) => <article className="decision-record" key={item.decisionId}>
+            {groupItems.length === 0 ? <p className="decision-group__empty">这一段目前没有事项。</p> : <div className="decision-group__items">{groupItems.map((item) => <article className="decision-record" id={item.decisionId} data-testid={`decision-item-${item.decisionId}`} tabIndex={-1} key={item.decisionId}>
               <div className="decision-record__rail" aria-hidden="true" /><div className="decision-record__body">
                 <div className="decision-record__heading"><div><p className="decision-record__meta">{item.projectId} · {item.risk} 风险 · 条目版本 {item.revision}</p><h3>{item.title}</h3></div><span className="decision-cost">¥{item.estimatedCost}</span></div>
                 <p>{item.reason}</p>

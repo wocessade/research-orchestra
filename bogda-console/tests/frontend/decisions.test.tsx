@@ -22,9 +22,9 @@ const decision = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-function decisionRoutes(items = [decision() as Record<string, unknown>], extras: Record<string, unknown> = {}) {
+function decisionRoutes(items = [decision() as Record<string, unknown>], extras: Record<string, unknown> = {}, revision = 0) {
   return Object.assign(standardRoutes(), {
-    "/api/v1/decisions": envelope({ items, revision: 0 }, { modelControl: sourceFresh }),
+    "/api/v1/decisions": envelope({ items, revision }, { modelControl: sourceFresh }),
   }, extras);
 }
 
@@ -96,23 +96,139 @@ describe("owner decision runway", () => {
     const user = userEvent.setup();
     let calls = 0;
     let body: Record<string, unknown> | null = null;
-    const current = { items: [decision({ revision: 4, title: "被其他操作更新" })], revision: 4 };
+    const current = { items: [decision({ revision: 1, title: "被其他操作更新" })], revision: 4 };
     const routes = decisionRoutes([decision()], {
+      "/api/v1/capabilities": envelope({ profile: "mock-all", projectId: "project-1", canResolveModelDecision: true }, {}),
       "/api/v1/decisions/decision-1": ({ init }: { init?: RequestInit }) => {
         calls += 1;
         body = JSON.parse(String(init?.body));
         return new Response(JSON.stringify(envelope(null, { modelControl: sourceFresh }, [{ code: "RESOURCE_CHANGED", message: "resource changed after the action was opened", source: "modelControl", retryable: false, details: { currentResource: current } }])), { status: 409, headers: { "Content-Type": "application/json" } });
       },
     });
-    renderAppAt("/decisions", routes);
+    renderAppAt("/decisions", routes,);
     await user.click(await screen.findByRole("button", { name: "查看：允许高峰时段运行" }));
     await user.type(screen.getByRole("textbox", { name: "操作理由" }), "我确认在该窗口执行");
+    await user.click(screen.getByRole("checkbox", { name: /确认不可逆后果/ }));
     await user.click(screen.getByRole("button", { name: "允许高峰运行" }));
     expect(await screen.findByText("决策已被其他操作修改，请重新确认。")).toBeVisible();
     expect(within(screen.getByRole("dialog")).getByText("被其他操作更新")).toBeVisible();
     expect(screen.getByRole("textbox", { name: "操作理由" })).toHaveValue("我确认在该窗口执行");
     expect(calls).toBe(1);
     expect(body).toEqual({ actionId: "approve", expectedRevision: 0, rationale: "我确认在该窗口执行" });
+  });
+
+  it("fails closed while capabilities are pending, unavailable, or explicitly disabled", async () => {
+    const user = userEvent.setup();
+    const routes = decisionRoutes([decision()], {
+      "/api/v1/capabilities": () => new Response(JSON.stringify(envelope(null, {}, [{ code: "MODEL_CONTROL_UNAVAILABLE", message: "capability unavailable", source: "modelControl", retryable: true }])), { status: 503, headers: { "Content-Type": "application/json" } }),
+    });
+    renderAppAt("/decisions", routes);
+    await user.click(await screen.findByRole("button", { name: "查看：允许高峰时段运行" }));
+    expect(screen.getByText("当前无法确认操作能力，所有变更操作已停用。")).toBeVisible();
+    expect(screen.getByRole("button", { name: "允许高峰运行" })).toBeDisabled();
+  });
+
+  it("keeps mutation controls disabled while capability loading is pending", async () => {
+    const user = userEvent.setup();
+    const routes = decisionRoutes([decision()], {
+      "/api/v1/capabilities": () => new Promise(() => {}),
+    });
+    renderAppAt("/decisions", routes);
+    await user.click(await screen.findByRole("button", { name: "查看：允许高峰时段运行" }));
+    expect(screen.getByText("正在确认操作能力，所有变更操作已停用。")).toBeVisible();
+    expect(screen.getByRole("button", { name: "允许高峰运行" })).toBeDisabled();
+  });
+
+  it("uses the opened decision-center revision rather than the item revision", async () => {
+    const user = userEvent.setup();
+    let body: Record<string, unknown> | null = null;
+    const routes = decisionRoutes([decision({ revision: 2 })], {
+      "/api/v1/capabilities": envelope({ profile: "mock-all", projectId: "project-1", canResolveModelDecision: true }, {}),
+      "/api/v1/decisions/decision-1": ({ init }: { init?: RequestInit }) => {
+        body = JSON.parse(String(init?.body));
+        return envelope({ command: "resolveDecision", resourceId: "decision-1", acceptedAt: "2026-08-29T08:00:00Z", snapshot: { items: [], revision: 8 } }, { modelControl: sourceFresh });
+      },
+    }, 7);
+    renderAppAt("/decisions", routes);
+    await user.click(await screen.findByRole("button", { name: "查看：允许高峰时段运行" }));
+    expect(screen.getByText("权威列表修订 7")).toBeVisible();
+    await user.type(screen.getByRole("textbox", { name: "操作理由" }), "依据当前预算窗口");
+    await user.click(screen.getByRole("checkbox", { name: /确认不可逆后果/ }));
+    await user.click(screen.getByRole("button", { name: "允许高峰运行" }));
+    expect(body).toMatchObject({ expectedRevision: 7 });
+  });
+
+  it("adopts a new center revision and disables submission when the selected item disappeared", async () => {
+    const user = userEvent.setup();
+    const current = { items: [], revision: 9 };
+    const routes = decisionRoutes([decision()], {
+      "/api/v1/capabilities": envelope({ profile: "mock-all", projectId: "project-1", canResolveModelDecision: true }, {}),
+      "/api/v1/decisions/decision-1": () => new Response(JSON.stringify(envelope(null, { modelControl: sourceFresh }, [{ code: "RESOURCE_CHANGED", message: "changed", source: "modelControl", retryable: false, details: { currentResource: current } }])), { status: 409, headers: { "Content-Type": "application/json" } }),
+    }, 6);
+    renderAppAt("/decisions", routes);
+    await user.click(await screen.findByRole("button", { name: "查看：允许高峰时段运行" }));
+    await user.type(screen.getByRole("textbox", { name: "操作理由" }), "保留以便重新判断");
+    await user.click(screen.getByRole("checkbox", { name: /确认不可逆后果/ }));
+    await user.click(screen.getByRole("button", { name: "允许高峰运行" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("该决策已被处理或撤回，请关闭此窗口。")).toBeVisible();
+    expect(within(dialog).getByText("权威列表修订 9")).toBeVisible();
+    expect(within(dialog).getByRole("textbox", { name: "操作理由" })).toHaveValue("保留以便重新判断");
+    expect(within(dialog).getByRole("button", { name: "该决策已处理" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "返回" })).toBeEnabled();
+  });
+
+  it("lets the owner choose any action and updates its effects and requirements", async () => {
+    const user = userEvent.setup();
+    const actions = [
+      { actionId: "approve", label: "批准执行", costImpact: "消耗 ¥1.00", qualityImpact: "保持质量", irreversibleConsequence: "会启动运行", requiresRationale: true, requiresConfirmation: true },
+      { actionId: "defer", label: "暂缓执行", costImpact: "不产生费用", qualityImpact: "等待更多证据", irreversibleConsequence: null, requiresRationale: false, requiresConfirmation: false },
+    ];
+    renderAppAt("/decisions", decisionRoutes([decision({ actions })]));
+    await user.click(await screen.findByRole("button", { name: "查看：允许高峰时段运行" }));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByRole("combobox", { name: "选择操作" })).toBeVisible();
+    await user.selectOptions(within(dialog).getByRole("combobox", { name: "选择操作" }), "defer");
+    expect(within(dialog).getByText("不产生费用")).toBeVisible();
+    expect(within(dialog).getByText("等待更多证据")).toBeVisible();
+    expect(within(dialog).queryByRole("checkbox", { name: /确认不可逆后果/ })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("textbox", { name: "操作理由" })).not.toBeInTheDocument();
+  });
+
+  it("requires explicit acknowledgement only for confirming actions", async () => {
+    const user = userEvent.setup();
+    renderAppAt("/decisions", decisionRoutes());
+    await user.click(await screen.findByRole("button", { name: "查看：允许高峰时段运行" }));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByRole("checkbox", { name: /确认不可逆后果/ })).not.toBeChecked();
+    expect(within(dialog).getByRole("button", { name: "允许高峰运行" })).toBeDisabled();
+    await user.type(within(dialog).getByRole("textbox", { name: "操作理由" }), "明确承担预算影响");
+    expect(within(dialog).getByRole("button", { name: "允许高峰运行" })).toBeDisabled();
+    await user.click(within(dialog).getByRole("checkbox", { name: /确认不可逆后果/ }));
+    expect(within(dialog).getByRole("button", { name: "允许高峰运行" })).toBeEnabled();
+  });
+
+  it("renders authoritative non-conflict mutation errors in the dialog", async () => {
+    const user = userEvent.setup();
+    const routes = decisionRoutes([decision()], {
+      "/api/v1/capabilities": envelope({ profile: "mock-all", projectId: "project-1", canResolveModelDecision: true }, {}),
+      "/api/v1/decisions/decision-1": () => new Response(JSON.stringify(envelope(null, { modelControl: sourceFresh }, [{ code: "COMMAND_REJECTED", message: "预算窗口已关闭", source: "modelControl", retryable: false }])), { status: 409, headers: { "Content-Type": "application/json" } }),
+    });
+    renderAppAt("/decisions", routes);
+    await user.click(await screen.findByRole("button", { name: "查看：允许高峰时段运行" }));
+    await user.type(screen.getByRole("textbox", { name: "操作理由" }), "确认窗口状态");
+    await user.click(screen.getByRole("checkbox", { name: /确认不可逆后果/ }));
+    await user.click(screen.getByRole("button", { name: "允许高峰运行" }));
+    expect(await screen.findByText("预算窗口已关闭")).toBeVisible();
+  });
+
+  it("distinguishes an authoritative empty list from filters matching zero", async () => {
+    const user = userEvent.setup();
+    renderAppAt("/decisions", decisionRoutes([decision({ projectId: "project-1" }), decision({ decisionId: "decision-2", projectId: "project-2", risk: "low" })]));
+    await user.selectOptions(await screen.findByRole("combobox", { name: "项目" }), "project-1");
+    await user.selectOptions(screen.getByRole("combobox", { name: "风险" }), "low");
+    expect(screen.getByText("没有匹配的决策")).toBeVisible();
+    expect(screen.getByRole("button", { name: "清除筛选" })).toBeVisible();
   });
 
   it("does not call any secondary decision endpoint", async () => {

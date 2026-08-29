@@ -42,9 +42,12 @@ export function DecisionsPage() {
   const [risk, setRisk] = useState<Filter | string>("全部");
   const [selected, setSelected] = useState<DecisionItem | null>(null);
   const [selectedAction, setSelectedAction] = useState<DecisionAction | null>(null);
+  const [openedRevision, setOpenedRevision] = useState<number | null>(null);
   const [rationale, setRationale] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [conflict, setConflict] = useState(false);
+  const [withdrawn, setWithdrawn] = useState(false);
+  const [acknowledged, setAcknowledged] = useState(false);
 
   const snapshot = decisions.data?.data;
   const items = useMemo(() => uniqueDecisions(snapshot?.items ?? []), [snapshot?.items]);
@@ -54,7 +57,7 @@ export function DecisionsPage() {
     () => items.filter((item) => (project === "全部" || item.projectId === project) && (risk === "全部" || item.risk === risk)),
     [items, project, risk],
   );
-  const canResolve = capabilities.data?.data?.canResolveModelDecision !== false;
+  const canResolve = capabilities.data?.data?.canResolveModelDecision === true;
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -66,7 +69,7 @@ export function DecisionsPage() {
       setFormError(null);
       return api.command<{ command: string; resourceId: string; acceptedAt: string; snapshot: DecisionCenterSnapshot }>(
         "/api/v1/decisions/" + selected.decisionId,
-        { actionId: selectedAction.actionId, expectedRevision: selected.revision, rationale: rationale.trim() || null },
+        { actionId: selectedAction.actionId, expectedRevision: openedRevision ?? snapshot?.revision ?? 0, rationale: rationale.trim() || null },
       );
     },
     onSuccess: (response) => {
@@ -75,19 +78,28 @@ export function DecisionsPage() {
       setSelectedAction(null);
       setRationale("");
       setConflict(false);
+      setWithdrawn(false);
+      setAcknowledged(false);
     },
     onError: (error) => {
+      const apiError = error instanceof ApiClientError ? error.errors[0] : undefined;
+      setFormError(apiError?.message ?? (error instanceof Error ? error.message : "操作未获得权威回执；没有自动重试。"));
       if (!(error instanceof ApiClientError)) return;
-      const apiError = error.errors[0];
       const current = apiError?.details?.currentResource as DecisionCenterSnapshot | undefined;
       if (apiError?.code !== "RESOURCE_CHANGED" || !current) return;
       queryClient.setQueryData(["decisions"], { ...decisions.data, data: current });
+      setOpenedRevision(current.revision);
+      setAcknowledged(false);
       const currentItem = current.items.find((item) => item.decisionId === selected?.decisionId);
       if (currentItem) {
         setSelected(currentItem);
         setSelectedAction(currentItem.actions.find((action) => action.actionId === selectedAction?.actionId) ?? currentItem.actions[0] ?? null);
+        setWithdrawn(false);
+      } else {
+        setWithdrawn(true);
       }
       setConflict(true);
+      setFormError(null);
     },
   });
 
@@ -97,9 +109,12 @@ export function DecisionsPage() {
   function openDecision(item: DecisionItem) {
     setSelected(item);
     setSelectedAction(item.actions[0] ?? null);
+    setOpenedRevision(snapshot?.revision ?? 0);
     setRationale("");
     setFormError(null);
     setConflict(false);
+    setWithdrawn(false);
+    setAcknowledged(false);
   }
 
   return (
@@ -124,7 +139,7 @@ export function DecisionsPage() {
             <header className="decision-group__heading"><div><p className="page-kicker">Runway / {String(index + 1).padStart(2, "0")}</p><h2 id={"decision-group-" + group.key}>{group.label}</h2></div><span>{groupItems.length} 项 · {group.note}</span></header>
             {groupItems.length === 0 ? <p className="decision-group__empty">这一段目前没有事项。</p> : <div className="decision-group__items">{groupItems.map((item) => <article className="decision-record" key={item.decisionId}>
               <div className="decision-record__rail" aria-hidden="true" /><div className="decision-record__body">
-                <div className="decision-record__heading"><div><p className="decision-record__meta">{item.projectId} · {item.risk} 风险 · 修订 {item.revision}</p><h3>{item.title}</h3></div><span className="decision-cost">¥{item.estimatedCost}</span></div>
+                <div className="decision-record__heading"><div><p className="decision-record__meta">{item.projectId} · {item.risk} 风险 · 条目版本 {item.revision}</p><h3>{item.title}</h3></div><span className="decision-cost">¥{item.estimatedCost}</span></div>
                 <p>{item.reason}</p>
                 <div className="evidence-chips">{item.evidence.map((reference) => reference.uri ? <a className="evidence-chip" href={reference.uri} key={reference.kind + ":" + reference.refId}>{reference.label}</a> : <span className="evidence-chip" key={reference.kind + ":" + reference.refId}>{reference.label}</span>)}</div>
                 {item.deadline && <time className="decision-deadline" dateTime={item.deadline}>截止 {formatDeadline(item.deadline)}</time>}
@@ -134,19 +149,24 @@ export function DecisionsPage() {
           </section>;
         })}
       </div>
-      {filtered.length === 0 && <div className="empty-state decision-empty"><strong>当前没有待处理决策</strong><span>新的判断会从权威来源进入这里；来源故障时不会伪造空列表。</span></div>}
+      {items.length === 0 && <div className="empty-state decision-empty"><strong>当前没有待处理决策</strong><span>新的判断会从权威来源进入这里；来源故障时不会伪造空列表。</span></div>}
+      {items.length > 0 && filtered.length === 0 && <div className="empty-state decision-empty"><strong>没有匹配的决策</strong><span>权威列表仍有 {items.length} 项，请调整筛选条件。</span><button type="button" className="secondary-action" onClick={() => { setProject("全部"); setRisk("全部"); }}>清除筛选</button></div>}
 
-      <ModalDialog open={Boolean(selected && selectedAction)} title={selected?.title ?? "确认决策"} onClose={() => setSelected(null)} busy={mutation.isPending} footer={<><button type="button" className="secondary-action" data-autofocus onClick={() => setSelected(null)} disabled={mutation.isPending}>返回</button><button type="button" className="primary-action" onClick={() => mutation.mutate()} disabled={!canResolve || mutation.isPending || Boolean(selectedAction?.requiresRationale && !rationale.trim())}>{mutation.isPending ? "等待权威回执…" : selectedAction?.label ?? "确认操作"}</button></>}>
+      <ModalDialog open={Boolean(selected && selectedAction)} title={selected?.title ?? "确认决策"} onClose={() => setSelected(null)} busy={mutation.isPending} footer={<><button type="button" className="secondary-action" data-autofocus onClick={() => setSelected(null)} disabled={mutation.isPending}>返回</button><button type="button" className="primary-action" onClick={() => mutation.mutate()} disabled={withdrawn || !canResolve || mutation.isPending || Boolean(selectedAction?.requiresRationale && !rationale.trim()) || Boolean(selectedAction?.requiresConfirmation && !acknowledged)}>{mutation.isPending ? "等待权威回执…" : withdrawn ? "该决策已处理" : selectedAction?.label ?? "确认操作"}</button></>}>
         {selected && selectedAction && <div className="decision-dialog">
           {conflict && <div className="command-conflict" role="alert"><strong>决策已被其他操作修改，请重新确认。</strong><span>已载入当前权威版本；你的操作理由保留，但不会自动重放。</span></div>}
+          {withdrawn && <div className="command-conflict" role="alert"><strong>该决策已被处理或撤回，请关闭此窗口。</strong><span>当前权威列表中已找不到它；你的操作理由保留，但不会自动重放。</span></div>}
+          <p className="decision-revision"><span>权威列表修订 {openedRevision ?? snapshot.revision}</span> · 条目版本 {selected.revision}</p>
           <p>{selected.reason}</p>
+          <label className="decision-action-picker">选择操作<select aria-label="选择操作" value={selectedAction.actionId} onChange={(event) => { const next = selected.actions.find((action) => action.actionId === event.target.value); if (next) { setSelectedAction(next); setAcknowledged(false); setFormError(null); } }}>{selected.actions.map((action) => <option key={action.actionId} value={action.actionId}>{action.label}</option>)}</select></label>
           <dl className="dialog-facts"><div><dt>费用影响</dt><dd>{selectedAction.costImpact}</dd></div><div><dt>质量影响</dt><dd>{selectedAction.qualityImpact ?? "未声明"}</dd></div><div><dt>风险</dt><dd>{selected.risk}</dd></div><div><dt>不可逆后果</dt><dd>{selectedAction.irreversibleConsequence ?? "未声明"}</dd></div></dl>
           <section><h3>证据</h3><div className="evidence-chips">{selected.evidence.map((reference) => reference.uri ? <a className="evidence-chip" href={reference.uri} key={reference.kind + ":" + reference.refId}>{reference.label}</a> : <span className="evidence-chip" key={reference.kind + ":" + reference.refId}>{reference.label}</span>)}</div></section>
           <section><h3>精确日志摘要</h3><p className="log-summary">{selected.logSummary}</p></section>
           {selected.risk.toLowerCase() === "high" && <p className="decision-high-risk">高风险操作需要明确确认。</p>}
           {selectedAction.requiresRationale && <label className="decision-rationale">操作理由<textarea aria-label="操作理由" value={rationale} onChange={(event) => setRationale(event.target.value)} placeholder="说明这次判断的依据" rows={3} required /></label>}
+          {selectedAction.requiresConfirmation && <label className="decision-acknowledgement"><input aria-label="确认不可逆后果" type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} />确认我已理解不可逆后果：{selectedAction.irreversibleConsequence ?? "该操作可能产生不可撤销影响。"}</label>}
           {formError && <p className="command-error" role="alert">{formError}</p>}
-          {!canResolve && <p className="readonly-note">当前 profile 为 {capabilities.data?.data?.profile ?? "readonly"}，只读，不能处理决策。</p>}
+          {!canResolve && <p className="readonly-note">{capabilities.isPending ? "正在确认操作能力，所有变更操作已停用。" : capabilities.isError || !capabilities.data?.data ? "当前无法确认操作能力，所有变更操作已停用。" : "当前 profile 为 " + (capabilities.data.data.profile ?? "readonly") + "，只读，不能处理决策。"}</p>}
         </div>}
       </ModalDialog>
     </section>

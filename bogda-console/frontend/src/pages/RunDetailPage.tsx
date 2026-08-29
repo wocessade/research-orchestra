@@ -6,6 +6,7 @@ import { api, ApiClientError } from "../api/client";
 import type { CapabilitySnapshot, CommandReceipt, Page, RunDetail, RunResultVersion, RunResultView, RunSummary } from "../api/types";
 import { ConfirmDialog } from "../components/Dialogs";
 import { EnvelopeErrors, QueryFailure, QueryLoading, SourceStrip } from "../components/EnvelopeState";
+import { RunBudgetPanel } from "../components/RunBudgetPanel";
 import { ExecutionMark, ScientificMark } from "../components/StatusMark";
 import { SCIENTIFIC_REVIEW_ID } from "../scientificReview";
 
@@ -172,6 +173,7 @@ export function RunDetailPage() {
       <div><p>科研判断状态</p>{science?.availability === "available" ? <ScientificMark status={science.scientificStatus} /> : <span className={`availability availability--${science?.availability ?? "none"}`}>{science?.availability === "invalid" ? "RunResult 无效" : science?.availability === "missing" ? "RunResult 缺失" : "科研状态不可用"}</span>}<span>{science?.artifactId ?? "无权威 Artifact"}</span></div>
     </section>
     <section className="detail-section context-section" aria-labelledby="context-title"><div className="detail-heading"><h2 id="context-title">项目上下文</h2><p>只读上下文。有效自主模式在创建时冻结，不在此修改。</p></div>{detail.projectContext ? <dl className="fact-grid"><div><dt>项目</dt><dd>{detail.projectContext.projectId}</dd></div><div><dt>冻结模式</dt><dd>{detail.projectContext.effectiveAutonomyMode}</dd></div><div><dt>模式来源</dt><dd>{detail.projectContext.modeSource}</dd></div><div><dt>可写</dt><dd>否</dd></div></dl> : <p className="muted">项目上下文不可用。</p>}</section>
+    <RunBudgetPanel runId={runId} />
     {detail.checkpoint && !detail.checkpoint.verdict && <CheckpointControl runId={runId} checkpoint={detail.checkpoint} enabled={Boolean(capabilities?.canReviewScientificResult)} profile={capabilities?.profile} onDecided={setDetailSnapshot} />}
     {resultQuery.isPending && <QueryLoading />}
     {resultQuery.isError && <QueryFailure title="RunResult 暂不可用" />}

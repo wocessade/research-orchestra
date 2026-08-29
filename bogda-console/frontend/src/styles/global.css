@@ -119,6 +119,16 @@ h2 { margin: 0; font-size: clamp(21px, 2vw, 30px); line-height: 1.15; letter-spa
 .checkpoint-control label { display: grid; gap: 7px; color: var(--ink); font-size: 12px; }
 .checkpoint-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
 .checkpoint-actions .primary-action { margin-top: 0; }
+.run-budget-panel .source-strip { margin-bottom: 18px; }
+.run-budget-source-warning { margin: 0 0 18px; padding: 10px 12px; color: var(--amber); background: #f8f0e3; border-left: 3px solid currentColor; }
+.run-budget-status { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; margin-bottom: 20px; padding: 14px 16px; background: var(--snow); border-left: 4px solid var(--conifer); }
+.run-budget-status strong { font-size: 18px; }.run-budget-status span { color: var(--note); font-size: 12px; }.run-budget-status--stale,.run-budget-status--insufficient,.run-budget-status--awaiting-approval,.run-budget-status--usage-unknown { border-color: var(--amber); }.run-budget-status--scheduled-off-peak { border-color: var(--lake); }
+.run-budget-ledger { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin: 0; background: var(--line); }
+.run-budget-ledger div { min-width: 0; display: grid; gap: 6px; padding: 14px; background: var(--paper); }.run-budget-ledger dt { color: var(--note); font-size: 10px; }.run-budget-ledger dd { margin: 0; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: 12px; }
+.run-budget-recovery { margin: 20px 0 28px; padding: 18px; background: #f3efe6; border-left: 4px solid var(--umber); }.run-budget-recovery strong { display: block; }.run-budget-recovery ul { margin: 8px 0 0; padding-left: 18px; color: var(--note); }.run-budget-recovery .text-action { margin-top: 12px; }
+.run-budget-audit-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }.run-budget-audit-columns .detail-heading { margin-bottom: 10px; }.run-budget-audit-columns h3 { margin: 0; font-size: 16px; }.run-budget-audit-columns .detail-heading span { color: var(--note); font-family: var(--font-mono); font-size: 10px; }
+.run-budget-events,.run-budget-artifacts { margin: 0; padding: 0; list-style: none; }.run-budget-events li,.run-budget-artifacts li { display: grid; gap: 5px; padding: 11px 0; border-bottom: 1px solid var(--soft-line); }.run-budget-events time,.run-budget-events strong,.run-budget-artifacts span { color: var(--note); font-family: var(--font-mono); font-size: 10px; }.run-budget-events span { font-size: 12px; }.run-budget-artifacts li { grid-template-columns: 72px minmax(0,1fr); align-items: center; }.run-budget-artifacts a { min-width: 0; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: 11px; }
+.run-budget-safety { margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--line); }.run-budget-safety h3 { margin: 0 0 8px; font-size: 16px; }.run-budget-safety p,.run-budget-safety li { color: var(--note); font-size: 12px; }.run-budget-safety ul { margin-bottom: 0; padding-left: 18px; }
 .autonomy-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 12px; margin: 18px 0 22px; }
 .autonomy-facts div { display: grid; gap: 4px; padding: 12px 14px; background: var(--paper); border: 1px solid var(--line); }
 .autonomy-facts small { color: var(--note); font-size: 11px; }
@@ -227,6 +237,7 @@ h2 { margin: 0; font-size: clamp(21px, 2vw, 30px); line-height: 1.15; letter-spa
   .power-observation,.pool-grid { grid-template-columns: 1fr; }.power-facts { grid-template-columns: 1fr 1fr; }.power-facts strong { grid-column: 1 / -1; }
   .deployment-record { grid-template-columns: 1fr; }.schedule-list { grid-column: auto; }.deployment-actions .primary-action { width: 100%; }
   .review-control form { grid-template-columns: 1fr; }.review-control .primary-action { width: 100%; }
+  .run-budget-ledger { grid-template-columns: 1fr 1fr; }.run-budget-audit-columns { grid-template-columns: 1fr; }
   .mode-band { grid-template-columns: 1fr; }
   .mode-detent { border-right: 0; border-bottom: 1px solid var(--line); }
   .mode-detent:last-child { border-bottom: 0; }

@@ -84,7 +84,7 @@ export function envelope(data: unknown, sources: JsonValue = { prefect: sourceFr
 
 export function standardRoutes(): Record<string, RouteHandler> {
   return {
-    "/api/v1/capabilities": envelope({ profile: "mock-all", projectId: "bogda-main", effectiveAutonomyMode: "supervised", canSubmitRegisteredDeployment: true, canCancelRun: true, canPauseSchedule: true, canPauseWorkQueue: true, canReviewScientificResult: true, canSetAutonomyMode: false, canResolveModelDecision: true }, {}),
+    "/api/v1/capabilities": envelope({ profile: "mock-all", projectId: "bogda-main", effectiveAutonomyMode: "supervised", canSubmitRegisteredDeployment: true, canCancelRun: true, canPauseSchedule: true, canPauseWorkQueue: true, canReviewScientificResult: true, canSetAutonomyMode: false, canResolveModelDecision: true, canSetModelPolicy: false, canPreparePaidRun: false }, {}),
     "/api/v1/autonomy-policy": envelope({ globalDefault: "supervised", projectOverrides: {}, revision: 0 }, {}),
     "/api/v1/overview": envelope({
       execution: {
@@ -114,6 +114,14 @@ export function standardRoutes(): Record<string, RouteHandler> {
       projectContext: { projectId: "bogda-main", effectiveAutonomyMode: "supervised", modeSource: "frozen-run-request", writable: false },
     }, { prefect: sourceFresh, runResult: { ...sourceFresh, source: "runResult" } }),
     "/api/v1/runs/run-completed-unreviewed/result": envelope(validResult, { runResult: { ...sourceFresh, source: "runResult" } }),
+    "/api/v1/model-policy": envelope({
+      projectId: "bogda-main", source: "global", revision: 1, inheritsGlobal: true,
+      minimumRemaining: "6.00", workloadSafetyMargin: "1.25", defaultModelTier: "auto",
+      allowAutoUpgrade: false, allowFlashDowngrade: true, preferOffPeak: true, autoResume: false,
+      criticalNotifications: true, usageSnapshotStaleAfterSeconds: 120,
+      priceCatalog: { status: "ready", version: "deepseek-v4-0813", effectiveAt: "2026-08-28T00:00:00Z", reviewBy: "2026-09-01T00:00:00Z", source: "deepseek" },
+      hardSafetyBaselines: { budgetIncreaseApprovalRequired: true, decideAuditNoSilentDowngrade: true, humanExternalActions: true, humanScientificJudgment: true, minimumRemainingEnforced: true, promptArchivingRequired: true, structuredEventLog: true, unknownUsageRecoveryGate: true, usageSnapshotFailClosed: true },
+    }, { modelControl: { ...sourceFresh, source: "modelControl" } }),
     "/api/v1/runs/run-completed-unreviewed/result/versions": envelope({
       items: [{ artifactId: "artifact-completed-1", createdAt: "2026-08-24T07:44:10Z", availability: "available", scientificStatus: "unreviewed", reviewSummary: null }],
       nextCursor: null,

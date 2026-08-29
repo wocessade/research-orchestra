@@ -3,8 +3,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "../api/client";
 import type { CapabilitySnapshot, CommandReceipt, DeploymentSummary, InfrastructureView, Page, PoolSnapshot, QueueSnapshot, RunSummary } from "../api/types";
-import { ConfirmDialog, ModalDialog } from "../components/Dialogs";
+import { ConfirmDialog } from "../components/Dialogs";
 import { EnvelopeErrors, QueryFailure, QueryLoading, SourceStrip } from "../components/EnvelopeState";
+import { RunPreparation } from "../components/RunPreparation";
 
 type PendingAction =
   | { kind: "queue"; queue: QueueSnapshot }
@@ -45,47 +46,6 @@ export function coerceDeploymentParameters(values: Record<string, string>, schem
     else throw new Error(`${property.title ?? name} 的参数类型暂不支持`);
   }
   return result;
-}
-
-function SubmitDialog({ deployment, open, onClose, onSubmitted }: { deployment: DeploymentSummary | null; open: boolean; onClose: () => void; onSubmitted: (run: RunSummary) => void }) {
-  const [parameters, setParameters] = useState<Record<string, string>>({});
-  const [idempotencyKey, setIdempotencyKey] = useState("");
-  const [validationError, setValidationError] = useState<string | null>(null);
-  const schema = deployment?.parameterSchema as DeploymentSchema | undefined;
-  const fields = Object.entries(schema?.properties ?? {});
-  const mutation = useMutation({ mutationFn: (typedParameters: Record<string, unknown>) => api.command<CommandReceipt<RunSummary>>(`/api/v1/deployments/${deployment!.deploymentId}/runs`, { parameters: typedParameters, idempotencyKey }) });
-
-  useEffect(() => {
-    if (!open || !deployment) return;
-    setParameters({});
-    setValidationError(null);
-    setIdempotencyKey(`bogda-console-${deployment.deploymentId}-${Date.now()}`);
-  }, [open, deployment]);
-
-  async function submit() {
-    let typedParameters: Record<string, unknown>;
-    try {
-      typedParameters = coerceDeploymentParameters(parameters, schema);
-      setValidationError(null);
-    } catch (error) {
-      setValidationError(error instanceof Error ? error.message : "参数无效");
-      return;
-    }
-    const response = await mutation.mutateAsync(typedParameters).catch(() => null);
-    if (!response) return;
-    if (response.data) {
-      onSubmitted(response.data.snapshot);
-      onClose();
-    }
-  }
-
-  return <ModalDialog open={open} title={`提交 ${deployment?.name ?? "Deployment"}`} onClose={onClose} busy={mutation.isPending} footer={<><button type="button" className="secondary-action" data-autofocus onClick={onClose} disabled={mutation.isPending}>返回</button><button type="button" className="primary-action" onClick={() => void submit()} disabled={mutation.isPending}>{mutation.isPending ? "等待 Prefect 回执…" : "提交运行"}</button></>}>
-    <p>只提交这个已注册且 allowlisted 的 Deployment；参数结构由服务端提供。</p>
-    <dl className="dialog-facts"><div><dt>Flow</dt><dd>{deployment?.flowName}</dd></div><div><dt>执行位置</dt><dd>{deployment?.workPoolName} / {deployment?.workQueueName}</dd></div></dl>
-    <div className="parameter-fields">{fields.map(([name, property]) => <label key={name}>{property.title ?? name}{property.type === "boolean" ? <select aria-label={property.title ?? name} required={schema?.required?.includes(name)} value={parameters[name] ?? ""} onChange={(event) => setParameters((current) => ({ ...current, [name]: event.target.value }))}><option value="">请选择</option><option value="true">true</option><option value="false">false</option></select> : <input type={property.type === "integer" || property.type === "number" ? "number" : "text"} step={property.type === "integer" ? "1" : property.type === "number" ? "any" : undefined} aria-label={property.title ?? name} required={schema?.required?.includes(name)} value={parameters[name] ?? ""} onChange={(event) => setParameters((current) => ({ ...current, [name]: event.target.value }))} />}<small>{property.description ?? name}</small></label>)}</div>
-    {validationError && <p className="command-error" role="alert">{validationError}</p>}
-    {mutation.isError && <p className="command-error" role="alert">提交未获得权威回执；没有自动重试。</p>}
-  </ModalDialog>;
 }
 
 export function InfrastructurePage() {
@@ -139,6 +99,6 @@ export function InfrastructurePage() {
     <section className="deployment-section section-block" aria-labelledby="deployments-title"><div className="section-heading"><p>Registered</p><h2 id="deployments-title">已注册 Deployments</h2><span>{deployments.data?.data?.items.length ?? "—"} 个</span></div>{deployments.data?.data?.items.map((deployment) => <article className="deployment-record" key={deployment.deploymentId}><div><p className="page-kicker">{deployment.flowName}</p><h3>{deployment.name}</h3><span>{deployment.workPoolName} / {deployment.workQueueName}</span></div><div className="deployment-actions"><button type="button" className="primary-action" disabled={!cap?.canSubmitRegisteredDeployment || !deployment.allowlisted} onClick={() => setSelectedDeployment(deployment)}>提交 {deployment.name}</button></div>{Boolean(deployment.schedules?.length) && <ul className="schedule-list">{deployment.schedules?.map((schedule) => <li key={schedule.scheduleId}><span><strong>{schedule.label}</strong><small>{schedule.active ? "active" : "paused"}</small></span><button type="button" className="quiet-action" disabled={!cap?.canPauseSchedule} onClick={() => setAction({ kind: "schedule", deployment, schedule })}>{schedule.active ? `暂停日程 ${schedule.label}` : `恢复日程 ${schedule.label}`}</button></li>)}</ul>}</article>)}</section>
 
     <ConfirmDialog open={Boolean(action)} title={action?.kind === "queue" ? `${action.queue.isPaused ? "恢复" : "暂停"}队列 ${action.queue.name}` : `${action?.schedule.active ? "暂停" : "恢复"}日程 ${action?.schedule.label}`} confirmLabel={action?.kind === "queue" ? `确认${action.queue.isPaused ? "恢复" : "暂停"}` : `确认${action?.schedule.active ? "暂停" : "恢复"}`} onClose={() => setAction(null)} onConfirm={confirmAction} busy={actionMutation.isPending}>请求会提交给 Prefect；界面等待回执后才更新。{actionMutation.isError && <span className="command-error" role="alert">操作未获得权威回执；没有自动重试。</span>}</ConfirmDialog>
-    <SubmitDialog deployment={selectedDeployment} open={Boolean(selectedDeployment)} onClose={() => setSelectedDeployment(null)} onSubmitted={(run) => { setNotice(`已提交：${run.name}`); void queryClient.invalidateQueries({ queryKey: ["runs"] }); }} />
+    <RunPreparation deployment={selectedDeployment} open={Boolean(selectedDeployment)} capability={cap ?? undefined} onClose={() => setSelectedDeployment(null)} onSubmitted={(run) => { setNotice(`已提交：${run.name}`); void queryClient.invalidateQueries({ queryKey: ["runs"] }); }} />
   </section>;
 }

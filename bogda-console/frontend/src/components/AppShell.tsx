@@ -10,6 +10,7 @@ const destinations = [
   { to: "/reviews", label: "评审", glyph: "◇" },
   { to: "/infrastructure", label: "基础设施", glyph: "⌘" },
   { to: "/decisions", label: "决策", glyph: "!" },
+  { to: "/model-policy", label: "模型策略", glyph: "◌" },
 ];
 
 

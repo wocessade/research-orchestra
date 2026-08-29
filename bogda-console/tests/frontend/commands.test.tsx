@@ -92,6 +92,7 @@ describe("guarded commands", () => {
   it("submits only the selected registered Deployment", async () => {
     const user = userEvent.setup();
     const routes = standardRoutes();
+    routes["/api/v1/capabilities"] = envelope({ ...(routes["/api/v1/capabilities"] as any).data, canPreparePaidRun: true });
     const idempotencyKeys: string[] = [];
     let submitCalls = 0;
     routes["/api/v1/deployments/deployment-dorm/runs"] = ({ init }) => {
@@ -102,12 +103,14 @@ describe("guarded commands", () => {
       if (submitCalls === 1) return new Response(JSON.stringify(envelope(null, {}, [{ code: "COMMAND_OUTCOME_UNKNOWN", message: "unknown", source: "prefect", retryable: true, details: { fields: [], expected: null, observed: null } }])), { status: 503, headers: { "Content-Type": "application/json" } });
       return envelope({ command: "submit", resourceId: "mock-submitted-1", acceptedAt: "2026-08-24T08:30:00Z", snapshot: { ...completedRun, runId: "mock-submitted-1", name: "alpine-assay · 1", state: { ...completedRun.state, type: "SCHEDULED", name: "Scheduled", terminal: false } } }, {});
     };
+    routes["/api/v1/run-preparations/preview"] = envelope({ preparationId: "prep-command", projectId: "bogda-main", policyRevision: 1, intent: "execute", requestedModelTier: "auto", effectiveModelTier: "flash", fallbackModelTier: null, effectiveAutonomyMode: "supervised", deadline: null, scheduledStart: null, pricePeriod: "off-peak", confirmed: false, workload: { expectedCalls: 1, inputTokens: 1000, outputTokens: 1000, runtimeMinutes: 5 }, allowedPreferences: { allowAutoUpgrade: false, allowFlashDowngrade: true, autoResume: false, preferOffPeak: true }, budget: { runId: "prep-command", projectId: "bogda-main", revision: 1, state: "ready", currency: "CNY", requestedModelTier: "auto", effectiveModelTier: "flash", effectiveAutonomyMode: "supervised", intent: "execute", authorizedCeiling: "5.00", expectedCost: "1.00", usedCost: "0.00", reservedCost: "0.00", remainingCost: "5.00", pricePeriod: "off-peak", scheduledStart: null, pauseReason: null, recoveryConditions: [], decisionId: null, artifacts: [], events: [] } });
     renderAppAt("/infrastructure", routes);
     await user.click(await screen.findByRole("button", { name: "提交 alpine-assay" }));
     await user.type(screen.getByLabelText("Sample"), "ridge-a");
-    await user.click(screen.getByRole("button", { name: "提交运行" }));
+    await user.click(screen.getByRole("button", { name: "生成服务端预览" }));
+    await user.click(await screen.findByRole("button", { name: "确认并提交运行" }));
     expect(await screen.findByRole("alert")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "提交运行" }));
+    await user.click(screen.getByRole("button", { name: "确认并提交运行" }));
     expect(await screen.findByText("已提交：alpine-assay · 1")).toBeVisible();
     expect(idempotencyKeys[0]).toBe(idempotencyKeys[1]);
   });

@@ -9,6 +9,7 @@ import type {
   CommandReceipt,
 } from "../api/types";
 import { ConfirmDialog } from "./Dialogs";
+import { envelopeHasErrors } from "./EnvelopeState";
 
 const MODE_LABELS: Record<AutonomyMode, string> = {
   manual: "手动",
@@ -78,7 +79,9 @@ export function AutonomyPolicyPanel() {
     queryFn: () => api.get<CapabilitySnapshot>("/api/v1/capabilities"),
   });
   const capabilities = capabilitiesQuery.data?.data;
-  const canSet = capabilities?.canSetAutonomyMode === true;
+  const canSet = capabilitiesQuery.isSuccess
+    && !envelopeHasErrors(capabilitiesQuery.data)
+    && capabilities?.canSetAutonomyMode === true;
   const policyQuery = useQuery({
     queryKey: ["autonomy-policy"],
     queryFn: () => api.get<AutonomyPolicySnapshot>("/api/v1/autonomy-policy"),

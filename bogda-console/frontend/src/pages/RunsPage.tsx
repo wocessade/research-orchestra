@@ -21,7 +21,7 @@ export function RunsPage() {
 
   return (
     <section className="page">
-      <header className="page-header"><p className="page-kicker">Ledger / 02</p><h1>运行账簿</h1><p className="lede">原样保留 Prefect state name，并把科研评审状态放在独立一列。</p></header>
+      <header className="page-header"><p className="page-kicker">Ledger / 02</p><h1>运行账簿</h1><p className="lede">Prefect 状态名原样保留；科研评审单独一列。</p></header>
       <form className="filter-bar" aria-label="运行筛选" onSubmit={(event) => event.preventDefault()}>
         <label>执行状态<select value={executionType} onChange={(event) => setExecutionType(event.target.value)}><option value="">全部</option>{executionOptions.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
         <label>科研状态<select value={scientificStatus} onChange={(event) => setScientificStatus(event.target.value)}><option value="">全部</option>{scienceOptions.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>

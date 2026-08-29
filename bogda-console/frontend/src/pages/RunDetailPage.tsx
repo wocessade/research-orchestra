@@ -5,7 +5,7 @@ import { Link, useLocation, useParams } from "react-router-dom";
 import { api, ApiClientError } from "../api/client";
 import type { CapabilitySnapshot, CommandReceipt, Page, RunDetail, RunResultVersion, RunResultView, RunSummary } from "../api/types";
 import { ConfirmDialog } from "../components/Dialogs";
-import { EnvelopeErrors, QueryFailure, QueryLoading, SourceStrip } from "../components/EnvelopeState";
+import { EnvelopeErrors, QueryFailure, QueryLoading, SourceStrip, envelopeHasErrors } from "../components/EnvelopeState";
 import { RunBudgetPanel } from "../components/RunBudgetPanel";
 import { ExecutionMark, ScientificMark } from "../components/StatusMark";
 import { SCIENTIFIC_REVIEW_ID } from "../scientificReview";
@@ -155,6 +155,9 @@ export function RunDetailPage() {
   const run = cancelSnapshot ?? detail.run;
   const science = reviewSnapshot?.result ? { availability: "available", artifactId: reviewSnapshot.artifactId, artifactCreatedAt: reviewSnapshot.artifactCreatedAt, scientificStatus: reviewSnapshot.result.scientific_status, reviewSummary: reviewSnapshot.result.review_summary, validationIssues: [] } : run.scientific;
   const capabilities = capabilitiesQuery.data?.data;
+  const capReady = capabilitiesQuery.isSuccess && !envelopeHasErrors(capabilitiesQuery.data);
+  const canCancel = capReady && capabilities?.canCancelRun === true;
+  const canReview = capReady && capabilities?.canReviewScientificResult === true;
 
   async function cancelRun() {
     const response = await cancelMutation.mutateAsync(run).catch(() => null);
@@ -165,7 +168,7 @@ export function RunDetailPage() {
 
   return <article className="page run-detail">
     <Link className="back-link" to="/runs">← 返回运行账簿</Link>
-    <header className="page-header page-header--split"><div><p className="page-kicker">Run / {run.runId}</p><h1>{run.name}</h1><p className="lede">{run.deploymentName ?? "未注册 Deployment"} · {run.workPoolName ?? "—"} / {run.workQueueName ?? "—"}</p></div>{!run.state.terminal && <button type="button" className="danger-outline-action" disabled={!capabilities?.canCancelRun} onClick={() => setCancelOpen(true)}>取消运行</button>}</header>
+    <header className="page-header page-header--split"><div><p className="page-kicker">Run / {run.runId}</p><h1>{run.name}</h1><p className="lede">{run.deploymentName ?? "未注册 Deployment"} · {run.workPoolName ?? "—"} / {run.workQueueName ?? "—"}</p></div>{!run.state.terminal && <button type="button" className="danger-outline-action" disabled={!canCancel} onClick={() => setCancelOpen(true)}>取消运行</button>}</header>
     <SourceStrip sources={{ ...envelope.sources, ...(resultQuery.data?.sources ?? {}) }} />
     <EnvelopeErrors errors={[...envelope.errors, ...(resultQuery.data?.errors ?? [])]} />
     <section className="authority-bands" aria-label="执行与科研状态">
@@ -174,11 +177,11 @@ export function RunDetailPage() {
     </section>
     <section className="detail-section context-section" aria-labelledby="context-title"><div className="detail-heading"><h2 id="context-title">项目上下文</h2><p>只读上下文。有效自主模式在创建时冻结，不在此修改。</p></div>{detail.projectContext ? <dl className="fact-grid"><div><dt>项目</dt><dd>{detail.projectContext.projectId}</dd></div><div><dt>冻结模式</dt><dd>{detail.projectContext.effectiveAutonomyMode}</dd></div><div><dt>模式来源</dt><dd>{detail.projectContext.modeSource}</dd></div><div><dt>可写</dt><dd>否</dd></div></dl> : <p className="muted">项目上下文不可用。</p>}</section>
     <RunBudgetPanel runId={runId} />
-    {detail.checkpoint && !detail.checkpoint.verdict && <CheckpointControl runId={runId} checkpoint={detail.checkpoint} enabled={Boolean(capabilities?.canReviewScientificResult)} profile={capabilities?.profile} onDecided={setDetailSnapshot} />}
+    {detail.checkpoint && !detail.checkpoint.verdict && <CheckpointControl runId={runId} checkpoint={detail.checkpoint} enabled={canReview} profile={capabilities?.profile} onDecided={setDetailSnapshot} />}
     {resultQuery.isPending && <QueryLoading />}
     {resultQuery.isError && <QueryFailure title="RunResult 暂不可用" />}
     {resultView && <ResultPanel view={resultView} executionType={run.state.type} />}
-    {resultView?.availability === "available" && resultView.result && <ReviewControl runId={runId} view={resultView} enabled={Boolean(capabilities?.canReviewScientificResult)} profile={capabilities?.profile} onReviewed={setReviewSnapshot} />}
+    {resultView?.availability === "available" && resultView.result && <ReviewControl runId={runId} view={resultView} enabled={canReview} profile={capabilities?.profile} onReviewed={setReviewSnapshot} />}
     <section className="detail-section" aria-labelledby="versions-title"><div className="detail-heading"><h2 id="versions-title">RunResult 版本</h2><p>由新到旧；第一条是当前科研权威版本。</p></div>{versionsQuery.data?.data?.items.length ? <ol className="version-list">{versionsQuery.data.data.items.map((version, index) => <li key={version.artifactId}><span>{index === 0 ? "当前" : `历史 ${index}`}</span><strong>{version.artifactId}</strong><time dateTime={version.createdAt}>{formatAbsolute(version.createdAt)}</time><em>{version.availability}</em></li>)}</ol> : versionsQuery.isPending ? <QueryLoading /> : <p className="muted">没有可显示的版本。</p>}</section>
     <section className="detail-section" aria-labelledby="request-title"><div className="detail-heading"><h2 id="request-title">运行请求</h2><p>Prefect 参数与标签，只读展示。</p></div><pre className="request-code">{JSON.stringify({ parameters: detail.parameters, tags: detail.tags }, null, 2)}</pre></section>
     {cancelMutation.isError && <div className="command-error persistent-command-error" role="alert">取消请求未获得权威回执；运行状态保持原样，没有自动重试。</div>}

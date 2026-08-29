@@ -1,5 +1,9 @@
-import type { ApiError, SourceMeta } from "../api/types";
+import type { ApiError, Envelope, SourceMeta } from "../api/types";
 import { SourceNotice } from "./SourceNotice";
+
+export function envelopeHasErrors(envelope: Envelope<unknown> | undefined | null) {
+  return Boolean(envelope?.errors.length);
+}
 
 const sourceNames: Record<string, string> = {
   prefect: "Prefect",

@@ -12,7 +12,7 @@ import type {
 } from "../api/types";
 import { coerceDeploymentParameters } from "../pages/InfrastructurePage";
 import { ModalDialog } from "./Dialogs";
-import { EnvelopeErrors, SourceStrip } from "./EnvelopeState";
+import { EnvelopeErrors, SourceStrip, envelopeHasErrors } from "./EnvelopeState";
 
 type RunPreparationPreview = Schemas["RunPreparationPreview"];
 type RunPreparationPreviewRequest = Schemas["RunPreparationPreviewRequest"];
@@ -50,10 +50,6 @@ const defaultForm = (): PreparationForm => ({
     preferOffPeak: true,
   },
 });
-
-function envelopeHasErrors(envelope: Envelope<unknown> | undefined) {
-  return Boolean(envelope?.errors.length);
-}
 
 function CatalogFacts({ catalog }: { catalog: PriceCatalog }) {
   return (
@@ -312,6 +308,7 @@ export function RunPreparation({ deployment, open, onClose, onSubmitted }: Props
       </div>
       {!preview && (
         <>
+          <p className="seed-note">下面是预览请求，不是报价。费用和档位以生成后的服务端预览为准。</p>
           <label>
             研究意图
             <select

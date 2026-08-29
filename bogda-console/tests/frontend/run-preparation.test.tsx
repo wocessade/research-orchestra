@@ -247,9 +247,8 @@ describe("RunPreparation", () => {
       retryable: true,
     }]);
     renderAppAt("/infrastructure", result);
-    const { dialog } = await openPreparation();
-    expect(await within(dialog).findByText("paid flags incomplete")).toBeVisible();
-    expect(within(dialog).getByRole("button", { name: "生成服务端预览" })).toBeDisabled();
+    expect(await screen.findByText("paid flags incomplete")).toBeVisible();
+    expect(screen.getByRole("button", { name: "提交 alpine-assay" })).toBeDisabled();
   });
 
   it("shows local coercion errors instead of a missing receipt", async () => {

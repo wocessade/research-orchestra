@@ -11,7 +11,7 @@ describe("OverviewPage", () => {
     const recent = screen.getByRole("heading", { name: "最近结果" });
     expect(attention.compareDocumentPosition(active) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(active.compareDocumentPosition(recent) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByText("Prefect 决定执行事实，RunResult 承载科研判断。两者不会合并成一个‘成功’。" )).toBeVisible();
+    expect(screen.getByText("Prefect 决定执行事实，科研结论另判。")).toBeVisible();
   });
 
   it("offers a review entry in the waiting-review block without one-click judgment", async () => {

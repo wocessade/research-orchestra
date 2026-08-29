@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { CapabilitySnapshot, CommandReceipt, DeploymentSummary, InfrastructureView, Page, PoolSnapshot, QueueSnapshot, RunSummary } from "../api/types";
 import { ConfirmDialog } from "../components/Dialogs";
-import { EnvelopeErrors, QueryFailure, QueryLoading, SourceStrip } from "../components/EnvelopeState";
+import { EnvelopeErrors, QueryFailure, QueryLoading, SourceStrip, envelopeHasErrors } from "../components/EnvelopeState";
 import { RunPreparation } from "../components/RunPreparation";
 
 type PendingAction =
@@ -57,6 +57,10 @@ export function InfrastructurePage() {
   const [selectedDeployment, setSelectedDeployment] = useState<DeploymentSummary | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const cap = capabilities.data?.data;
+  const capReady = capabilities.isSuccess && !envelopeHasErrors(capabilities.data);
+  const canPauseQueue = capReady && cap?.canPauseWorkQueue === true;
+  const canSubmitDeployment = capReady && cap?.canSubmitRegisteredDeployment === true;
+  const canPauseSched = capReady && cap?.canPauseSchedule === true;
 
   const actionMutation = useMutation({ mutationFn: async (pending: PendingAction) => {
     if (pending.kind === "queue") {
@@ -86,17 +90,19 @@ export function InfrastructurePage() {
   const powerMeta = infrastructure.data.sources.power;
 
   return <section className="page infrastructure-page">
-    <header className="page-header page-header--split"><div><p className="page-kicker">Field / 04</p><h1>基础设施</h1><p className="lede">Worker、工作池、队列与电源模式分别来自各自权威来源，不互相推断。</p></div><span className="profile-flag">{cap?.profile ?? "读取能力中"}</span></header>
+    <header className="page-header page-header--split"><div><p className="page-kicker">Field / 04</p><h1>基础设施</h1><p className="lede">容量、队列和电源各看来源，不互相推断。</p></div><span className="profile-flag">{cap?.profile ?? "读取能力中"}</span></header>
     <SourceStrip sources={infrastructure.data.sources} />
     <EnvelopeErrors errors={infrastructure.data.errors} />
+    <SourceStrip sources={capabilities.data?.sources ?? {}} />
+    <EnvelopeErrors errors={capabilities.data?.errors ?? []} />
     {dorm && dorm.concurrencyLimit !== 1 && <div className="contract-alert" role="alert"><strong>宿舍机共享并发配置不符合约束</strong><span>期望 1，Prefect 当前报告 {dorm.concurrencyLimit ?? "未设置"}。</span></div>}
     {notice && <div className="command-notice" role="status">{notice}</div>}
 
     <section className="power-observation" aria-labelledby="power-title"><div><p className="page-kicker">Power agent / mock adapter</p><h2 id="power-title">宿舍机电源状态</h2></div>{data.dormPower ? <div className="power-facts"><strong>{data.dormPower.mode}</strong><span>Agent {data.dormPower.agentReachable === true ? "可达" : data.dormPower.agentReachable === false ? "不可达" : "未知"}</span><span>Sleep inhibition {data.dormPower.sleepInhibited === true ? "开启" : data.dormPower.sleepInhibited === false ? "关闭" : "未知"}</span><time dateTime={data.dormPower.lastTransitionAt ?? undefined}>{formatAbsolute(data.dormPower.lastTransitionAt)}</time>{powerMeta?.sourceMode === "mock" && <em>模拟数据</em>}</div> : <p className="muted">Power Agent 数据不可用。</p>}</section>
 
-    <div className="pool-grid">{data.pools?.map((pool) => <PoolLedger key={pool.name} pool={pool} canPause={Boolean(cap?.canPauseWorkQueue)} onAction={setAction} />) ?? <p className="muted">Prefect 工作池数据不可用。</p>}</div>
+    <div className="pool-grid">{data.pools?.map((pool) => <PoolLedger key={pool.name} pool={pool} canPause={canPauseQueue} onAction={setAction} />) ?? <p className="muted">Prefect 工作池数据不可用。</p>}</div>
 
-    <section className="deployment-section section-block" aria-labelledby="deployments-title"><div className="section-heading"><p>Registered</p><h2 id="deployments-title">已注册 Deployments</h2><span>{deployments.data?.data?.items.length ?? "—"} 个</span></div>{deployments.data?.data?.items.map((deployment) => <article className="deployment-record" key={deployment.deploymentId}><div><p className="page-kicker">{deployment.flowName}</p><h3>{deployment.name}</h3><span>{deployment.workPoolName} / {deployment.workQueueName}</span></div><div className="deployment-actions"><button type="button" className="primary-action" disabled={!cap?.canSubmitRegisteredDeployment || !deployment.allowlisted} onClick={() => setSelectedDeployment(deployment)}>提交 {deployment.name}</button></div>{Boolean(deployment.schedules?.length) && <ul className="schedule-list">{deployment.schedules?.map((schedule) => <li key={schedule.scheduleId}><span><strong>{schedule.label}</strong><small>{schedule.active ? "active" : "paused"}</small></span><button type="button" className="quiet-action" disabled={!cap?.canPauseSchedule} onClick={() => setAction({ kind: "schedule", deployment, schedule })}>{schedule.active ? `暂停日程 ${schedule.label}` : `恢复日程 ${schedule.label}`}</button></li>)}</ul>}</article>)}</section>
+    <section className="deployment-section section-block" aria-labelledby="deployments-title"><div className="section-heading"><p>Registered</p><h2 id="deployments-title">已注册 Deployments</h2><span>{deployments.data?.data?.items.length ?? "—"} 个</span></div>{deployments.data?.data?.items.map((deployment) => <article className="deployment-record" key={deployment.deploymentId}><div><p className="page-kicker">{deployment.flowName}</p><h3>{deployment.name}</h3><span>{deployment.workPoolName} / {deployment.workQueueName}</span></div><div className="deployment-actions"><button type="button" className="primary-action" disabled={!canSubmitDeployment || !deployment.allowlisted} onClick={() => setSelectedDeployment(deployment)}>提交 {deployment.name}</button></div>{Boolean(deployment.schedules?.length) && <ul className="schedule-list">{deployment.schedules?.map((schedule) => <li key={schedule.scheduleId}><span><strong>{schedule.label}</strong><small>{schedule.active ? "active" : "paused"}</small></span><button type="button" className="quiet-action" disabled={!canPauseSched} onClick={() => setAction({ kind: "schedule", deployment, schedule })}>{schedule.active ? `暂停日程 ${schedule.label}` : `恢复日程 ${schedule.label}`}</button></li>)}</ul>}</article>)}</section>
 
     <ConfirmDialog open={Boolean(action)} title={action?.kind === "queue" ? `${action.queue.isPaused ? "恢复" : "暂停"}队列 ${action.queue.name}` : `${action?.schedule.active ? "暂停" : "恢复"}日程 ${action?.schedule.label}`} confirmLabel={action?.kind === "queue" ? `确认${action.queue.isPaused ? "恢复" : "暂停"}` : `确认${action?.schedule.active ? "暂停" : "恢复"}`} onClose={() => setAction(null)} onConfirm={confirmAction} busy={actionMutation.isPending}>请求会提交给 Prefect；界面等待回执后才更新。{actionMutation.isError && <span className="command-error" role="alert">操作未获得权威回执；没有自动重试。</span>}</ConfirmDialog>
     <RunPreparation

@@ -29,7 +29,7 @@ export function OverviewPage() {
   return (
     <section className="page overview-page">
       <header className="page-header page-header--split">
-        <div><p className="page-kicker">Observatory / 01</p><h1>今天需要你判断的研究</h1><p className="lede">Prefect 决定执行事实，RunResult 承载科研判断。两者不会合并成一个‘成功’。</p></div>
+        <div><p className="page-kicker">Observatory / 01</p><h1>今天需要你判断的研究</h1><p className="lede">Prefect 决定执行事实，科研结论另判。</p></div>
         <Link className="text-action" to="/runs">打开运行账簿 <span aria-hidden="true">↗</span></Link>
       </header>
       <SourceStrip sources={envelope.sources} />
@@ -48,17 +48,21 @@ export function OverviewPage() {
 
       <section className="section-block" aria-labelledby="review-title">
         <div className="section-heading"><p>03 / SCIENCE</p><h2 id="review-title">等待评审</h2><span>{review.length} 条</span></div>
-        <p className="lede">先阅读证据，再提交科研判断。打开详情会定位到追加评审区，不会在列表上一键接受或拒绝。</p>
+        <p className="lede">打开详情再判断，列表不能一键接受或拒绝。</p>
         <RunLedger runs={review.slice(0, 4)} emptyText="当前没有待评审结果" reviewEntry />
       </section>
 
-      <section className="field-band section-block" aria-labelledby="field-title">
-        <div className="section-heading"><p>04 / FIELD</p><h2 id="field-title">宿舍机容量与电源</h2></div>
-        <div className="field-band__grid">
-          <div><small>共享执行容量</small><strong>{dorm ? `${dorm.activeSlots} / ${dorm.concurrencyLimit ?? "—"}` : "来源不可用"}</strong><span>dorm-x86 · CPU/GPU 共用</span></div>
-          <div><small>电源模式</small><strong>{data.power?.mode ?? "unknown"}</strong><span>{data.power?.agentReachable === true ? "Agent 可达" : "Agent 不可达或未知"}</span></div>
-        </div>
-      </section>
+      {dorm ? (
+        <section className="field-band section-block" aria-labelledby="field-title">
+          <div className="section-heading"><p>04 / FIELD</p><h2 id="field-title">宿舍机容量与电源</h2></div>
+          <div className="field-band__grid">
+            <div><small>共享执行容量</small><strong>{`${dorm.activeSlots} / ${dorm.concurrencyLimit ?? "—"}`}</strong><span>dorm-x86 · CPU/GPU 共用</span></div>
+            <div><small>电源模式</small><strong>{data.power?.mode ?? "unknown"}</strong><span>{data.power?.agentReachable === true ? "Agent 可达" : "Agent 不可达或未知"}</span></div>
+          </div>
+        </section>
+      ) : (
+        <p className="muted field-absent">宿舍机未接入。容量与电源在<Link to="/infrastructure">基础设施</Link>查看。</p>
+      )}
 
       <section className="section-block" aria-labelledby="recent-title">
         <div className="section-heading"><p>05 / RECENT</p><h2 id="recent-title">最近结果</h2><span>{recent.length} 条</span></div>

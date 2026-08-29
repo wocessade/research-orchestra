@@ -153,7 +153,7 @@ export function ModelPolicyPage() {
         <div>
           <p className="page-kicker">Control / 05</p>
           <h1 id="model-policy-title">模型策略</h1>
-          <p className="lede">模型层级与预算控制独立于科研自主模式；所有价格与路由仍由服务端决定。</p>
+          <p className="lede">层级与预算跟科研自主模式分开。价格由服务端决定。</p>
         </div>
         <span className="profile-flag">{cap?.profile ?? "unknown"}</span>
       </header>

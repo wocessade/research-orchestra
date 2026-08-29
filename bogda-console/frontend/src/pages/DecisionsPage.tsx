@@ -5,7 +5,7 @@ import { useLocation } from "react-router-dom";
 import { ApiClientError, api } from "../api/client";
 import type { CapabilitySnapshot, DecisionAction, DecisionCenterSnapshot, DecisionItem } from "../api/types";
 import { ModalDialog } from "../components/Dialogs";
-import { EnvelopeErrors, QueryFailure, QueryLoading, SourceStrip } from "../components/EnvelopeState";
+import { EnvelopeErrors, QueryFailure, QueryLoading, SourceStrip, envelopeHasErrors } from "../components/EnvelopeState";
 
 const groups = [
   { key: "needs-owner-now", label: "需要我现在处理", note: "不处理，工作会停在这里。" },
@@ -62,7 +62,10 @@ export function DecisionsPage() {
     [items, project, risk],
   );
   const renderedDecisionIds = filtered.map((item) => item.decisionId).join("|");
-  const canResolve = capabilities.data?.data?.canResolveModelDecision === true;
+  const canResolve = capabilities.isSuccess
+    && !envelopeHasErrors(decisions.data)
+    && !envelopeHasErrors(capabilities.data)
+    && capabilities.data?.data?.canResolveModelDecision === true;
 
   useEffect(() => {
     if (!location.hash || !renderedDecisionIds) return;
@@ -132,7 +135,7 @@ export function DecisionsPage() {
 
   function openDecision(item: DecisionItem) {
     setSelected(item);
-    setSelectedAction(item.actions[0] ?? null);
+    setSelectedAction(null);
     setOpenedRevision(snapshot?.revision ?? 0);
     setRationale("");
     setFormError(null);
@@ -146,7 +149,7 @@ export function DecisionsPage() {
   return (
     <section className="page decisions-page">
       <header className="page-header page-header--split">
-        <div><p className="page-kicker">Owner console / 04</p><h1>决策跑道</h1><p className="lede">所有待判断事项只从一个权威列表进入；每次操作都带着打开时的修订号提交。</p></div>
+        <div><p className="page-kicker">Owner console / 04</p><h1>决策跑道</h1><p className="lede">待判断只从这一份列表进入。提交使用打开时的列表修订号。</p></div>
         <div className="decision-count"><strong>{filtered.length}</strong><span>项待判断</span></div>
       </header>
       <SourceStrip sources={decisions.data.sources} />
@@ -169,7 +172,7 @@ export function DecisionsPage() {
                 <p>{item.reason}</p>
                 <div className="evidence-chips">{item.evidence.map((reference) => reference.uri ? <a className="evidence-chip" href={reference.uri} key={reference.kind + ":" + reference.refId}>{reference.label}</a> : <span className="evidence-chip" key={reference.kind + ":" + reference.refId}>{reference.label}</span>)}</div>
                 {item.deadline && <time className="decision-deadline" dateTime={item.deadline}>截止 {formatDeadline(item.deadline)}</time>}
-                <button type="button" className="text-action decision-open" onClick={() => openDecision(item)} aria-label={"查看：" + item.title}>查看判断细节 ↗</button>
+                <button type="button" className="text-action decision-open" onClick={() => openDecision(item)} aria-label={"查看：" + item.title}>处理这项判断</button>
               </div>
             </article>)}</div>}
           </section>;
@@ -183,9 +186,9 @@ export function DecisionsPage() {
           {conflict && <div className="command-conflict" role="alert"><strong>决策已被其他操作修改，请重新确认。</strong><span>已载入当前权威版本；你的操作理由保留，但不会自动重放。</span></div>}
           {withdrawn && <div className="command-conflict" role="alert"><strong>该决策已被处理或撤回，请关闭此窗口。</strong><span>当前权威列表中已找不到它；你的操作理由保留，但不会自动重放。</span></div>}
           {actionUnavailable && <div className="command-conflict" role="alert"><strong>原操作已不在当前权威选项中，请选择一个当前操作。</strong><span>旧操作不会被隐式替换，也不会自动重放。</span></div>}
-          <p className="decision-revision"><span>权威列表修订 {openedRevision ?? snapshot.revision}</span> · 条目版本 {selected.revision}</p>
+          <p className="decision-revision"><span>提交使用列表修订 {openedRevision ?? snapshot.revision}</span> · 条目 {selected.revision}（仅展示）</p>
           <p>{selected.reason}</p>
-          {!withdrawn && selected.actions.length > 0 && <label className="decision-action-picker">选择操作<select aria-label="选择操作" value={selectedAction?.actionId ?? ""} onChange={(event) => { const next = selected.actions.find((action) => action.actionId === event.target.value); if (next) { setSelectedAction(next); setRationale(""); setAcknowledged(false); setConflictAcknowledged(false); setActionUnavailable(false); setFormError(null); } }}>{selectedAction === null && <option value="" disabled>请选择当前操作</option>}{selected.actions.map((action) => <option key={action.actionId} value={action.actionId}>{action.label}</option>)}</select></label>}
+          {!withdrawn && selected.actions.length > 0 && <label className="decision-action-picker">选择操作<select aria-label="选择操作" value={selectedAction?.actionId ?? ""} onChange={(event) => { const next = selected.actions.find((action) => action.actionId === event.target.value); if (next) { setSelectedAction(next); setRationale(""); setAcknowledged(false); setConflictAcknowledged(false); setActionUnavailable(false); setFormError(null); } }}><option value="" disabled>请选择当前操作</option>{selected.actions.map((action) => <option key={action.actionId} value={action.actionId}>{action.label}</option>)}</select></label>}
           {selectedAction && <dl className="dialog-facts"><div><dt>费用影响</dt><dd>{selectedAction.costImpact}</dd></div><div><dt>质量影响</dt><dd>{selectedAction.qualityImpact ?? "未声明"}</dd></div><div><dt>风险</dt><dd>{selected.risk}</dd></div><div><dt>不可逆后果</dt><dd>{selectedAction.irreversibleConsequence ?? "未声明"}</dd></div></dl>}
           <section><h3>证据</h3><div className="evidence-chips">{selected.evidence.map((reference) => reference.uri ? <a className="evidence-chip" href={reference.uri} key={reference.kind + ":" + reference.refId}>{reference.label}</a> : <span className="evidence-chip" key={reference.kind + ":" + reference.refId}>{reference.label}</span>)}</div></section>
           <section><h3>精确日志摘要</h3><p className="log-summary">{selected.logSummary}</p></section>

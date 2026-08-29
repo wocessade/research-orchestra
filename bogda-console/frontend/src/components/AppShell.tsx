@@ -9,6 +9,7 @@ const destinations = [
   { to: "/runs", label: "运行", glyph: "↗" },
   { to: "/reviews", label: "评审", glyph: "◇" },
   { to: "/infrastructure", label: "基础设施", glyph: "⌘" },
+  { to: "/decisions", label: "决策", glyph: "!" },
 ];
 
 

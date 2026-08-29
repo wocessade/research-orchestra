@@ -72,6 +72,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Decisions */
+        get: operations["decisions_api_v1_decisions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/decisions/{decision_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve Decision */
+        post: operations["resolve_decision_api_v1_decisions__decision_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/deployments": {
         parameters: {
             query?: never;
@@ -157,6 +191,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/model-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Model Policy */
+        get: operations["model_policy_api_v1_model_policy_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/model-policy/global": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set Global Model Policy */
+        post: operations["set_global_model_policy_api_v1_model_policy_global_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/model-policy/projects/{project_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set Project Model Policy */
+        post: operations["set_project_model_policy_api_v1_model_policy_projects__project_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/overview": {
         parameters: {
             query?: never;
@@ -168,6 +253,23 @@ export interface paths {
         get: operations["overview_api_v1_overview_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/run-preparations/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Run */
+        post: operations["preview_run_api_v1_run_preparations_preview_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -236,6 +338,23 @@ export interface paths {
         put?: never;
         /** Decide Checkpoint */
         post: operations["decide_checkpoint_api_v1_runs__run_id__checkpoints_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/runs/{run_id}/model-budget": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Run Model Budget */
+        get: operations["run_model_budget_api_v1_runs__run_id__model_budget_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -348,6 +467,17 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AllowedRunPreferences */
+        AllowedRunPreferences: {
+            /** Allowautoupgrade */
+            allowAutoUpgrade: boolean;
+            /** Allowflashdowngrade */
+            allowFlashDowngrade: boolean;
+            /** Autoresume */
+            autoResume: boolean;
+            /** Preferoffpeak */
+            preferOffPeak: boolean;
+        };
         /** ApiEnvelope[AutonomyPolicySnapshot] */
         ApiEnvelope_AutonomyPolicySnapshot_: {
             data: components["schemas"]["AutonomyPolicySnapshot"] | null;
@@ -378,9 +508,29 @@ export interface components {
                 [key: string]: components["schemas"]["SourceMeta"];
             };
         };
+        /** ApiEnvelope[CommandReceipt[DecisionCenterSnapshot]] */
+        ApiEnvelope_CommandReceipt_DecisionCenterSnapshot__: {
+            data: components["schemas"]["CommandReceipt_DecisionCenterSnapshot_"] | null;
+            /** Errors */
+            errors?: components["schemas"]["ApiError"][];
+            /** Sources */
+            sources?: {
+                [key: string]: components["schemas"]["SourceMeta"];
+            };
+        };
         /** ApiEnvelope[CommandReceipt[DeploymentSummary]] */
         ApiEnvelope_CommandReceipt_DeploymentSummary__: {
             data: components["schemas"]["CommandReceipt_DeploymentSummary_"] | null;
+            /** Errors */
+            errors?: components["schemas"]["ApiError"][];
+            /** Sources */
+            sources?: {
+                [key: string]: components["schemas"]["SourceMeta"];
+            };
+        };
+        /** ApiEnvelope[CommandReceipt[ModelPolicySnapshot]] */
+        ApiEnvelope_CommandReceipt_ModelPolicySnapshot__: {
+            data: components["schemas"]["CommandReceipt_ModelPolicySnapshot_"] | null;
             /** Errors */
             errors?: components["schemas"]["ApiError"][];
             /** Sources */
@@ -428,9 +578,39 @@ export interface components {
                 [key: string]: components["schemas"]["SourceMeta"];
             };
         };
+        /** ApiEnvelope[DecisionCenterSnapshot] */
+        ApiEnvelope_DecisionCenterSnapshot_: {
+            data: components["schemas"]["DecisionCenterSnapshot"] | null;
+            /** Errors */
+            errors?: components["schemas"]["ApiError"][];
+            /** Sources */
+            sources?: {
+                [key: string]: components["schemas"]["SourceMeta"];
+            };
+        };
         /** ApiEnvelope[InfrastructureView] */
         ApiEnvelope_InfrastructureView_: {
             data: components["schemas"]["InfrastructureView"] | null;
+            /** Errors */
+            errors?: components["schemas"]["ApiError"][];
+            /** Sources */
+            sources?: {
+                [key: string]: components["schemas"]["SourceMeta"];
+            };
+        };
+        /** ApiEnvelope[ModelBudgetSnapshot] */
+        ApiEnvelope_ModelBudgetSnapshot_: {
+            data: components["schemas"]["ModelBudgetSnapshot"] | null;
+            /** Errors */
+            errors?: components["schemas"]["ApiError"][];
+            /** Sources */
+            sources?: {
+                [key: string]: components["schemas"]["SourceMeta"];
+            };
+        };
+        /** ApiEnvelope[ModelPolicySnapshot] */
+        ApiEnvelope_ModelPolicySnapshot_: {
+            data: components["schemas"]["ModelPolicySnapshot"] | null;
             /** Errors */
             errors?: components["schemas"]["ApiError"][];
             /** Sources */
@@ -488,6 +668,16 @@ export interface components {
                 [key: string]: components["schemas"]["SourceMeta"];
             };
         };
+        /** ApiEnvelope[RunPreparationPreview] */
+        ApiEnvelope_RunPreparationPreview_: {
+            data: components["schemas"]["RunPreparationPreview"] | null;
+            /** Errors */
+            errors?: components["schemas"]["ApiError"][];
+            /** Sources */
+            sources?: {
+                [key: string]: components["schemas"]["SourceMeta"];
+            };
+        };
         /** ApiEnvelope[RunResultView] */
         ApiEnvelope_RunResultView_: {
             data: components["schemas"]["RunResultView"] | null;
@@ -513,7 +703,7 @@ export interface components {
          * ApiErrorCode
          * @enum {string}
          */
-        ApiErrorCode: "PREFECT_UNAVAILABLE" | "RUN_RESULT_UNAVAILABLE" | "POWER_UNAVAILABLE" | "AUTONOMY_POLICY_UNAVAILABLE" | "PROJECT_CONTEXT_UNAVAILABLE" | "RESULT_MISSING" | "RESULT_INVALID" | "REVIEW_CONFLICT" | "RESOURCE_CHANGED" | "RESOURCE_NOT_ALLOWLISTED" | "COMMAND_NOT_APPLICABLE" | "COMMAND_REJECTED" | "COMMAND_OUTCOME_MISMATCH" | "COMMAND_OUTCOME_UNKNOWN" | "INFRASTRUCTURE_MISCONFIGURED" | "NOT_FOUND" | "VALIDATION_ERROR" | "INTERNAL_ERROR";
+        ApiErrorCode: "PREFECT_UNAVAILABLE" | "RUN_RESULT_UNAVAILABLE" | "POWER_UNAVAILABLE" | "AUTONOMY_POLICY_UNAVAILABLE" | "MODEL_CONTROL_UNAVAILABLE" | "PROJECT_CONTEXT_UNAVAILABLE" | "RESULT_MISSING" | "RESULT_INVALID" | "REVIEW_CONFLICT" | "RESOURCE_CHANGED" | "RESOURCE_NOT_ALLOWLISTED" | "COMMAND_NOT_APPLICABLE" | "COMMAND_REJECTED" | "COMMAND_OUTCOME_MISMATCH" | "COMMAND_OUTCOME_UNKNOWN" | "INFRASTRUCTURE_MISCONFIGURED" | "NOT_FOUND" | "VALIDATION_ERROR" | "INTERNAL_ERROR";
         /** ApiErrorDetails */
         ApiErrorDetails: {
             /** Currentresource */
@@ -560,6 +750,11 @@ export interface components {
          * @enum {string}
          */
         Availability: "available" | "missing" | "invalid";
+        /**
+         * BudgetState
+         * @enum {string}
+         */
+        BudgetState: "ready" | "stale" | "insufficient" | "scheduled-off-peak" | "awaiting-approval" | "usage-unknown";
         /** CapabilitySnapshot */
         CapabilitySnapshot: {
             /** Cancancelrun */
@@ -568,10 +763,16 @@ export interface components {
             canPauseSchedule: boolean;
             /** Canpauseworkqueue */
             canPauseWorkQueue: boolean;
+            /** Canpreparepaidrun */
+            canPreparePaidRun: boolean;
+            /** Canresolvemodeldecision */
+            canResolveModelDecision: boolean;
             /** Canreviewscientificresult */
             canReviewScientificResult: boolean;
             /** Cansetautonomymode */
             canSetAutonomyMode: boolean;
+            /** Cansetmodelpolicy */
+            canSetModelPolicy: boolean;
             /** Cansubmitregistereddeployment */
             canSubmitRegisteredDeployment: boolean;
             effectiveAutonomyMode?: components["schemas"]["AutonomyMode"] | null;
@@ -605,6 +806,19 @@ export interface components {
             resourceId: string;
             snapshot: components["schemas"]["AutonomyPolicySnapshot"];
         };
+        /** CommandReceipt[DecisionCenterSnapshot] */
+        CommandReceipt_DecisionCenterSnapshot_: {
+            /**
+             * Acceptedat
+             * Format: date-time
+             */
+            acceptedAt: string;
+            /** Command */
+            command: string;
+            /** Resourceid */
+            resourceId: string;
+            snapshot: components["schemas"]["DecisionCenterSnapshot"];
+        };
         /** CommandReceipt[DeploymentSummary] */
         CommandReceipt_DeploymentSummary_: {
             /**
@@ -617,6 +831,19 @@ export interface components {
             /** Resourceid */
             resourceId: string;
             snapshot: components["schemas"]["DeploymentSummary"];
+        };
+        /** CommandReceipt[ModelPolicySnapshot] */
+        CommandReceipt_ModelPolicySnapshot_: {
+            /**
+             * Acceptedat
+             * Format: date-time
+             */
+            acceptedAt: string;
+            /** Command */
+            command: string;
+            /** Resourceid */
+            resourceId: string;
+            snapshot: components["schemas"]["ModelPolicySnapshot"];
         };
         /** CommandReceipt[QueueSnapshot] */
         CommandReceipt_QueueSnapshot_: {
@@ -670,6 +897,85 @@ export interface components {
             resourceId: string;
             snapshot: components["schemas"]["RunSummary"];
         };
+        /** DecisionAction */
+        DecisionAction: {
+            /** Actionid */
+            actionId: string;
+            /** Costimpact */
+            costImpact: string;
+            /** Irreversibleconsequence */
+            irreversibleConsequence?: string | null;
+            /** Label */
+            label: string;
+            /** Qualityimpact */
+            qualityImpact?: string | null;
+            /**
+             * Requiresconfirmation
+             * @default true
+             */
+            requiresConfirmation: boolean;
+            /**
+             * Requiresrationale
+             * @default false
+             */
+            requiresRationale: boolean;
+        };
+        /** DecisionCenterSnapshot */
+        DecisionCenterSnapshot: {
+            /**
+             * Items
+             * @default []
+             */
+            items: components["schemas"]["DecisionItem"][];
+            /** Revision */
+            revision: number;
+        };
+        /** DecisionItem */
+        DecisionItem: {
+            /** Actions */
+            actions: components["schemas"]["DecisionAction"][];
+            /** Deadline */
+            deadline?: string | null;
+            /** Decisionid */
+            decisionId: string;
+            decisionKind: components["schemas"]["DecisionKind"];
+            /** Estimatedcost */
+            estimatedCost: string;
+            /**
+             * Evidence
+             * @default []
+             */
+            evidence: components["schemas"]["EvidenceReference"][];
+            /** Logsummary */
+            logSummary: string;
+            /** Projectid */
+            projectId: string;
+            /** Reason */
+            reason: string;
+            /** Revision */
+            revision: number;
+            /** Risk */
+            risk: string;
+            /** Runid */
+            runId?: string | null;
+            /** Title */
+            title: string;
+            urgencyGroup: components["schemas"]["UrgencyGroup"];
+        };
+        /**
+         * DecisionKind
+         * @enum {string}
+         */
+        DecisionKind: "plan-approval" | "scientific-result" | "budget-increase" | "pro-unavailable" | "peak-override" | "usage-unknown" | "external-action";
+        /** DecisionRequest */
+        DecisionRequest: {
+            /** Actionid */
+            actionId: string;
+            /** Expectedrevision */
+            expectedRevision: number;
+            /** Rationale */
+            rationale?: string | null;
+        };
         /** DeploymentSummary */
         DeploymentSummary: {
             /** Allowlisted */
@@ -692,6 +998,17 @@ export interface components {
             /** Workqueuename */
             workQueueName?: string | null;
         };
+        /** EvidenceReference */
+        EvidenceReference: {
+            /** Kind */
+            kind: string;
+            /** Label */
+            label: string;
+            /** Refid */
+            refId: string;
+            /** Uri */
+            uri?: string | null;
+        };
         /**
          * ExecutionStatus
          * @enum {string}
@@ -707,16 +1024,236 @@ export interface components {
          * @enum {string}
          */
         Freshness: "fresh" | "stale" | "unavailable";
+        /** GlobalModelPolicyRequest */
+        GlobalModelPolicyRequest: {
+            /** Expectedrevision */
+            expectedRevision: number;
+            patch: components["schemas"]["ModelPolicyPatch"];
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** HardSafetyBaselines */
+        HardSafetyBaselines: {
+            /**
+             * Budgetincreaseapprovalrequired
+             * @default true
+             */
+            budgetIncreaseApprovalRequired: boolean;
+            /**
+             * Decideauditnosilentdowngrade
+             * @default true
+             */
+            decideAuditNoSilentDowngrade: boolean;
+            /**
+             * Humanexternalactions
+             * @default true
+             */
+            humanExternalActions: boolean;
+            /**
+             * Humanscientificjudgment
+             * @default true
+             */
+            humanScientificJudgment: boolean;
+            /**
+             * Minimumremainingenforced
+             * @default true
+             */
+            minimumRemainingEnforced: boolean;
+            /**
+             * Promptarchivingrequired
+             * @default true
+             */
+            promptArchivingRequired: boolean;
+            /**
+             * Structuredeventlog
+             * @default true
+             */
+            structuredEventLog: boolean;
+            /**
+             * Unknownusagerecoverygate
+             * @default true
+             */
+            unknownUsageRecoveryGate: boolean;
+            /**
+             * Usagesnapshotfailclosed
+             * @default true
+             */
+            usageSnapshotFailClosed: boolean;
         };
         /** InfrastructureView */
         InfrastructureView: {
             dormPower?: components["schemas"]["PowerSnapshot"] | null;
             /** Pools */
             pools?: components["schemas"]["PoolSnapshot"][] | null;
+        };
+        /** ModelArtifactReference */
+        ModelArtifactReference: {
+            /** Artifactid */
+            artifactId: string;
+            /** Kind */
+            kind: string;
+            /** Uri */
+            uri: string;
+        };
+        /** ModelBudgetSnapshot */
+        ModelBudgetSnapshot: {
+            /**
+             * Artifacts
+             * @default []
+             */
+            artifacts: components["schemas"]["ModelArtifactReference"][];
+            /** Authorizedceiling */
+            authorizedCeiling: string;
+            /** Currency */
+            currency: string;
+            /** Decisionid */
+            decisionId?: string | null;
+            /** @default supervised */
+            effectiveAutonomyMode: components["schemas"]["AutonomyMode"];
+            /** Effectivemodeltier */
+            effectiveModelTier?: ("flash" | "pro") | null;
+            /**
+             * Events
+             * @default []
+             */
+            events: components["schemas"]["ModelEventRow"][];
+            /** Expectedcost */
+            expectedCost: string;
+            /**
+             * Intent
+             * @default execute
+             * @enum {string}
+             */
+            intent: "execute" | "brief" | "explore" | "decide" | "audit";
+            /** Pausereason */
+            pauseReason?: string | null;
+            /**
+             * Priceperiod
+             * @default off-peak
+             * @enum {string}
+             */
+            pricePeriod: "peak" | "off-peak";
+            /** Projectid */
+            projectId: string;
+            /**
+             * Recoveryconditions
+             * @default []
+             */
+            recoveryConditions: string[];
+            /** Remainingcost */
+            remainingCost: string;
+            /**
+             * Requestedmodeltier
+             * @default auto
+             * @enum {string}
+             */
+            requestedModelTier: "auto" | "flash" | "pro";
+            /** Reservedcost */
+            reservedCost: string;
+            /** Revision */
+            revision: number;
+            /** Runid */
+            runId: string;
+            /** Scheduledstart */
+            scheduledStart?: string | null;
+            state: components["schemas"]["BudgetState"];
+            /** Usedcost */
+            usedCost: string;
+        };
+        /** ModelEventRow */
+        ModelEventRow: {
+            /** Eventid */
+            eventId: string;
+            /**
+             * Eventtype
+             * @enum {string}
+             */
+            eventType: "budget_snapshot" | "budget_reserved" | "budget_released" | "route_selected" | "tier_upgrade_requested" | "tier_downgraded" | "model_call_started" | "model_call_finished" | "model_call_usage_unknown" | "budget_paused" | "budget_resumed" | "budget_override_approved";
+            /**
+             * Occurredat
+             * Format: date-time
+             */
+            occurredAt: string;
+            /** Summary */
+            summary?: string | null;
+        };
+        /** ModelPolicyPatch */
+        ModelPolicyPatch: {
+            /** Allowautoupgrade */
+            allowAutoUpgrade?: boolean | null;
+            /** Allowflashdowngrade */
+            allowFlashDowngrade?: boolean | null;
+            /** Autoresume */
+            autoResume?: boolean | null;
+            /** Criticalnotifications */
+            criticalNotifications?: boolean | null;
+            /** Defaultmodeltier */
+            defaultModelTier?: ("auto" | "flash" | "pro") | null;
+            /** Minimumremaining */
+            minimumRemaining?: number | string | null;
+            /** Preferoffpeak */
+            preferOffPeak?: boolean | null;
+            /** Workloadsafetymargin */
+            workloadSafetyMargin?: number | string | null;
+        };
+        /** ModelPolicySnapshot */
+        ModelPolicySnapshot: {
+            /** Allowautoupgrade */
+            allowAutoUpgrade: boolean;
+            /** Allowflashdowngrade */
+            allowFlashDowngrade: boolean;
+            /** Autoresume */
+            autoResume: boolean;
+            /** Criticalnotifications */
+            criticalNotifications: boolean;
+            /**
+             * Defaultmodeltier
+             * @enum {string}
+             */
+            defaultModelTier: "auto" | "flash" | "pro";
+            /**
+             * @default {
+             *       "budgetIncreaseApprovalRequired": true,
+             *       "decideAuditNoSilentDowngrade": true,
+             *       "humanExternalActions": true,
+             *       "humanScientificJudgment": true,
+             *       "minimumRemainingEnforced": true,
+             *       "promptArchivingRequired": true,
+             *       "structuredEventLog": true,
+             *       "unknownUsageRecoveryGate": true,
+             *       "usageSnapshotFailClosed": true
+             *     }
+             */
+            hardSafetyBaselines: components["schemas"]["HardSafetyBaselines"];
+            /** Inheritsglobal */
+            inheritsGlobal: boolean;
+            /** Minimumremaining */
+            minimumRemaining: string;
+            /** Preferoffpeak */
+            preferOffPeak: boolean;
+            priceCatalog: components["schemas"]["PriceCatalog"];
+            /** Projectid */
+            projectId?: string | null;
+            /** Revision */
+            revision: number;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "global" | "project";
+            /**
+             * Usagesnapshotstaleafterseconds
+             * @default 120
+             */
+            usageSnapshotStaleAfterSeconds: number;
+            /**
+             * Workloadsafetymargin
+             * @default 1
+             */
+            workloadSafetyMargin: string;
         };
         /** OverviewSnapshot */
         OverviewSnapshot: {
@@ -808,6 +1345,22 @@ export interface components {
             /** Type */
             type: string;
         };
+        /** PriceCatalog */
+        PriceCatalog: {
+            /** Effectiveat */
+            effectiveAt?: string | null;
+            /** Reviewby */
+            reviewBy?: string | null;
+            /** Source */
+            source?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ready" | "stale" | "missing" | "invalid";
+            /** Version */
+            version?: string | null;
+        };
         /** ProjectContext */
         ProjectContext: {
             effectiveAutonomyMode: components["schemas"]["AutonomyMode"] | null;
@@ -824,6 +1377,12 @@ export interface components {
              * @constant
              */
             writable: false;
+        };
+        /** ProjectModelPolicyRequest */
+        ProjectModelPolicyRequest: {
+            /** Expectedrevision */
+            expectedRevision: number;
+            patch: components["schemas"]["ModelPolicyPatch"] | null;
         };
         /** QueueSnapshot */
         QueueSnapshot: {
@@ -876,6 +1435,68 @@ export interface components {
             run: components["schemas"]["RunSummary"];
             /** Tags */
             tags?: string[];
+        };
+        /** RunPreparationPreview */
+        RunPreparationPreview: {
+            allowedPreferences: components["schemas"]["AllowedRunPreferences"];
+            budget: components["schemas"]["ModelBudgetSnapshot"];
+            /**
+             * Confirmed
+             * @default false
+             */
+            confirmed: boolean;
+            /** Confirmedat */
+            confirmedAt?: string | null;
+            /** Deadline */
+            deadline?: string | null;
+            effectiveAutonomyMode: components["schemas"]["AutonomyMode"];
+            /** Effectivemodeltier */
+            effectiveModelTier: ("flash" | "pro") | null;
+            /** Fallbackmodeltier */
+            fallbackModelTier: "flash" | null;
+            /**
+             * Intent
+             * @enum {string}
+             */
+            intent: "execute" | "brief" | "explore" | "decide" | "audit";
+            /** Policyrevision */
+            policyRevision: number;
+            /** Preparationid */
+            preparationId: string;
+            /**
+             * Priceperiod
+             * @enum {string}
+             */
+            pricePeriod: "peak" | "off-peak";
+            /** Projectid */
+            projectId: string;
+            /**
+             * Requestedmodeltier
+             * @enum {string}
+             */
+            requestedModelTier: "auto" | "flash" | "pro";
+            /** Scheduledstart */
+            scheduledStart?: string | null;
+            workload: components["schemas"]["WorkloadEstimate"];
+        };
+        /** RunPreparationPreviewRequest */
+        RunPreparationPreviewRequest: {
+            allowedPreferences: components["schemas"]["AllowedRunPreferences"];
+            /** Deadline */
+            deadline?: string | null;
+            /**
+             * Intent
+             * @enum {string}
+             */
+            intent: "execute" | "brief" | "explore" | "decide" | "audit";
+            /** Projectid */
+            projectId: string;
+            /**
+             * Requestedmodeltier
+             * @enum {string}
+             */
+            requestedModelTier: "auto" | "flash" | "pro";
+            workload: components["schemas"]["WorkloadEstimate"];
         };
         /** RunResultVersionSummary */
         RunResultVersionSummary: {
@@ -1015,7 +1636,14 @@ export interface components {
             parameters?: {
                 [key: string]: unknown;
             };
+            /** Runpreparationid */
+            runPreparationId?: string | null;
         };
+        /**
+         * UrgencyGroup
+         * @enum {string}
+         */
+        UrgencyGroup: "needs-owner-now" | "has-deadline" | "for-information";
         /** ValidRunResult */
         ValidRunResult: {
             /** Attempt */
@@ -1071,6 +1699,17 @@ export interface components {
             status: string;
             /** Workerid */
             workerId: string;
+        };
+        /** WorkloadEstimate */
+        WorkloadEstimate: {
+            /** Expectedcalls */
+            expectedCalls: number;
+            /** Inputtokens */
+            inputTokens: number;
+            /** Outputtokens */
+            outputTokens: number;
+            /** Runtimeminutes */
+            runtimeMinutes: number;
         };
     };
     responses: never;
@@ -1185,6 +1824,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiEnvelope_CapabilitySnapshot_"];
+                };
+            };
+        };
+    };
+    decisions_api_v1_decisions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiEnvelope_DecisionCenterSnapshot_"];
+                };
+            };
+        };
+    };
+    resolve_decision_api_v1_decisions__decision_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                decision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiEnvelope_CommandReceipt_DecisionCenterSnapshot__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1348,6 +2042,105 @@ export interface operations {
             };
         };
     };
+    model_policy_api_v1_model_policy_get: {
+        parameters: {
+            query?: {
+                projectId?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiEnvelope_ModelPolicySnapshot_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_global_model_policy_api_v1_model_policy_global_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GlobalModelPolicyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiEnvelope_CommandReceipt_ModelPolicySnapshot__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_project_model_policy_api_v1_model_policy_projects__project_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectModelPolicyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiEnvelope_CommandReceipt_ModelPolicySnapshot__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     overview_api_v1_overview_get: {
         parameters: {
             query?: never;
@@ -1364,6 +2157,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiEnvelope_OverviewSnapshot_"];
+                };
+            };
+        };
+    };
+    preview_run_api_v1_run_preparations_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunPreparationPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiEnvelope_RunPreparationPreview_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1492,6 +2318,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiEnvelope_CommandReceipt_RunDetail__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_model_budget_api_v1_runs__run_id__model_budget_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiEnvelope_ModelBudgetSnapshot_"];
                 };
             };
             /** @description Validation Error */

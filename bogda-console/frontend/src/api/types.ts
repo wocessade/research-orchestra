@@ -19,6 +19,10 @@ export type AutonomyPolicySnapshot = {
 };
 export type QueueSnapshot = Schemas["QueueSnapshot"];
 export type PoolSnapshot = Schemas["PoolSnapshot"];
+export type DecisionAction = Schemas["DecisionAction"];
+export type DecisionItem = Schemas["DecisionItem"];
+export type DecisionCenterSnapshot = Schemas["DecisionCenterSnapshot"];
+export type DecisionRequest = Schemas["DecisionRequest"];
 
 export interface Envelope<T> {
   data: T | null;

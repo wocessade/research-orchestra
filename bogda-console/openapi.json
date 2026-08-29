@@ -1,6 +1,35 @@
 {
   "components": {
     "schemas": {
+      "AllowedRunPreferences": {
+        "additionalProperties": false,
+        "properties": {
+          "allowAutoUpgrade": {
+            "title": "Allowautoupgrade",
+            "type": "boolean"
+          },
+          "allowFlashDowngrade": {
+            "title": "Allowflashdowngrade",
+            "type": "boolean"
+          },
+          "autoResume": {
+            "title": "Autoresume",
+            "type": "boolean"
+          },
+          "preferOffPeak": {
+            "title": "Preferoffpeak",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "preferOffPeak",
+          "allowAutoUpgrade",
+          "allowFlashDowngrade",
+          "autoResume"
+        ],
+        "title": "AllowedRunPreferences",
+        "type": "object"
+      },
       "ApiEnvelope_AutonomyPolicySnapshot_": {
         "additionalProperties": false,
         "properties": {
@@ -103,6 +132,40 @@
         "title": "ApiEnvelope[CommandReceipt[AutonomyPolicySnapshot]]",
         "type": "object"
       },
+      "ApiEnvelope_CommandReceipt_DecisionCenterSnapshot__": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CommandReceipt_DecisionCenterSnapshot_"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SourceMeta"
+            },
+            "title": "Sources",
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiEnvelope[CommandReceipt[DecisionCenterSnapshot]]",
+        "type": "object"
+      },
       "ApiEnvelope_CommandReceipt_DeploymentSummary__": {
         "additionalProperties": false,
         "properties": {
@@ -135,6 +198,40 @@
           "data"
         ],
         "title": "ApiEnvelope[CommandReceipt[DeploymentSummary]]",
+        "type": "object"
+      },
+      "ApiEnvelope_CommandReceipt_ModelPolicySnapshot__": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CommandReceipt_ModelPolicySnapshot_"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SourceMeta"
+            },
+            "title": "Sources",
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiEnvelope[CommandReceipt[ModelPolicySnapshot]]",
         "type": "object"
       },
       "ApiEnvelope_CommandReceipt_QueueSnapshot__": {
@@ -273,6 +370,40 @@
         "title": "ApiEnvelope[CommandReceipt[RunSummary]]",
         "type": "object"
       },
+      "ApiEnvelope_DecisionCenterSnapshot_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecisionCenterSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SourceMeta"
+            },
+            "title": "Sources",
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiEnvelope[DecisionCenterSnapshot]",
+        "type": "object"
+      },
       "ApiEnvelope_InfrastructureView_": {
         "additionalProperties": false,
         "properties": {
@@ -305,6 +436,74 @@
           "data"
         ],
         "title": "ApiEnvelope[InfrastructureView]",
+        "type": "object"
+      },
+      "ApiEnvelope_ModelBudgetSnapshot_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelBudgetSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SourceMeta"
+            },
+            "title": "Sources",
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiEnvelope[ModelBudgetSnapshot]",
+        "type": "object"
+      },
+      "ApiEnvelope_ModelPolicySnapshot_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelPolicySnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SourceMeta"
+            },
+            "title": "Sources",
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiEnvelope[ModelPolicySnapshot]",
         "type": "object"
       },
       "ApiEnvelope_OverviewSnapshot_": {
@@ -477,6 +676,40 @@
         "title": "ApiEnvelope[RunDetail]",
         "type": "object"
       },
+      "ApiEnvelope_RunPreparationPreview_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunPreparationPreview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SourceMeta"
+            },
+            "title": "Sources",
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiEnvelope[RunPreparationPreview]",
+        "type": "object"
+      },
       "ApiEnvelope_RunResultView_": {
         "additionalProperties": false,
         "properties": {
@@ -555,6 +788,7 @@
           "RUN_RESULT_UNAVAILABLE",
           "POWER_UNAVAILABLE",
           "AUTONOMY_POLICY_UNAVAILABLE",
+          "MODEL_CONTROL_UNAVAILABLE",
           "PROJECT_CONTEXT_UNAVAILABLE",
           "RESULT_MISSING",
           "RESULT_INVALID",
@@ -700,6 +934,18 @@
         "title": "Availability",
         "type": "string"
       },
+      "BudgetState": {
+        "enum": [
+          "ready",
+          "stale",
+          "insufficient",
+          "scheduled-off-peak",
+          "awaiting-approval",
+          "usage-unknown"
+        ],
+        "title": "BudgetState",
+        "type": "string"
+      },
       "CapabilitySnapshot": {
         "additionalProperties": false,
         "properties": {
@@ -715,12 +961,24 @@
             "title": "Canpauseworkqueue",
             "type": "boolean"
           },
+          "canPreparePaidRun": {
+            "title": "Canpreparepaidrun",
+            "type": "boolean"
+          },
+          "canResolveModelDecision": {
+            "title": "Canresolvemodeldecision",
+            "type": "boolean"
+          },
           "canReviewScientificResult": {
             "title": "Canreviewscientificresult",
             "type": "boolean"
           },
           "canSetAutonomyMode": {
             "title": "Cansetautonomymode",
+            "type": "boolean"
+          },
+          "canSetModelPolicy": {
+            "title": "Cansetmodelpolicy",
             "type": "boolean"
           },
           "canSubmitRegisteredDeployment": {
@@ -754,7 +1012,10 @@
           "canPauseSchedule",
           "canPauseWorkQueue",
           "canReviewScientificResult",
-          "canSetAutonomyMode"
+          "canSetAutonomyMode",
+          "canResolveModelDecision",
+          "canSetModelPolicy",
+          "canPreparePaidRun"
         ],
         "title": "CapabilitySnapshot",
         "type": "object"
@@ -823,6 +1084,35 @@
         "title": "CommandReceipt[AutonomyPolicySnapshot]",
         "type": "object"
       },
+      "CommandReceipt_DecisionCenterSnapshot_": {
+        "additionalProperties": false,
+        "properties": {
+          "acceptedAt": {
+            "format": "date-time",
+            "title": "Acceptedat",
+            "type": "string"
+          },
+          "command": {
+            "title": "Command",
+            "type": "string"
+          },
+          "resourceId": {
+            "title": "Resourceid",
+            "type": "string"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/DecisionCenterSnapshot"
+          }
+        },
+        "required": [
+          "command",
+          "resourceId",
+          "acceptedAt",
+          "snapshot"
+        ],
+        "title": "CommandReceipt[DecisionCenterSnapshot]",
+        "type": "object"
+      },
       "CommandReceipt_DeploymentSummary_": {
         "additionalProperties": false,
         "properties": {
@@ -850,6 +1140,35 @@
           "snapshot"
         ],
         "title": "CommandReceipt[DeploymentSummary]",
+        "type": "object"
+      },
+      "CommandReceipt_ModelPolicySnapshot_": {
+        "additionalProperties": false,
+        "properties": {
+          "acceptedAt": {
+            "format": "date-time",
+            "title": "Acceptedat",
+            "type": "string"
+          },
+          "command": {
+            "title": "Command",
+            "type": "string"
+          },
+          "resourceId": {
+            "title": "Resourceid",
+            "type": "string"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/ModelPolicySnapshot"
+          }
+        },
+        "required": [
+          "command",
+          "resourceId",
+          "acceptedAt",
+          "snapshot"
+        ],
+        "title": "CommandReceipt[ModelPolicySnapshot]",
         "type": "object"
       },
       "CommandReceipt_QueueSnapshot_": {
@@ -968,6 +1287,238 @@
         "title": "CommandReceipt[RunSummary]",
         "type": "object"
       },
+      "DecisionAction": {
+        "additionalProperties": false,
+        "properties": {
+          "actionId": {
+            "minLength": 1,
+            "title": "Actionid",
+            "type": "string"
+          },
+          "costImpact": {
+            "minLength": 1,
+            "title": "Costimpact",
+            "type": "string"
+          },
+          "irreversibleConsequence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Irreversibleconsequence"
+          },
+          "label": {
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "qualityImpact": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qualityimpact"
+          },
+          "requiresConfirmation": {
+            "default": true,
+            "title": "Requiresconfirmation",
+            "type": "boolean"
+          },
+          "requiresRationale": {
+            "default": false,
+            "title": "Requiresrationale",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "actionId",
+          "label",
+          "costImpact"
+        ],
+        "title": "DecisionAction",
+        "type": "object"
+      },
+      "DecisionCenterSnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/DecisionItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "revision": {
+            "minimum": 0.0,
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision"
+        ],
+        "title": "DecisionCenterSnapshot",
+        "type": "object"
+      },
+      "DecisionItem": {
+        "additionalProperties": false,
+        "properties": {
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionAction"
+            },
+            "minItems": 1,
+            "title": "Actions",
+            "type": "array"
+          },
+          "deadline": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline"
+          },
+          "decisionId": {
+            "minLength": 1,
+            "title": "Decisionid",
+            "type": "string"
+          },
+          "decisionKind": {
+            "$ref": "#/components/schemas/DecisionKind"
+          },
+          "estimatedCost": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Estimatedcost",
+            "type": "string"
+          },
+          "evidence": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/EvidenceReference"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "logSummary": {
+            "minLength": 1,
+            "title": "Logsummary",
+            "type": "string"
+          },
+          "projectId": {
+            "minLength": 1,
+            "title": "Projectid",
+            "type": "string"
+          },
+          "reason": {
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 0.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "risk": {
+            "minLength": 1,
+            "title": "Risk",
+            "type": "string"
+          },
+          "runId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runid"
+          },
+          "title": {
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "urgencyGroup": {
+            "$ref": "#/components/schemas/UrgencyGroup"
+          }
+        },
+        "required": [
+          "decisionId",
+          "decisionKind",
+          "title",
+          "urgencyGroup",
+          "projectId",
+          "reason",
+          "risk",
+          "estimatedCost",
+          "actions",
+          "revision",
+          "logSummary"
+        ],
+        "title": "DecisionItem",
+        "type": "object"
+      },
+      "DecisionKind": {
+        "enum": [
+          "plan-approval",
+          "scientific-result",
+          "budget-increase",
+          "pro-unavailable",
+          "peak-override",
+          "usage-unknown",
+          "external-action"
+        ],
+        "title": "DecisionKind",
+        "type": "string"
+      },
+      "DecisionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "actionId": {
+            "minLength": 1,
+            "title": "Actionid",
+            "type": "string"
+          },
+          "expectedRevision": {
+            "minimum": 0.0,
+            "title": "Expectedrevision",
+            "type": "integer"
+          },
+          "rationale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rationale"
+          }
+        },
+        "required": [
+          "actionId",
+          "expectedRevision"
+        ],
+        "title": "DecisionRequest",
+        "type": "object"
+      },
       "DeploymentSummary": {
         "additionalProperties": false,
         "properties": {
@@ -1041,6 +1592,44 @@
         "title": "DeploymentSummary",
         "type": "object"
       },
+      "EvidenceReference": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "minLength": 1,
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "refId": {
+            "minLength": 1,
+            "title": "Refid",
+            "type": "string"
+          },
+          "uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uri"
+          }
+        },
+        "required": [
+          "kind",
+          "refId",
+          "label"
+        ],
+        "title": "EvidenceReference",
+        "type": "object"
+      },
       "ExecutionStatus": {
         "enum": [
           "Scheduled",
@@ -1077,6 +1666,25 @@
         "title": "Freshness",
         "type": "string"
       },
+      "GlobalModelPolicyRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedRevision": {
+            "minimum": 0.0,
+            "title": "Expectedrevision",
+            "type": "integer"
+          },
+          "patch": {
+            "$ref": "#/components/schemas/ModelPolicyPatch"
+          }
+        },
+        "required": [
+          "patch",
+          "expectedRevision"
+        ],
+        "title": "GlobalModelPolicyRequest",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1088,6 +1696,58 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HardSafetyBaselines": {
+        "additionalProperties": false,
+        "properties": {
+          "budgetIncreaseApprovalRequired": {
+            "default": true,
+            "title": "Budgetincreaseapprovalrequired",
+            "type": "boolean"
+          },
+          "decideAuditNoSilentDowngrade": {
+            "default": true,
+            "title": "Decideauditnosilentdowngrade",
+            "type": "boolean"
+          },
+          "humanExternalActions": {
+            "default": true,
+            "title": "Humanexternalactions",
+            "type": "boolean"
+          },
+          "humanScientificJudgment": {
+            "default": true,
+            "title": "Humanscientificjudgment",
+            "type": "boolean"
+          },
+          "minimumRemainingEnforced": {
+            "default": true,
+            "title": "Minimumremainingenforced",
+            "type": "boolean"
+          },
+          "promptArchivingRequired": {
+            "default": true,
+            "title": "Promptarchivingrequired",
+            "type": "boolean"
+          },
+          "structuredEventLog": {
+            "default": true,
+            "title": "Structuredeventlog",
+            "type": "boolean"
+          },
+          "unknownUsageRecoveryGate": {
+            "default": true,
+            "title": "Unknownusagerecoverygate",
+            "type": "boolean"
+          },
+          "usageSnapshotFailClosed": {
+            "default": true,
+            "title": "Usagesnapshotfailclosed",
+            "type": "boolean"
+          }
+        },
+        "title": "HardSafetyBaselines",
         "type": "object"
       },
       "InfrastructureView": {
@@ -1119,6 +1779,480 @@
           }
         },
         "title": "InfrastructureView",
+        "type": "object"
+      },
+      "ModelArtifactReference": {
+        "additionalProperties": false,
+        "properties": {
+          "artifactId": {
+            "minLength": 1,
+            "title": "Artifactid",
+            "type": "string"
+          },
+          "kind": {
+            "minLength": 1,
+            "title": "Kind",
+            "type": "string"
+          },
+          "uri": {
+            "minLength": 1,
+            "title": "Uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifactId",
+          "kind",
+          "uri"
+        ],
+        "title": "ModelArtifactReference",
+        "type": "object"
+      },
+      "ModelBudgetSnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "artifacts": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ModelArtifactReference"
+            },
+            "title": "Artifacts",
+            "type": "array"
+          },
+          "authorizedCeiling": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Authorizedceiling",
+            "type": "string"
+          },
+          "currency": {
+            "minLength": 1,
+            "title": "Currency",
+            "type": "string"
+          },
+          "decisionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decisionid"
+          },
+          "effectiveAutonomyMode": {
+            "$ref": "#/components/schemas/AutonomyMode",
+            "default": "supervised"
+          },
+          "effectiveModelTier": {
+            "anyOf": [
+              {
+                "enum": [
+                  "flash",
+                  "pro"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effectivemodeltier"
+          },
+          "events": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ModelEventRow"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "expectedCost": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Expectedcost",
+            "type": "string"
+          },
+          "intent": {
+            "default": "execute",
+            "enum": [
+              "execute",
+              "brief",
+              "explore",
+              "decide",
+              "audit"
+            ],
+            "title": "Intent",
+            "type": "string"
+          },
+          "pauseReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pausereason"
+          },
+          "pricePeriod": {
+            "default": "off-peak",
+            "enum": [
+              "peak",
+              "off-peak"
+            ],
+            "title": "Priceperiod",
+            "type": "string"
+          },
+          "projectId": {
+            "minLength": 1,
+            "title": "Projectid",
+            "type": "string"
+          },
+          "recoveryConditions": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Recoveryconditions",
+            "type": "array"
+          },
+          "remainingCost": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Remainingcost",
+            "type": "string"
+          },
+          "requestedModelTier": {
+            "default": "auto",
+            "enum": [
+              "auto",
+              "flash",
+              "pro"
+            ],
+            "title": "Requestedmodeltier",
+            "type": "string"
+          },
+          "reservedCost": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Reservedcost",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 0.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "runId": {
+            "minLength": 1,
+            "title": "Runid",
+            "type": "string"
+          },
+          "scheduledStart": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scheduledstart"
+          },
+          "state": {
+            "$ref": "#/components/schemas/BudgetState"
+          },
+          "usedCost": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Usedcost",
+            "type": "string"
+          }
+        },
+        "required": [
+          "runId",
+          "projectId",
+          "state",
+          "currency",
+          "expectedCost",
+          "authorizedCeiling",
+          "usedCost",
+          "reservedCost",
+          "remainingCost",
+          "revision"
+        ],
+        "title": "ModelBudgetSnapshot",
+        "type": "object"
+      },
+      "ModelEventRow": {
+        "additionalProperties": false,
+        "properties": {
+          "eventId": {
+            "minLength": 1,
+            "title": "Eventid",
+            "type": "string"
+          },
+          "eventType": {
+            "enum": [
+              "budget_snapshot",
+              "budget_reserved",
+              "budget_released",
+              "route_selected",
+              "tier_upgrade_requested",
+              "tier_downgraded",
+              "model_call_started",
+              "model_call_finished",
+              "model_call_usage_unknown",
+              "budget_paused",
+              "budget_resumed",
+              "budget_override_approved"
+            ],
+            "title": "Eventtype",
+            "type": "string"
+          },
+          "occurredAt": {
+            "format": "date-time",
+            "title": "Occurredat",
+            "type": "string"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          }
+        },
+        "required": [
+          "eventId",
+          "eventType",
+          "occurredAt"
+        ],
+        "title": "ModelEventRow",
+        "type": "object"
+      },
+      "ModelPolicyPatch": {
+        "additionalProperties": false,
+        "properties": {
+          "allowAutoUpgrade": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowautoupgrade"
+          },
+          "allowFlashDowngrade": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowflashdowngrade"
+          },
+          "autoResume": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Autoresume"
+          },
+          "criticalNotifications": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Criticalnotifications"
+          },
+          "defaultModelTier": {
+            "anyOf": [
+              {
+                "enum": [
+                  "auto",
+                  "flash",
+                  "pro"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Defaultmodeltier"
+          },
+          "minimumRemaining": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimumremaining"
+          },
+          "preferOffPeak": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferoffpeak"
+          },
+          "workloadSafetyMargin": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workloadsafetymargin"
+          }
+        },
+        "title": "ModelPolicyPatch",
+        "type": "object"
+      },
+      "ModelPolicySnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "allowAutoUpgrade": {
+            "title": "Allowautoupgrade",
+            "type": "boolean"
+          },
+          "allowFlashDowngrade": {
+            "title": "Allowflashdowngrade",
+            "type": "boolean"
+          },
+          "autoResume": {
+            "title": "Autoresume",
+            "type": "boolean"
+          },
+          "criticalNotifications": {
+            "title": "Criticalnotifications",
+            "type": "boolean"
+          },
+          "defaultModelTier": {
+            "enum": [
+              "auto",
+              "flash",
+              "pro"
+            ],
+            "title": "Defaultmodeltier",
+            "type": "string"
+          },
+          "hardSafetyBaselines": {
+            "$ref": "#/components/schemas/HardSafetyBaselines",
+            "default": {
+              "budgetIncreaseApprovalRequired": true,
+              "decideAuditNoSilentDowngrade": true,
+              "humanExternalActions": true,
+              "humanScientificJudgment": true,
+              "minimumRemainingEnforced": true,
+              "promptArchivingRequired": true,
+              "structuredEventLog": true,
+              "unknownUsageRecoveryGate": true,
+              "usageSnapshotFailClosed": true
+            }
+          },
+          "inheritsGlobal": {
+            "title": "Inheritsglobal",
+            "type": "boolean"
+          },
+          "minimumRemaining": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Minimumremaining",
+            "type": "string"
+          },
+          "preferOffPeak": {
+            "title": "Preferoffpeak",
+            "type": "boolean"
+          },
+          "priceCatalog": {
+            "$ref": "#/components/schemas/PriceCatalog"
+          },
+          "projectId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Projectid"
+          },
+          "revision": {
+            "minimum": 0.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "source": {
+            "enum": [
+              "global",
+              "project"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "usageSnapshotStaleAfterSeconds": {
+            "default": 120,
+            "minimum": 1.0,
+            "title": "Usagesnapshotstaleafterseconds",
+            "type": "integer"
+          },
+          "workloadSafetyMargin": {
+            "default": "1",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Workloadsafetymargin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "inheritsGlobal",
+          "defaultModelTier",
+          "allowAutoUpgrade",
+          "allowFlashDowngrade",
+          "preferOffPeak",
+          "autoResume",
+          "minimumRemaining",
+          "criticalNotifications",
+          "priceCatalog",
+          "revision"
+        ],
+        "title": "ModelPolicySnapshot",
         "type": "object"
       },
       "OverviewSnapshot": {
@@ -1420,6 +2554,72 @@
         "title": "PrefectStateSnapshot",
         "type": "object"
       },
+      "PriceCatalog": {
+        "additionalProperties": false,
+        "properties": {
+          "effectiveAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effectiveat"
+          },
+          "reviewBy": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewby"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "status": {
+            "enum": [
+              "ready",
+              "stale",
+              "missing",
+              "invalid"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "PriceCatalog",
+        "type": "object"
+      },
       "ProjectContext": {
         "additionalProperties": false,
         "properties": {
@@ -1459,6 +2659,32 @@
           "modeSource"
         ],
         "title": "ProjectContext",
+        "type": "object"
+      },
+      "ProjectModelPolicyRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedRevision": {
+            "minimum": 0.0,
+            "title": "Expectedrevision",
+            "type": "integer"
+          },
+          "patch": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelPolicyPatch"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "patch",
+          "expectedRevision"
+        ],
+        "title": "ProjectModelPolicyRequest",
         "type": "object"
       },
       "QueueSnapshot": {
@@ -1647,6 +2873,206 @@
           "run"
         ],
         "title": "RunDetail",
+        "type": "object"
+      },
+      "RunPreparationPreview": {
+        "additionalProperties": false,
+        "properties": {
+          "allowedPreferences": {
+            "$ref": "#/components/schemas/AllowedRunPreferences"
+          },
+          "budget": {
+            "$ref": "#/components/schemas/ModelBudgetSnapshot"
+          },
+          "confirmed": {
+            "default": false,
+            "title": "Confirmed",
+            "type": "boolean"
+          },
+          "confirmedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmedat"
+          },
+          "deadline": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline"
+          },
+          "effectiveAutonomyMode": {
+            "$ref": "#/components/schemas/AutonomyMode"
+          },
+          "effectiveModelTier": {
+            "anyOf": [
+              {
+                "enum": [
+                  "flash",
+                  "pro"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effectivemodeltier"
+          },
+          "fallbackModelTier": {
+            "anyOf": [
+              {
+                "const": "flash",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallbackmodeltier"
+          },
+          "intent": {
+            "enum": [
+              "execute",
+              "brief",
+              "explore",
+              "decide",
+              "audit"
+            ],
+            "title": "Intent",
+            "type": "string"
+          },
+          "policyRevision": {
+            "minimum": 0.0,
+            "title": "Policyrevision",
+            "type": "integer"
+          },
+          "preparationId": {
+            "minLength": 1,
+            "title": "Preparationid",
+            "type": "string"
+          },
+          "pricePeriod": {
+            "enum": [
+              "peak",
+              "off-peak"
+            ],
+            "title": "Priceperiod",
+            "type": "string"
+          },
+          "projectId": {
+            "minLength": 1,
+            "title": "Projectid",
+            "type": "string"
+          },
+          "requestedModelTier": {
+            "enum": [
+              "auto",
+              "flash",
+              "pro"
+            ],
+            "title": "Requestedmodeltier",
+            "type": "string"
+          },
+          "scheduledStart": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scheduledstart"
+          },
+          "workload": {
+            "$ref": "#/components/schemas/WorkloadEstimate"
+          }
+        },
+        "required": [
+          "preparationId",
+          "projectId",
+          "intent",
+          "requestedModelTier",
+          "effectiveModelTier",
+          "effectiveAutonomyMode",
+          "fallbackModelTier",
+          "pricePeriod",
+          "workload",
+          "allowedPreferences",
+          "budget",
+          "policyRevision"
+        ],
+        "title": "RunPreparationPreview",
+        "type": "object"
+      },
+      "RunPreparationPreviewRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "allowedPreferences": {
+            "$ref": "#/components/schemas/AllowedRunPreferences"
+          },
+          "deadline": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline"
+          },
+          "intent": {
+            "enum": [
+              "execute",
+              "brief",
+              "explore",
+              "decide",
+              "audit"
+            ],
+            "title": "Intent",
+            "type": "string"
+          },
+          "projectId": {
+            "title": "Projectid",
+            "type": "string"
+          },
+          "requestedModelTier": {
+            "enum": [
+              "auto",
+              "flash",
+              "pro"
+            ],
+            "title": "Requestedmodeltier",
+            "type": "string"
+          },
+          "workload": {
+            "$ref": "#/components/schemas/WorkloadEstimate"
+          }
+        },
+        "required": [
+          "projectId",
+          "intent",
+          "requestedModelTier",
+          "workload",
+          "allowedPreferences"
+        ],
+        "title": "RunPreparationPreviewRequest",
         "type": "object"
       },
       "RunResultVersionSummary": {
@@ -2142,6 +3568,17 @@
             "additionalProperties": true,
             "title": "Parameters",
             "type": "object"
+          },
+          "runPreparationId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runpreparationid"
           }
         },
         "required": [
@@ -2149,6 +3586,15 @@
         ],
         "title": "SubmitRequest",
         "type": "object"
+      },
+      "UrgencyGroup": {
+        "enum": [
+          "needs-owner-now",
+          "has-deadline",
+          "for-information"
+        ],
+        "title": "UrgencyGroup",
+        "type": "string"
       },
       "ValidRunResult": {
         "additionalProperties": true,
@@ -2300,6 +3746,39 @@
         ],
         "title": "WorkerSnapshot",
         "type": "object"
+      },
+      "WorkloadEstimate": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedCalls": {
+            "minimum": 1.0,
+            "title": "Expectedcalls",
+            "type": "integer"
+          },
+          "inputTokens": {
+            "minimum": 0.0,
+            "title": "Inputtokens",
+            "type": "integer"
+          },
+          "outputTokens": {
+            "minimum": 0.0,
+            "title": "Outputtokens",
+            "type": "integer"
+          },
+          "runtimeMinutes": {
+            "minimum": 0.0,
+            "title": "Runtimeminutes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "inputTokens",
+          "outputTokens",
+          "expectedCalls",
+          "runtimeMinutes"
+        ],
+        "title": "WorkloadEstimate",
+        "type": "object"
       }
     }
   },
@@ -2430,6 +3909,73 @@
           }
         },
         "summary": "Capabilities"
+      }
+    },
+    "/api/v1/decisions": {
+      "get": {
+        "operationId": "decisions_api_v1_decisions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_DecisionCenterSnapshot_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Decisions"
+      }
+    },
+    "/api/v1/decisions/{decision_id}": {
+      "post": {
+        "operationId": "resolve_decision_api_v1_decisions__decision_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "decision_id",
+            "required": true,
+            "schema": {
+              "title": "Decision Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_CommandReceipt_DecisionCenterSnapshot__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resolve Decision"
       }
     },
     "/api/v1/deployments": {
@@ -2673,6 +4219,139 @@
         "summary": "Infrastructure"
       }
     },
+    "/api/v1/model-policy": {
+      "get": {
+        "operationId": "model_policy_api_v1_model_policy_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "projectId",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Projectid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_ModelPolicySnapshot_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Model Policy"
+      }
+    },
+    "/api/v1/model-policy/global": {
+      "post": {
+        "operationId": "set_global_model_policy_api_v1_model_policy_global_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GlobalModelPolicyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_CommandReceipt_ModelPolicySnapshot__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Global Model Policy"
+      }
+    },
+    "/api/v1/model-policy/projects/{project_id}": {
+      "post": {
+        "operationId": "set_project_model_policy_api_v1_model_policy_projects__project_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectModelPolicyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_CommandReceipt_ModelPolicySnapshot__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Project Model Policy"
+      }
+    },
     "/api/v1/overview": {
       "get": {
         "operationId": "overview_api_v1_overview_get",
@@ -2689,6 +4368,44 @@
           }
         },
         "summary": "Overview"
+      }
+    },
+    "/api/v1/run-preparations/preview": {
+      "post": {
+        "operationId": "preview_run_api_v1_run_preparations_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunPreparationPreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_RunPreparationPreview_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Run"
       }
     },
     "/api/v1/runs": {
@@ -2948,6 +4665,45 @@
           }
         },
         "summary": "Decide Checkpoint"
+      }
+    },
+    "/api/v1/runs/{run_id}/model-budget": {
+      "get": {
+        "operationId": "run_model_budget_api_v1_runs__run_id__model_budget_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_ModelBudgetSnapshot_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Model Budget"
       }
     },
     "/api/v1/runs/{run_id}/result": {

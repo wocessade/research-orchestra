@@ -5,6 +5,7 @@ const sourceNames: Record<string, string> = {
   prefect: "Prefect",
   runResult: "RunResult Artifact",
   power: "Power Agent",
+  modelControl: "模型控制",
 };
 
 export function SourceStrip({ sources }: { sources: Record<string, SourceMeta> }) {

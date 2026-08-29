@@ -6,6 +6,7 @@ import { InfrastructurePage } from "../pages/InfrastructurePage";
 import { ReviewsPage } from "../pages/ReviewsPage";
 import { RunDetailPage } from "../pages/RunDetailPage";
 import { RunsPage } from "../pages/RunsPage";
+import { DecisionsPage } from "../pages/DecisionsPage";
 
 export function App() {
   return (
@@ -16,6 +17,7 @@ export function App() {
         <Route path="/runs/:runId" element={<RunDetailPage />} />
         <Route path="/reviews" element={<ReviewsPage />} />
         <Route path="/infrastructure" element={<InfrastructurePage />} />
+        <Route path="/decisions" element={<DecisionsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AppShell>

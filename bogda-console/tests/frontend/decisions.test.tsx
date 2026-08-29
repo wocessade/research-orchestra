@@ -173,8 +173,11 @@ describe("owner decision runway", () => {
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText("该决策已被处理或撤回，请关闭此窗口。")).toBeVisible();
     expect(within(dialog).getByText("权威列表修订 9")).toBeVisible();
-    expect(within(dialog).getByRole("textbox", { name: "操作理由" })).toHaveValue("保留以便重新判断");
     expect(within(dialog).getByRole("button", { name: "该决策已处理" })).toBeDisabled();
+    expect(within(dialog).queryByRole("combobox", { name: "选择操作" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("textbox", { name: "操作理由" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(within(dialog).getByText("保留以便重新判断")).toBeVisible();
     expect(screen.getByRole("button", { name: "返回" })).toBeEnabled();
   });
 

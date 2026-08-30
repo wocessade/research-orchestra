@@ -150,6 +150,12 @@ class BudgetAdmissionService:
         except Exception:
             raise BudgetAdmissionError("clock failed") from None
 
+    def catalog_for(self, version: str):
+        try:
+            return self._guard.catalog_for(version)
+        except Exception:
+            raise BudgetAdmissionError("pricing catalog is not available") from None
+
     def _append(self, event: RunEventV1) -> None:
         try:
             self._event_sink.append(event)

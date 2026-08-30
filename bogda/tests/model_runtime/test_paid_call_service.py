@@ -13,10 +13,13 @@ import pytest
 from bogda.budget import (
     BudgetAdmissionService,
     BudgetGuard,
+    ReservationState,
     SingleFlightBudgetLedger,
+    SqliteBudgetLedger,
     UsageSnapshotV1,
     UsageSourceStatus,
 )
+from bogda.budget.pricing import DEEPSEEK_CN_2026_08_28, PricingCatalogV1
 from bogda.contracts import (
     AutonomyMode,
     BudgetSource,
@@ -165,15 +168,21 @@ def service_for(
     archive=None,
     usage_port: FakeUsage | None = None,
     id_factory: Callable[[], str] | None = None,
+    catalogs: tuple = (),
+    ledger=None,
 ):
     actual_sink = sink or MemorySink()
-    ledger = SingleFlightBudgetLedger(
-        clock=lambda: NOW,
-        id_factory=id_factory or (lambda: "reservation-1"),
-    )
+    if ledger is None:
+        ledger = SingleFlightBudgetLedger(
+            clock=lambda: NOW,
+            id_factory=id_factory or (lambda: "reservation-1"),
+        )
+    guard_kwargs = {"now": NOW}
+    if catalogs:
+        guard_kwargs["pricing_catalogs"] = catalogs
     budget = BudgetAdmissionService(
         usage=usage_port or FakeUsage(),
-        guard=BudgetGuard(ledger, now=NOW),
+        guard=BudgetGuard(ledger, **guard_kwargs),
         ledger=ledger,
         event_sink=actual_sink,
         clock=lambda: NOW,
@@ -220,6 +229,51 @@ def test_finished_call_archives_reserves_starts_finishes_then_reconciles(tmp_pat
     assert ledger.active_total == Decimal("0")
 
 
+def test_finished_call_reconciles_on_sqlite_ledger_and_survives_reopen(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "ledger.sqlite"
+    ledger = SqliteBudgetLedger(
+        path,
+        clock=lambda: NOW,
+        id_factory=lambda: "reservation-1",
+    )
+    service, sink, used_ledger, executor = service_for(
+        tmp_path, finished_result(), ledger=ledger
+    )
+
+    result = service.execute(
+        "run-1",
+        "call-1",
+        request(),
+        PROMPT,
+        tmp_path / "attempt",
+        pro_available=True,
+        allow_low_risk_fallback=False,
+    )
+
+    assert result.status is PaidCallStatus.FINISHED
+    assert result.actual_cost_cny == Decimal("0.25")
+    assert used_ledger.lookup("reservation-1").state is ReservationState.RECONCILED
+    assert used_ledger.active_total == Decimal("0")
+    assert [event.event for event in sink.events] == [
+        RunEventType.ROUTE_SELECTED,
+        RunEventType.BUDGET_SNAPSHOT,
+        RunEventType.BUDGET_RESERVED,
+        RunEventType.MODEL_CALL_STARTED,
+        RunEventType.MODEL_CALL_FINISHED,
+        RunEventType.BUDGET_RELEASED,
+    ]
+    used_ledger.close()
+
+    reopened = SqliteBudgetLedger(path)
+    loaded = reopened.lookup("reservation-1")
+    assert loaded.state is ReservationState.RECONCILED
+    assert loaded.actual_cost == Decimal("0.25")
+    assert reopened.active_total == Decimal("0")
+    reopened.close()
+
+
 def test_provider_cost_is_used_exactly_and_local_cost_uses_cache_subset(tmp_path: Path) -> None:
     exact_service, _, _, _ = service_for(tmp_path / "exact", finished_result(actual_cost="0.0000007"))
     exact = exact_service.execute(
@@ -239,6 +293,34 @@ def test_provider_cost_is_used_exactly_and_local_cost_uses_cache_subset(tmp_path
         + Decimal("9") * Decimal("3.0")
         + Decimal("8") * Decimal("9.0")
     ) / Decimal("1000000")
+
+
+def test_local_cost_uses_envelope_pinned_catalog(tmp_path: Path) -> None:
+    values = DEEPSEEK_CN_2026_08_28.model_dump()
+    values["version"] = "alt-catalog-test"
+    values["flash"]["peak"]["cache_hit_input"] = "1.00"
+    values["flash"]["peak"]["cache_miss_input"] = "30.0"
+    values["flash"]["peak"]["output"] = "90.0"
+    alt = PricingCatalogV1.model_validate(values)
+    job = request()
+    job = job.model_copy(
+        update={"budget": job.budget.model_copy(update={"pricing_version": alt.version})}
+    )
+    service, _, ledger, _ = service_for(
+        tmp_path,
+        finished_result(actual_cost=None),
+        catalogs=(DEEPSEEK_CN_2026_08_28, alt),
+    )
+    result = service.execute(
+        "run-alt", "call-alt", job, PROMPT, tmp_path / "attempt-alt",
+        pro_available=True, allow_low_risk_fallback=False,
+    )
+    assert result.actual_cost_cny == (
+        Decimal("3") * Decimal("1.00")
+        + Decimal("9") * Decimal("30.0")
+        + Decimal("8") * Decimal("90.0")
+    ) / Decimal("1000000")
+    assert ledger.active_total == Decimal("0")
 
 
 def test_archive_failure_stops_before_admission_and_executor(tmp_path: Path) -> None:

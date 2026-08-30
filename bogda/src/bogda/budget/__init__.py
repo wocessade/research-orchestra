@@ -8,6 +8,11 @@ from bogda.budget.pricing import (
     period_for_window,
     prices_for,
 )
+from bogda.budget.deepseek_balance import (
+    DEFAULT_DEEPSEEK_API_BASE,
+    DEFAULT_DEEPSEEK_BALANCE_URL,
+    DeepSeekBalanceClient,
+)
 from bogda.budget.usage import (
     UsageMonitorAuthenticationError,
     UsageMonitorBalanceUnavailableError,
@@ -54,6 +59,7 @@ from bogda.budget.ledger import (
     SingleFlightBudgetLedger,
     UnknownReservationError,
 )
+from bogda.budget.durable_ledger import SqliteBudgetLedger
 from bogda.budget.service import (
     BudgetAdmissionError,
     BudgetAdmissionResult,
@@ -74,6 +80,9 @@ __all__ = [
     "prices_for",
     "UsageMonitorAuthenticationError",
     "UsageMonitorBalanceUnavailableError",
+    "DEFAULT_DEEPSEEK_API_BASE",
+    "DEFAULT_DEEPSEEK_BALANCE_URL",
+    "DeepSeekBalanceClient",
     "UsageMonitorClient",
     "UsageMonitorCurrencyError",
     "UsageMonitorError",
@@ -109,6 +118,7 @@ __all__ = [
     "ReservationConflictError",
     "ReservationState",
     "SingleFlightBudgetLedger",
+    "SqliteBudgetLedger",
     "UnknownReservationError",
     "BudgetAdmissionError",
     "BudgetAdmissionResult",

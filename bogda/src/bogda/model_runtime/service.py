@@ -384,6 +384,7 @@ class PaidModelCallService:
                 if usage.cache_read_tokens > usage.input_tokens:
                     raise ValueError("cache usage counts are impossible")
                 pricing_now = self._now()
+                catalog = self._budget.catalog_for(request.budget.pricing_version)
                 actual_cost = estimate_token_cost(
                     decision.effective_tier,
                     period_at(pricing_now),
@@ -391,6 +392,7 @@ class PaidModelCallService:
                     cache_miss_input_tokens=usage.input_tokens - usage.cache_read_tokens,
                     output_tokens=usage.output_tokens,
                     as_of=pricing_now,
+                    catalog=catalog,
                 )
             if not isinstance(actual_cost, Decimal) or not actual_cost.is_finite() or actual_cost < 0:
                 raise ValueError("local pricing did not produce an exact cost")

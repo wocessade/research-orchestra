@@ -16,6 +16,7 @@ from bogda.model_runtime import (
     ModelCallOutcome,
     ModelCallRequest,
     MAX_STDERR_BYTES,
+    SubprocessCommandRunner,
 )
 
 
@@ -295,3 +296,27 @@ def test_stderr_diagnostic_redacts_common_credentials_but_stdout_is_exact(
     assert "generic-secret" not in diagnostic
     assert "pw-secret" not in diagnostic
     assert "[REDACTED]" in diagnostic
+
+
+def test_subprocess_runner_resolves_bare_command_via_which(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    resolved = str(tmp_path / "dsh.CMD")
+    calls: list[list[str]] = []
+
+    monkeypatch.setattr(
+        "bogda.model_runtime.dsh.shutil.which",
+        lambda name: resolved if name == "dsh" else None,
+    )
+
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr("bogda.model_runtime.dsh.subprocess.run", fake_run)
+    SubprocessCommandRunner().run(
+        ["dsh", "--profile", "headless"],
+        cwd=tmp_path,
+        timeout=1.0,
+    )
+    assert calls == [[resolved, "--profile", "headless"]]

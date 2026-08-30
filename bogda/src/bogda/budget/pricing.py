@@ -157,27 +157,26 @@ def _coerce_period(period: PricePeriod) -> PricePeriod:
         raise ValueError("unknown price period") from exc
 
 
-def _validate_catalog_as_of(as_of: datetime) -> None:
+def _validate_catalog_as_of(as_of: datetime, catalog: PricingCatalogV1) -> None:
     as_of = _require_aware(as_of, "as_of")
-    if as_of < DEEPSEEK_CN_2026_08_28.effective_at:
+    if as_of < catalog.effective_at:
         raise ValueError("pricing catalog is not effective yet")
-    if as_of > DEEPSEEK_CN_2026_08_28.review_by:
+    if as_of > catalog.review_by:
         raise ValueError("pricing catalog review deadline has passed")
 
 
 def prices_for(
-    tier: ModelTier, period: PricePeriod, *, as_of: datetime
+    tier: ModelTier, period: PricePeriod, *, as_of: datetime, catalog: PricingCatalogV1 | None = None
 ) -> TokenPrices:
     """Return the reviewed price row for a concrete model tier and period."""
 
+    resolved = catalog or DEEPSEEK_CN_2026_08_28
+    if not isinstance(resolved, PricingCatalogV1):
+        raise ValueError("catalog must be a PricingCatalogV1")
     tier = _coerce_tier(tier)
     period = _coerce_period(period)
-    _validate_catalog_as_of(as_of)
-    rows = (
-        DEEPSEEK_CN_2026_08_28.flash
-        if tier is ModelTier.FLASH
-        else DEEPSEEK_CN_2026_08_28.pro
-    )
+    _validate_catalog_as_of(as_of, resolved)
+    rows = resolved.flash if tier is ModelTier.FLASH else resolved.pro
     return rows.off_peak if period is PricePeriod.OFF_PEAK else rows.peak
 
 
@@ -197,6 +196,7 @@ def estimate_token_cost(
     cache_miss_input_tokens: int = 0,
     output_tokens: int = 0,
     as_of: datetime,
+    catalog: PricingCatalogV1 | None = None,
 ) -> Decimal:
     """Estimate CNY from token counts and supplied prices per million tokens."""
 
@@ -205,7 +205,7 @@ def estimate_token_cost(
         cache_miss_input_tokens, "cache_miss_input_tokens"
     )
     output_tokens = _validate_token_count(output_tokens, "output_tokens")
-    prices = prices_for(tier, period, as_of=as_of)
+    prices = prices_for(tier, period, as_of=as_of, catalog=catalog)
     return (
         Decimal(hit_tokens) * prices.cache_hit_input
         + Decimal(miss_tokens) * prices.cache_miss_input

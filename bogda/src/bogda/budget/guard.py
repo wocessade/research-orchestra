@@ -167,6 +167,14 @@ class BudgetGuard:
     def accepted_pricing_versions(self) -> frozenset[str]:
         return frozenset(self._catalogs)
 
+    def catalog_for(self, version: str) -> PricingCatalogV1:
+        if not isinstance(version, str) or not version.strip():
+            raise BudgetGuardError("pricing version is invalid")
+        catalog = self._catalogs.get(version)
+        if catalog is None:
+            raise BudgetGuardError("unknown pricing version")
+        return catalog
+
     @property
     def ledger(self) -> BudgetLedger:
         """The exact ledger whose facts this guard evaluates."""

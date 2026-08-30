@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import re
+import shutil
 import subprocess
 from typing import Protocol
 
@@ -58,13 +59,24 @@ class SubprocessCommandRunner:
         timeout: float,
     ) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
-            argv,
+            _resolve_argv(argv),
             cwd=cwd,
             capture_output=True,
             text=True,
             check=False,
             timeout=timeout,
         )
+
+
+def _resolve_argv(argv: list[str]) -> list[str]:
+    if not argv:
+        return list(argv)
+    found = shutil.which(argv[0])
+    if not found:
+        return list(argv)
+    resolved = list(argv)
+    resolved[0] = found
+    return resolved
 
 
 class JsonUsageReceiptReader:

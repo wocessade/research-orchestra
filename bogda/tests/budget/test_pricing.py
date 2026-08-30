@@ -185,3 +185,39 @@ def test_catalog_json_is_deterministic_and_serializes_money_as_strings() -> None
     payload = json.loads(first)
     assert payload["flash"]["off_peak"]["cache_hit_input"] == "0.05"
     assert payload["pro"]["peak"]["output"] == "27.0"
+
+
+def _alt_catalog() -> PricingCatalogV1:
+    values = DEEPSEEK_CN_2026_08_28.model_dump()
+    values["version"] = "alt-catalog-test"
+    values["flash"]["peak"]["cache_hit_input"] = "1.00"
+    values["flash"]["peak"]["cache_miss_input"] = "30.0"
+    values["flash"]["peak"]["output"] = "90.0"
+    return PricingCatalogV1.model_validate(values)
+
+
+def test_prices_for_and_estimate_use_supplied_catalog_not_the_default() -> None:
+    alt = _alt_catalog()
+    default_prices = prices_for(ModelTier.FLASH, PricePeriod.PEAK, as_of=AS_OF)
+    pinned = prices_for(ModelTier.FLASH, PricePeriod.PEAK, as_of=AS_OF, catalog=alt)
+    assert pinned.cache_miss_input == Decimal("30.0")
+    assert default_prices.cache_miss_input == Decimal("3.0")
+    default_cost = estimate_token_cost(
+        ModelTier.FLASH,
+        PricePeriod.PEAK,
+        cache_hit_input_tokens=3,
+        cache_miss_input_tokens=9,
+        output_tokens=8,
+        as_of=AS_OF,
+    )
+    pinned_cost = estimate_token_cost(
+        ModelTier.FLASH,
+        PricePeriod.PEAK,
+        cache_hit_input_tokens=3,
+        cache_miss_input_tokens=9,
+        output_tokens=8,
+        as_of=AS_OF,
+        catalog=alt,
+    )
+    assert pinned_cost == Decimal("3") * Decimal("1.00") / Decimal("1000000") + Decimal("9") * Decimal("30.0") / Decimal("1000000") + Decimal("8") * Decimal("90.0") / Decimal("1000000")
+    assert pinned_cost != default_cost

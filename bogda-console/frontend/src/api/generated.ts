@@ -781,7 +781,7 @@ export interface components {
          * BudgetState
          * @enum {string}
          */
-        BudgetState: "ready" | "stale" | "insufficient" | "scheduled-off-peak" | "awaiting-approval" | "usage-unknown";
+        BudgetState: "ready" | "stale" | "insufficient" | "scheduled-off-peak" | "awaiting-approval" | "usage-unknown" | "terminated";
         /** CapabilitySnapshot */
         CapabilitySnapshot: {
             /** Cancancelrun */
@@ -928,12 +928,22 @@ export interface components {
         DecisionAction: {
             /** Actionid */
             actionId: string;
+            /**
+             * Actualcostrequired
+             * @default false
+             */
+            actualCostRequired: boolean;
             /** Costimpact */
             costImpact: string;
             /** Irreversibleconsequence */
             irreversibleConsequence?: string | null;
             /** Label */
             label: string;
+            /**
+             * Newcallidrequired
+             * @default false
+             */
+            newCallIdRequired: boolean;
             /** Qualityimpact */
             qualityImpact?: string | null;
             /**
@@ -998,8 +1008,12 @@ export interface components {
         DecisionRequest: {
             /** Actionid */
             actionId: string;
+            /** Actualcostcny */
+            actualCostCny?: number | string | null;
             /** Expectedrevision */
             expectedRevision: number;
+            /** Newcallid */
+            newCallId?: string | null;
             /** Rationale */
             rationale?: string | null;
         };

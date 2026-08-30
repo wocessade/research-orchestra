@@ -275,6 +275,82 @@ describe("owner decision runway", () => {
     expect(within(dialog).getByRole("button", { name: "允许高峰运行" })).toBeEnabled();
   });
 
+  it("renders backend-required recovery inputs and sends only the selected action fields", async () => {
+    const user = userEvent.setup();
+    const bodies: Record<string, unknown>[] = [];
+    let step = 0;
+    const usageUnknown = decision({
+      decisionId: "decision-usage-unknown",
+      decisionKind: "usage-unknown",
+      title: "核对未知用量",
+      runId: "run-unknown-usage",
+      estimatedCost: "0",
+      risk: "usage",
+      actions: [{
+        actionId: "reconcile",
+        label: "登记实际费用",
+        costImpact: "不会启动新调用",
+        requiresRationale: false,
+        requiresConfirmation: false,
+        actualCostRequired: true,
+        newCallIdRequired: false,
+      }],
+    });
+    const afterReconcile = decision({
+      ...usageUnknown,
+      revision: 1,
+      actions: [
+        { actionId: "approve-retry", label: "批准一次重试", costImpact: "启动一个新调用", requiresRationale: false, requiresConfirmation: false, actualCostRequired: false, newCallIdRequired: true },
+        { actionId: "terminate", label: "终止运行", costImpact: "不再调用", requiresRationale: false, requiresConfirmation: false, actualCostRequired: false, newCallIdRequired: false },
+      ],
+    });
+    const routes = decisionRoutes([usageUnknown], {
+      "/api/v1/decisions/decision-usage-unknown": ({ init }: { init?: RequestInit }) => {
+        bodies.push(JSON.parse(String(init?.body)));
+        step += 1;
+        const snapshot = step === 1
+          ? { items: [afterReconcile], revision: 1 }
+          : { items: [], revision: 2 };
+        return envelope({ command: "resolveDecision", resourceId: "decision-usage-unknown", acceptedAt: "2026-08-31T02:00:00Z", snapshot }, { modelControl: sourceFresh });
+      },
+    });
+    renderAppAt("/decisions", routes);
+
+    let dialog = await openDecision(user, "核对未知用量");
+    await selectAction(user, "reconcile", dialog);
+    expect(within(dialog).getByRole("spinbutton", { name: "实际费用（CNY）" })).toBeVisible();
+    expect(within(dialog).queryByRole("textbox", { name: "新的调用 ID" })).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "登记实际费用" })).toBeDisabled();
+    await user.type(within(dialog).getByRole("spinbutton", { name: "实际费用（CNY）" }), "0.75");
+    expect(within(dialog).getByRole("button", { name: "登记实际费用" })).toBeEnabled();
+    await user.click(within(dialog).getByRole("button", { name: "登记实际费用" }));
+    expect(bodies[0]).toEqual({ actionId: "reconcile", expectedRevision: 0, rationale: null, actualCostCny: "0.75" });
+
+    dialog = await openDecision(user, "核对未知用量");
+    await selectAction(user, "approve-retry", dialog);
+    expect(within(dialog).getByRole("textbox", { name: "新的调用 ID" })).toBeVisible();
+    expect(within(dialog).queryByRole("spinbutton", { name: "实际费用（CNY）" })).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "批准一次重试" })).toBeDisabled();
+    await user.type(within(dialog).getByRole("textbox", { name: "新的调用 ID" }), "call-retry-2");
+    await selectAction(user, "terminate", dialog);
+    expect(within(dialog).queryByRole("textbox", { name: "新的调用 ID" })).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "终止运行" })).toBeEnabled();
+    await selectAction(user, "approve-retry", dialog);
+    expect(within(dialog).getByRole("textbox", { name: "新的调用 ID" })).toHaveValue("");
+    await user.type(within(dialog).getByRole("textbox", { name: "新的调用 ID" }), "call-retry-2");
+    await user.click(within(dialog).getByRole("button", { name: "批准一次重试" }));
+    expect(bodies[1]).toEqual({ actionId: "approve-retry", expectedRevision: 1, rationale: null, newCallId: "call-retry-2" });
+  });
+
+  it("does not invent recovery inputs for ordinary or terminal actions", async () => {
+    const user = userEvent.setup();
+    renderAppAt("/decisions", decisionRoutes());
+    const dialog = await openDecision(user);
+    await selectAction(user, "approve", dialog);
+    expect(within(dialog).queryByRole("spinbutton", { name: "实际费用（CNY）" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("textbox", { name: "新的调用 ID" })).not.toBeInTheDocument();
+  });
+
   it("requires conflict reconfirmation even when the current action needs no rationale or confirmation", async () => {
     const user = userEvent.setup();
     let calls = 0;

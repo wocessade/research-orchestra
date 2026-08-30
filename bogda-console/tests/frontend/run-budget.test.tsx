@@ -50,6 +50,7 @@ describe("RunBudgetPanel state matrix", () => {
     ["scheduled-off-peak", "已安排低峰时段", "等待计划开始"],
     ["awaiting-approval", "等待批准", "前往决策中心"],
     ["usage-unknown", "用量未知", "等待权威用量恢复"],
+    ["terminated", "运行已终止", "本次运行不会自动重试"],
   ])("renders distinct recovery copy for %s", async (state, label, recovery) => {
     const budgetState = state as Schemas["BudgetState"];
     renderBudget({ ...baseBudget, state: budgetState, pauseReason: budgetState === "usage-unknown" ? "供应商未返回用量" : null, recoveryConditions: [recovery] });

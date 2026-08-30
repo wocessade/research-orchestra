@@ -22,6 +22,9 @@ from bogda.budget.usage import (
 from bogda.contracts import RunBudgetEnvelope
 
 
+DEFAULT_AUTOMATIC_APPROVAL_CEILING_CNY = Decimal("20")
+
+
 class BudgetGuardError(ValueError):
     """The ledger supplied invalid facts and could not be evaluated safely."""
 
@@ -32,6 +35,7 @@ class BudgetDecisionKind(StrEnum):
     USAGE_UNAVAILABLE = "usage_unavailable"
     INSUFFICIENT_BALANCE = "insufficient_balance"
     BUDGET_CEILING_EXCEEDED = "budget_ceiling_exceeded"
+    OWNER_APPROVAL_REQUIRED = "owner_approval_required"
     RESERVATION_CONFLICT = "reservation_conflict"
     INVALID_PRICING = "invalid_pricing"
 
@@ -114,6 +118,7 @@ class BudgetGuard:
         pricing_catalogs: Iterable[PricingCatalogV1] | None = None,
         now: datetime | None = None,
         clock: Callable[[], datetime] | None = None,
+        automatic_approval_ceiling_cny: Decimal = DEFAULT_AUTOMATIC_APPROVAL_CEILING_CNY,
     ) -> None:
         if not callable(getattr(ledger, "facts", None)):
             raise ValueError("ledger must implement BudgetLedger.facts")
@@ -158,6 +163,13 @@ class BudgetGuard:
             _aware(now, "now")
         if clock is not None and not callable(clock):
             raise ValueError("clock must be callable")
+        try:
+            self._automatic_approval_ceiling_cny = _money(
+                automatic_approval_ceiling_cny,
+                "automatic_approval_ceiling_cny",
+            )
+        except ValueError as exc:
+            raise ValueError("automatic_approval_ceiling_cny must be a non-negative Decimal") from exc
         self._ledger = ledger
         self._catalogs = MappingProxyType(catalogs)
         self._fixed_now = now
@@ -166,6 +178,10 @@ class BudgetGuard:
     @property
     def accepted_pricing_versions(self) -> frozenset[str]:
         return frozenset(self._catalogs)
+
+    @property
+    def automatic_approval_ceiling_cny(self) -> Decimal:
+        return self._automatic_approval_ceiling_cny
 
     def catalog_for(self, version: str) -> PricingCatalogV1:
         if not isinstance(version, str) or not version.strip():
@@ -312,6 +328,23 @@ class BudgetGuard:
                 requested=requested,
                 pricing_version=pricing_version,
             )
+        if requested > self._automatic_approval_ceiling_cny:
+            available = (
+                ceiling_balance - active - minimum
+                if ceiling_balance is not None
+                else None
+            )
+            return self._decision(
+                kind=BudgetDecisionKind.OWNER_APPROVAL_REQUIRED,
+                reason="automatic_approval_ceiling_exceeded",
+                revision=revision,
+                active=active,
+                balance=ceiling_balance,
+                minimum=minimum,
+                available=available,
+                requested=requested,
+                pricing_version=pricing_version,
+            )
 
         balance: Decimal | None = None
         age: int | None = None
@@ -442,4 +475,10 @@ class BudgetGuard:
         )
 
 
-__all__ = ["BudgetDecision", "BudgetDecisionKind", "BudgetGuard", "BudgetGuardError"]
+__all__ = [
+    "DEFAULT_AUTOMATIC_APPROVAL_CEILING_CNY",
+    "BudgetDecision",
+    "BudgetDecisionKind",
+    "BudgetGuard",
+    "BudgetGuardError",
+]

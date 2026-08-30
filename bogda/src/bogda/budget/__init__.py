@@ -42,6 +42,7 @@ from bogda.budget.estimation import (
     WorkloadEstimator,
 )
 from bogda.budget.guard import (
+    DEFAULT_AUTOMATIC_APPROVAL_CEILING_CNY,
     BudgetDecision,
     BudgetDecisionKind,
     BudgetGuard,
@@ -106,6 +107,7 @@ __all__ = [
     "WorkloadEstimate",
     "WorkloadEstimator",
     "BudgetDecision",
+    "DEFAULT_AUTOMATIC_APPROVAL_CEILING_CNY",
     "BudgetDecisionKind",
     "BudgetGuard",
     "BudgetGuardError",

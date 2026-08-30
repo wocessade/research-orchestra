@@ -144,6 +144,7 @@ class RunEventV1(BaseModel):
                 "usage_unavailable",
                 "insufficient_balance",
                 "budget_ceiling_exceeded",
+                "owner_approval_required",
                 "reservation_conflict",
                 "invalid_pricing",
             }

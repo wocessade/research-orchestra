@@ -261,6 +261,18 @@ def test_explainable_budget_snapshot_requires_reason_when_decided() -> None:
         event(event="budget_snapshot", budget_decision="allow")
 
 
+def test_owner_approval_required_is_a_stable_budget_decision_code() -> None:
+    created = event(
+        event="budget_snapshot",
+        budget_decision="owner_approval_required",
+        reason="automatic_approval_ceiling_exceeded",
+        active_reservations_cny="0",
+        requested_reservation_cny="136",
+    )
+
+    assert created.budget_decision == "owner_approval_required"
+
+
 @pytest.mark.parametrize("event_name", ["budget_snapshot", "budget_paused"])
 @pytest.mark.parametrize("field", ["reserved_cny", "reservation_id"])
 def test_decided_snapshot_and_pause_reject_actual_reservation_facts(

@@ -175,7 +175,7 @@ def test_raised_stale_snapshot_is_distinct_from_generic_unavailable(
     )
 
 
-def test_pro_peak_estimate_uses_dynamic_p90_retry_and_contingency_ceiling(
+def test_pro_peak_estimate_above_automatic_ceiling_requires_owner_approval(
     tmp_path: Path,
 ) -> None:
     start = datetime(2026, 8, 28, 11, 30, tzinfo=BEIJING)
@@ -217,10 +217,15 @@ def test_pro_peak_estimate_uses_dynamic_p90_retry_and_contingency_ceiling(
     assert estimate.authorized_ceiling == Decimal("136.00")
     assert estimate.authorized_ceiling > estimate.expected_cost
     assert estimate.authorized_ceiling != Decimal("5.32")
-    assert result.decision.allowed is True
-    assert result.reservation is not None
-    assert ledger.active_total == Decimal("136.00")
-    assert read_events(tmp_path / "pro-peak.jsonl")[1].reserved_cny == Decimal("136.00")
+    assert result.decision.kind is BudgetDecisionKind.OWNER_APPROVAL_REQUIRED
+    assert result.decision.reason == "automatic_approval_ceiling_exceeded"
+    assert result.reservation is None
+    assert ledger.active_total == Decimal("0")
+    events = read_events(tmp_path / "pro-peak.jsonl")
+    assert [event.budget_decision for event in events] == [
+        "owner_approval_required",
+        "owner_approval_required",
+    ]
 
 
 def test_balance_recovery_rechecks_same_envelope_without_expanding_it(

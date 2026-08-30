@@ -5,6 +5,8 @@ from datetime import UTC, datetime, timedelta
 import json
 from pathlib import Path
 import sqlite3
+import subprocess
+import sys
 from unittest.mock import MagicMock
 
 import pytest
@@ -158,11 +160,54 @@ def test_append_sample_uses_one_write_for_json_and_newline(
 ) -> None:
     output = MagicMock()
     output.__enter__.return_value = output
+    output.fileno.return_value = 42
+    fsync = MagicMock()
     monkeypatch.setattr(Path, "open", lambda *args, **kwargs: output)
+    monkeypatch.setattr(health.os, "fsync", fsync)
 
     append_sample(tmp_path / "health.jsonl", {"api_ok": True})
 
     output.write.assert_called_once_with('{"api_ok":true}\n')
+    output.flush.assert_called_once_with()
+    fsync.assert_called_once_with(42)
+
+
+def test_summary_reports_the_corrupt_jsonl_line(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    path = tmp_path / "health.jsonl"
+    path.write_text('{"timestamp":"2026-08-24T00:00:00Z"}\nnot-json\n', encoding="utf-8")
+
+    assert health.main(["summarize", "--input", str(path)]) == 1
+
+    assert "invalid health sample at line 2" in capsys.readouterr().out
+
+
+def test_summary_keeps_prior_evidence_when_only_the_final_record_is_torn(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    path = tmp_path / "health.jsonl"
+    path.write_text(
+        '{"timestamp":"2026-08-24T00:00:00Z","api_ok":true}\n{"timestamp":',
+        encoding="utf-8",
+    )
+
+    assert health.main(["summarize", "--input", str(path)]) == 0
+
+    report = json.loads(capsys.readouterr().out)
+    assert report["sample_count"] == 1
+    assert report["incomplete_tail_ignored"] is True
+
+
+@pytest.mark.parametrize("module", ["bogda.ops.health", "bogda.ops.snapshot"])
+def test_module_entrypoint_help_has_no_duplicate_import_warning(module: str) -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", module, "--help"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "RuntimeWarning" not in result.stderr
 
 
 def test_summary_reports_72_hour_window_evidence() -> None:

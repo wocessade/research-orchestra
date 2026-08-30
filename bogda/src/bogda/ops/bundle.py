@@ -40,6 +40,9 @@ RUNTIME_SERVICE_GUARDS = (
 REQUIRED_UNIT_FRAGMENTS = {
     "bogda-prefect-server.service": (
         *RUNTIME_SERVICE_GUARDS,
+        "BindsTo=mnt-nas.mount",
+        "After=mnt-nas.mount",
+        "WantedBy=mnt-nas.mount",
         "User=bogda",
         "Group=bogda",
         "EnvironmentFile=/etc/bogda/bogda.env",
@@ -49,6 +52,9 @@ REQUIRED_UNIT_FRAGMENTS = {
     ),
     "bogda-pi-worker.service": (
         *RUNTIME_SERVICE_GUARDS,
+        "BindsTo=mnt-nas.mount",
+        "After=mnt-nas.mount",
+        "WantedBy=mnt-nas.mount",
         "User=bogda",
         "Group=bogda",
         "EnvironmentFile=/etc/bogda/bogda.env",

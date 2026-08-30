@@ -114,6 +114,8 @@ def append_sample(path: Path, sample: Mapping[str, object]) -> None:
     encoded = json.dumps(dict(sample), sort_keys=True, separators=(",", ":"))
     with path.open("a", encoding="utf-8", newline="\n") as output:
         output.write(encoded + "\n")
+        output.flush()
+        os.fsync(output.fileno())
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -288,15 +290,28 @@ def wait_for_api(
         sleep(min(interval, remaining))
 
 
-def _read_samples(path: Path) -> list[dict[str, object]]:
+def _read_samples(path: Path) -> tuple[list[dict[str, object]], bool]:
     samples: list[dict[str, object]] = []
-    for line in Path(path).read_text(encoding="utf-8").splitlines():
+    text = Path(path).read_text(encoding="utf-8")
+    lines = text.splitlines()
+    incomplete_tail_ignored = False
+    for line_number, line in enumerate(lines, start=1):
         if line.strip():
-            value = json.loads(line)
+            try:
+                value = json.loads(line)
+            except json.JSONDecodeError as error:
+                if line_number == len(lines) and not text.endswith(("\n", "\r")):
+                    incomplete_tail_ignored = True
+                    break
+                raise ValueError(
+                    f"invalid health sample at line {line_number}"
+                ) from error
             if not isinstance(value, dict):
-                raise ValueError("each sample must be a JSON object")
+                raise ValueError(
+                    f"health sample at line {line_number} must be a JSON object"
+                )
             samples.append(value)
-    return samples
+    return samples, incomplete_tail_ignored
 
 
 def main(arguments: list[str] | None = None) -> int:
@@ -317,7 +332,10 @@ def main(arguments: list[str] | None = None) -> int:
             append_sample(args.output, value)
             report: object = value
         elif args.command == "summarize":
-            report = summarize_samples(_read_samples(args.input))
+            samples, incomplete_tail_ignored = _read_samples(args.input)
+            report = summarize_samples(samples)
+            if incomplete_tail_ignored:
+                report["incomplete_tail_ignored"] = True
         else:
             return 0 if wait_for_api(args.url, args.timeout) else 1
     except Exception as error:

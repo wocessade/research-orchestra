@@ -225,6 +225,14 @@ for unit_name in $unit_names; do
 done
 systemctl daemon-reload
 
+# Refresh dependency symlinks for services that were already enabled without
+# changing an operator's decision to keep a service disabled.
+for unit_name in bogda-prefect-server.service bogda-pi-worker.service; do
+    if systemctl is-enabled --quiet "$unit_name"; then
+        systemctl reenable "$unit_name"
+    fi
+done
+
 if [ "$start" = true ]; then
     for unit_name in \
         bogda-prefect-server.service \

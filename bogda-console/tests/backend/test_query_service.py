@@ -84,3 +84,51 @@ async def test_last_good_run_pages_are_scoped_to_the_complete_query(fixture_load
     service.prefect._prefect["source"]["available"] = False
     with pytest.raises(SourceUnavailable):
         await service.runs(RunFilters(executionType="COMPLETED"), None, 20)
+
+
+@pytest.mark.asyncio
+async def test_overview_preserves_a_partial_source_failure(fixture_loader, monkeypatch) -> None:
+    service = service_for(fixture_loader("normal-active"))
+
+    async def unavailable_runs(*args, **kwargs):
+        raise SourceUnavailable(
+            "PREFECT_UNAVAILABLE",
+            "prefect read failed",
+            source="prefect",
+            retryable=True,
+            status_code=503,
+        )
+
+    monkeypatch.setattr(service, "runs", unavailable_runs)
+
+    response = await service.overview()
+
+    assert response.data.execution is None
+    # Infrastructure still observed Prefect successfully, so its source metadata
+    # remains fresh while the failed runs projection is retained as an error.
+    assert response.sources["prefect"].freshness == "fresh"
+    assert any(error.code == "PREFECT_UNAVAILABLE" for error in response.errors)
+
+
+@pytest.mark.asyncio
+async def test_overview_does_not_present_missing_run_results_as_empty_science(fixture_loader) -> None:
+    fixture = fixture_loader("normal-active")
+    fixture["runResults"]["source"]["available"] = False
+
+    response = await service_for(fixture).overview()
+
+    assert response.data.execution is not None
+    assert response.data.science is None
+    assert any(error.code == "RUN_RESULT_UNAVAILABLE" for error in response.errors)
+
+
+@pytest.mark.asyncio
+async def test_overview_keeps_power_but_marks_missing_pool_source_unavailable(fixture_loader) -> None:
+    fixture = fixture_loader("normal-active")
+    fixture["prefect"]["source"]["available"] = False
+
+    response = await service_for(fixture).overview()
+
+    assert response.data.infrastructure is None
+    assert response.data.power is not None
+    assert response.data.power.mode == "compute"

@@ -6,14 +6,14 @@ import { AppShell } from "../../frontend/src/components/AppShell";
 
 
 describe("AppShell", () => {
-  it("renders four primary destinations and a skip link", () => {
+  it("renders all primary destinations and a skip link", () => {
     render(
       <MemoryRouter>
         <AppShell><p>content</p></AppShell>
       </MemoryRouter>,
     );
     expect(screen.getByRole("link", { name: "跳到主要内容" })).toHaveAttribute("href", "#main-content");
-    for (const name of ["总览", "运行", "评审", "基础设施"]) {
+    for (const name of ["总览", "运行", "评审", "基础设施", "决策", "模型策略"]) {
       expect(screen.getAllByRole("link", { name })[0]).toBeVisible();
     }
     expect(screen.getByRole("main")).toHaveAttribute("id", "main-content");

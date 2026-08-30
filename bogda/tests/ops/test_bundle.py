@@ -178,6 +178,36 @@ def test_validator_requires_runtime_mount_ext4_and_restart_guards(
 
 
 @pytest.mark.parametrize(
+    "unit_name",
+    ["bogda-prefect-server.service", "bogda-pi-worker.service"],
+)
+@pytest.mark.parametrize(
+    "fragment",
+    ["BindsTo=mnt-nas.mount", "After=mnt-nas.mount", "WantedBy=mnt-nas.mount"],
+)
+def test_runtime_services_rebind_when_nas_mount_returns(
+    bundle_copy: Path, unit_name: str, fragment: str
+) -> None:
+    unit_path = bundle_copy / "systemd" / unit_name
+    unit_path.write_text(
+        unit_path.read_text(encoding="utf-8").replace(fragment, ""), encoding="utf-8"
+    )
+
+    assert f"{unit_name} missing required fragment: {fragment}" in validate_bundle(bundle_copy)
+
+
+def test_install_refreshes_mount_enablement_only_for_already_enabled_services() -> None:
+    install_script = Path(__file__).parents[2] / "deploy" / "pi" / "install.sh"
+    source = install_script.read_text(encoding="utf-8")
+    reload_at = source.index("systemctl daemon-reload")
+    enabled_check = source.index('systemctl is-enabled --quiet "$unit_name"', reload_at)
+    reenable = source.index('systemctl reenable "$unit_name"', enabled_check)
+    start_block = source.index('if [ "$start" = true ]; then', reenable)
+
+    assert reload_at < enabled_check < reenable < start_block
+
+
+@pytest.mark.parametrize(
     "manifest_text",
     [
         'service_user = "bogda"\nunits = [',

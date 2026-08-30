@@ -384,14 +384,17 @@ class QueryService:
         )
 
     async def overview(self) -> ApiEnvelope[OverviewSnapshot]:
+        unavailable: list[tuple[SourceUnavailable, str]] = []
         try:
             runs = await self.runs(RunFilters(), None, 12)
-        except SourceUnavailable:
+        except SourceUnavailable as error:
             runs = None
+            unavailable.append((error, getattr(self.prefect, "source_mode", "real")))
         try:
             infrastructure = await self.infrastructure()
-        except SourceUnavailable:
+        except SourceUnavailable as error:
             infrastructure = None
+            unavailable.append((error, getattr(self.prefect, "source_mode", "real")))
         if runs is None and infrastructure is None:
             raise SourceUnavailable(
                 ApiErrorCode.PREFECT_UNAVAILABLE,
@@ -400,6 +403,16 @@ class QueryService:
                 retryable=True,
             )
         items = runs.data.items if runs and runs.data else []
+        science_available = bool(
+            runs
+            and (run_result_meta := runs.sources.get("runResult"))
+            and run_result_meta.freshness != Freshness.UNAVAILABLE
+        )
+        infrastructure_available = bool(
+            infrastructure
+            and (prefect_meta := infrastructure.sources.get("prefect"))
+            and prefect_meta.freshness != Freshness.UNAVAILABLE
+        )
         execution_counts: dict[str, int] = {}
         science_counts: dict[str, int] = {}
         attention: list[RunSummary] = []
@@ -424,13 +437,13 @@ class QueryService:
                 "countsByScientificStatus": science_counts,
                 "attentionRuns": attention,
             }
-            if runs
+            if science_available
             else None,
             infrastructure={
                 "piService": pool_map.get("pi-service"),
                 "dormX86": pool_map.get("dorm-x86"),
             }
-            if infrastructure
+            if infrastructure_available
             else None,
             power=(infrastructure.data.dorm_power if infrastructure and infrastructure.data else None),
         )
@@ -440,6 +453,30 @@ class QueryService:
             if envelope:
                 sources.update(envelope.sources)
                 errors.extend(envelope.errors)
+        received_at = self._now()
+        for error, source_mode in unavailable:
+            sources.setdefault(
+                error.source,
+                SourceMeta(
+                    source=error.source,
+                    sourceMode=SourceMode(source_mode),
+                    observedAt=None,
+                    receivedAt=received_at,
+                    lastSuccessfulAt=None,
+                    staleAfterSeconds=60,
+                    freshness=Freshness.UNAVAILABLE,
+                ),
+            )
+            if not any(item.source == error.source and item.code == error.code for item in errors):
+                errors.append(
+                    ApiError(
+                        code=error.code,
+                        message=str(error),
+                        source=error.source,
+                        retryable=error.retryable,
+                        details=error.details,
+                    )
+                )
         return ApiEnvelope(data=data, sources=sources, errors=errors)
 
     async def _result_projection(

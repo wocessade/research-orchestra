@@ -1,5 +1,8 @@
 [Unit]
 Description=Bogda Pi Prefect worker
+# Stop with the NAS and start again when the same mount unit returns.
+BindsTo=mnt-nas.mount
+After=mnt-nas.mount
 RequiresMountsFor=/mnt/nas/.bogda
 ConditionPathIsMountPoint=/mnt/nas
 StartLimitIntervalSec=5min
@@ -19,3 +22,4 @@ ExecStart=/opt/bogda/.venv/bin/prefect worker start --pool pi-service --type pro
 
 [Install]
 WantedBy=multi-user.target
+WantedBy=mnt-nas.mount

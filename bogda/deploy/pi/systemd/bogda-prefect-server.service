@@ -1,5 +1,8 @@
 [Unit]
 Description=Bogda local Prefect server
+# Stop with the NAS and start again when the same mount unit returns.
+BindsTo=mnt-nas.mount
+After=mnt-nas.mount
 RequiresMountsFor=/mnt/nas/.bogda
 ConditionPathIsMountPoint=/mnt/nas
 StartLimitIntervalSec=5min
@@ -16,3 +19,4 @@ ExecStart=/opt/bogda/.venv/bin/prefect server start --host 0.0.0.0 --port 4200
 
 [Install]
 WantedBy=multi-user.target
+WantedBy=mnt-nas.mount

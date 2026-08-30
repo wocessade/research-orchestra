@@ -153,11 +153,11 @@ Commit task files with message `feat(runtime): persist unknown usage recovery`.
 
 **Interfaces:**
 - Consumes: the existing `DecisionItem`/`DecisionAction` revision model and Decision Center route.
-- Produces: optional `DecisionAction.actual_cost_required: bool = False`, optional `DecisionRequest.actual_cost_cny`, and the sequential reconcile → retry/terminate mock lifecycle.
+- Produces: optional `DecisionAction.actual_cost_required: bool = False`, optional `DecisionAction.new_call_id_required: bool = False`, optional matching request fields, and the sequential reconcile → retry/terminate mock lifecycle.
 
 - [ ] **Step 1: Write failing contract and command tests**
 
-Assert old decision payloads remain valid without the new field. For a usage-unknown item, `reconcile` requires finite non-negative CNY and the current revision; success updates the run budget cost/event and replaces actions with `approve-retry` and `terminate`; either terminal action removes the item; `approve-retry` requires a non-empty `newCallId`; stale revisions, missing required input, repeated terminal actions, and unknown actions return existing conflict/not-applicable envelopes rather than 500.
+Assert old decision payloads remain valid without the new fields. For a usage-unknown item, `reconcile` advertises and requires finite non-negative CNY plus the current revision; success updates the run budget cost/event and replaces actions with `approve-retry` (advertising `newCallIdRequired=true`) and `terminate`; either terminal action removes the item; `approve-retry` requires a non-empty `newCallId`; stale revisions, missing required input, repeated terminal actions, and unknown actions return existing conflict/not-applicable envelopes rather than 500.
 
 - [ ] **Step 2: Run RED**
 
@@ -191,7 +191,7 @@ Commit task files with message `feat(console): expose unknown usage decisions`.
 - Create: `bogda-console/tests/browser/decision-center.spec.ts`
 
 **Interfaces:**
-- Consumes: backend `DecisionAction.actualCostRequired`, action ids, and revisioned decision response.
+- Consumes: backend `DecisionAction.actualCostRequired`, `DecisionAction.newCallIdRequired`, and revisioned decision response.
 - Produces: accessible actual-cost and new-call-id fields shown only for the selected action that requires them; unchanged backend-driven decision rendering.
 
 - [ ] **Step 1: Write failing frontend tests**

@@ -34,6 +34,7 @@ from bogda_console.contracts.models import (
     DecisionCenterSnapshot,
     ModelBudgetSnapshot,
     ModelPolicySnapshot,
+    UsageBalanceSnapshot,
     RunPreparationPreview,
 )
 
@@ -157,6 +158,11 @@ async def run_model_budget(run_id: str, request: Request):
 @router.get("/model-policy", response_model=ApiEnvelope[ModelPolicySnapshot])
 async def model_policy(request: Request, project_id: str | None = Query(default=None, alias="projectId")):
     return await queries(request).model_policy(project_id)
+
+
+@router.get("/usage-balance", response_model=ApiEnvelope[UsageBalanceSnapshot])
+async def usage_balance(request: Request):
+    return await queries(request).usage_balance_snapshot()
 
 
 @router.post("/run-preparations/preview", response_model=ApiEnvelope[RunPreparationPreview])

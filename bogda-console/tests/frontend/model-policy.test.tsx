@@ -2,7 +2,7 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import { envelope, renderAppAt, sourceFresh, standardRoutes } from "./helpers";
+import { envelope, renderAppAt, sourceFresh, sourceStale, standardRoutes } from "./helpers";
 
 const policy = {
   projectId: "bogda-main",
@@ -60,8 +60,27 @@ function routes(projectId = "bogda-main") {
   result["/api/v1/capabilities"] = envelope(writableCapabilities(projectId), {
     modelControl: { ...sourceFresh, source: "modelControl" },
   });
-  result["/api/v1/model-policy"] = envelope({ ...policy, projectId }, {
+  result["/api/v1/model-policy"] = envelope({
+    ...policy,
+    projectId: null,
+    source: "global",
+    inheritsGlobal: false,
+    revision: 2,
+  }, {
     modelControl: { ...sourceFresh, source: "modelControl" },
+  });
+  result[`/api/v1/model-policy?projectId=${projectId}`] = envelope({ ...policy, projectId }, {
+    modelControl: { ...sourceFresh, source: "modelControl" },
+  });
+  result["/api/v1/usage-balance"] = envelope({
+    provider: "deepseek",
+    available: true,
+    totalBalance: "37.1250",
+    currency: "CNY",
+    observedAt: "2026-08-31T00:20:00Z",
+    sourceStatus: "up",
+  }, {
+    usageBalance: { ...sourceFresh, source: "usageBalance" },
   });
   return result;
 }
@@ -76,6 +95,124 @@ describe("ModelPolicyPage", () => {
     expect(within(region).getByText(/模型策略不属于科研自主模式/)).toBeVisible();
     expect(within(region).getByText("修订号")).toBeVisible();
     expect(within(region).getByText("4")).toBeVisible();
+    expect(within(region).getByText("账户余额")).toBeVisible();
+    expect(within(region).getByText("¥37.1250")).toBeVisible();
+  });
+
+  it("lets the owner edit the backend global policy with its own revision", async () => {
+    const user = userEvent.setup();
+    const result = routes();
+    let body: unknown;
+    result["/api/v1/model-policy/global"] = ({ init }) => {
+      body = JSON.parse(String(init?.body));
+      return envelope({
+        command: "setGlobalModelPolicy",
+        resourceId: "global",
+        acceptedAt: "2026-08-31T00:21:00Z",
+        snapshot: {
+          ...policy,
+          projectId: null,
+          source: "global",
+          inheritsGlobal: false,
+          minimumRemaining: "12.00",
+          revision: 3,
+        },
+      });
+    };
+    renderAppAt("/model-policy", result);
+    const region = await screen.findByRole("region", { name: "模型策略" });
+    await user.click(within(region).getByRole("button", { name: "全局默认" }));
+    const remaining = within(region).getByLabelText("最低剩余预算");
+    await user.clear(remaining);
+    await user.type(remaining, "12.00");
+    await user.click(within(region).getByRole("button", { name: "保存全局默认" }));
+    await user.click(screen.getByRole("button", { name: "确认保存" }));
+    expect(body).toEqual({ expectedRevision: 2, patch: { minimumRemaining: "12.00" } });
+  });
+
+  it("keeps policy controls usable when balance is unavailable", async () => {
+    const result = routes();
+    result["/api/v1/usage-balance"] = () => new Response(JSON.stringify(envelope(null, {}, [{
+      code: "USAGE_BALANCE_UNAVAILABLE",
+      message: "余额来源暂不可用",
+      source: "usageBalance",
+      retryable: true,
+    }])), { status: 503, headers: { "Content-Type": "application/json" } });
+    renderAppAt("/model-policy", result);
+    const region = await screen.findByRole("region", { name: "模型策略" });
+    expect(await within(region).findByText("余额来源暂不可用")).toBeVisible();
+    expect(within(region).getByLabelText("最低剩余预算")).toBeEnabled();
+  });
+
+  it("keeps a successful balance visible when model policy is unavailable", async () => {
+    const result = routes();
+    const unavailable = () => new Response(JSON.stringify(envelope(null, {}, [{
+      code: "MODEL_CONTROL_UNAVAILABLE",
+      message: "模型策略来源暂不可用",
+      source: "modelControl",
+      retryable: false,
+    }])), { status: 503, headers: { "Content-Type": "application/json" } });
+    result["/api/v1/model-policy"] = unavailable;
+    result["/api/v1/model-policy?projectId=bogda-main"] = unavailable;
+
+    renderAppAt("/model-policy", result);
+
+    const region = await screen.findByRole("region", { name: "模型策略" });
+    expect(await within(region).findByText("¥37.1250")).toBeVisible();
+    expect(within(region).getByText("模型策略来源暂不可用")).toBeVisible();
+  });
+
+  it("can switch to an available global policy when the project policy fails", async () => {
+    const user = userEvent.setup();
+    const result = routes();
+    result["/api/v1/model-policy?projectId=bogda-main"] = () => new Response(
+      JSON.stringify(envelope(null, {}, [{
+        code: "MODEL_CONTROL_UNAVAILABLE",
+        message: "项目策略来源暂不可用",
+        source: "modelControl",
+        retryable: false,
+      }])),
+      { status: 503, headers: { "Content-Type": "application/json" } },
+    );
+
+    renderAppAt("/model-policy", result);
+
+    const region = await screen.findByRole("region", { name: "模型策略" });
+    expect(within(region).getByText("模型策略来源暂不可用")).toBeVisible();
+    await user.click(within(region).getByRole("button", { name: "全局默认" }));
+    expect(await within(region).findByRole("heading", { name: "全局默认" })).toBeVisible();
+  });
+
+  it("shows a rejected policy mutation instead of swallowing it", async () => {
+    const user = userEvent.setup();
+    const result = routes();
+    result["/api/v1/model-policy/projects/bogda-main"] = () => new Response(
+      JSON.stringify(envelope(null, {}, [{
+        code: "COMMAND_REJECTED",
+        message: "策略写入被服务端拒绝",
+        source: "modelControl",
+        retryable: false,
+      }])),
+      { status: 409, headers: { "Content-Type": "application/json" } },
+    );
+    renderAppAt("/model-policy", result);
+    const region = await screen.findByRole("region", { name: "模型策略" });
+    await user.clear(within(region).getByLabelText("最低剩余预算"));
+    await user.type(within(region).getByLabelText("最低剩余预算"), "9.00");
+    await user.click(within(region).getByRole("button", { name: "保存项目默认" }));
+    await user.click(screen.getByRole("button", { name: "确认保存" }));
+    expect(await within(region).findByRole("alert")).toHaveTextContent("策略写入被服务端拒绝");
+  });
+
+  it("blocks policy writes when the authoritative policy snapshot is stale", async () => {
+    const result = routes();
+    result["/api/v1/model-policy?projectId=bogda-main"] = envelope(policy, {
+      modelControl: { ...sourceStale, source: "modelControl" },
+    });
+    renderAppAt("/model-policy", result);
+    const region = await screen.findByRole("region", { name: "模型策略" });
+    expect(await within(region).findByLabelText("最低剩余预算")).toBeDisabled();
+    expect(within(region).getByText(/权威快照不是实时数据/)).toBeVisible();
   });
 
   it("restores inheritance against the capability projectId", async () => {

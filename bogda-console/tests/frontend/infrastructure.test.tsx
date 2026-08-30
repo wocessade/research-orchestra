@@ -39,4 +39,17 @@ describe("InfrastructurePage", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("基础设施来源暂不可用");
     expect(screen.queryByText("0 个工作池")).not.toBeInTheDocument();
   });
+
+  it("does not turn a deployment query failure into an empty deployment list", async () => {
+    const routes = standardRoutes();
+    routes["/api/v1/deployments"] = () => new Response(JSON.stringify(envelope(null, {}, [{
+      code: "PREFECT_UNAVAILABLE",
+      message: "deployment query failed",
+      source: "prefect",
+      retryable: true,
+    }])), { status: 503, headers: { "Content-Type": "application/json" } });
+    renderAppAt("/infrastructure", routes);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Deployment 来源暂不可用");
+    expect(screen.queryByText("0 个")).not.toBeInTheDocument();
+  });
 });

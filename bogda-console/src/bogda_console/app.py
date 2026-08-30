@@ -20,6 +20,7 @@ from bogda_console.adapters.mock_run_results import MockRunResultAdapter
 from bogda_console.adapters.mock_model_control import MockModelControlAdapter
 from bogda_console.adapters.unwired_autonomy_policy import UnwiredAutonomyPolicyAdapter
 from bogda_console.adapters.unwired_model_control import UnwiredModelControlAdapter
+from bogda_console.adapters.deepseek_balance import DeepSeekBalanceAdapter, MockUsageBalanceAdapter
 from bogda_console.api.routes import router
 from bogda_console.config import Settings
 from bogda_console.contracts.models import (
@@ -50,6 +51,7 @@ class Container:
     commands: CommandService
     policy: Any
     model_control: Any
+    usage_balance: Any
 
     @classmethod
     def build(cls, settings: Settings, scenario: str | None = None) -> "Container":
@@ -64,9 +66,13 @@ class Container:
             power = MockPowerAdapter(load_fixture(settings.fixture_scenario))
             policy = UnwiredAutonomyPolicyAdapter()
             model_control = UnwiredModelControlAdapter()
-            queries = QueryService(settings=settings, prefect=prefect, results=prefect, power=power, policy=policy, model_control=model_control)
+            usage_balance = DeepSeekBalanceAdapter(
+                settings.deepseek_api_key,
+                api_base=settings.deepseek_api_base,
+            )
+            queries = QueryService(settings=settings, prefect=prefect, results=prefect, power=power, policy=policy, model_control=model_control, usage_balance=usage_balance)
             commands = CommandService(settings=settings, prefect=prefect, results=prefect, policy=policy, model_control=model_control)
-            return cls(settings, prefect, prefect, power, queries, commands, policy, model_control)
+            return cls(settings, prefect, prefect, power, queries, commands, policy, model_control, usage_balance)
         fixture = load_fixture(scenario or settings.fixture_scenario)
         prefect = MockPrefectAdapter(fixture)
         results = MockRunResultAdapter(fixture)
@@ -74,6 +80,7 @@ class Container:
         clock = datetime.fromisoformat(str(fixture["clock"]).replace("Z", "+00:00"))
         policy = MockAutonomyPolicyAdapter()
         model_control = MockModelControlAdapter()
+        usage_balance = MockUsageBalanceAdapter(now=lambda: clock)
         queries = QueryService(
             settings=settings,
             prefect=prefect,
@@ -82,6 +89,7 @@ class Container:
             now=lambda: clock,
             policy=policy,
             model_control=model_control,
+            usage_balance=usage_balance,
         )
         commands = CommandService(
             settings=settings,
@@ -91,7 +99,7 @@ class Container:
             policy=policy,
             model_control=model_control,
         )
-        return cls(settings, prefect, results, power, queries, commands, policy, model_control)
+        return cls(settings, prefect, results, power, queries, commands, policy, model_control, usage_balance)
 
     def for_scenario(self, scenario: str) -> "Container":
         if self.settings.profile != "mock-all":

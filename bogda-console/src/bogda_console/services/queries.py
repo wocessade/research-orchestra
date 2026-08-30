@@ -28,6 +28,7 @@ from bogda_console.contracts.models import (
     DecisionCenterSnapshot,
     ModelBudgetSnapshot,
     ModelPolicySnapshot,
+    UsageBalanceSnapshot,
     RunPreparationPreview,
     WorkloadEstimate,
     AllowedRunPreferences,
@@ -39,6 +40,7 @@ from bogda_console.contracts.ports import (
     RunResultPort,
     ModelControlQueryPort,
     ModelControlUnavailable, ModelControlNotFound,
+    UsageBalancePort, UsageBalanceUnavailable,
 )
 from bogda_console.services.errors import ServiceError, SourceUnavailable
 from bogda_console.services.snapshots import LastGoodReader, SourceRead
@@ -58,6 +60,7 @@ class QueryService:
         now: Callable[[], datetime] | None = None,
         policy: AutonomyPolicyPort | None = None,
         model_control: ModelControlQueryPort | None = None,
+        usage_balance: UsageBalancePort | None = None,
     ) -> None:
         self.settings = settings
         self.prefect = prefect
@@ -65,6 +68,7 @@ class QueryService:
         self.power = power
         self.policy = policy
         self.model_control = model_control
+        self.usage_balance = usage_balance
         self._now = now or (lambda: datetime.now(UTC))
         self._readers: dict[str, LastGoodReader[Any]] = {}
 
@@ -92,6 +96,42 @@ class QueryService:
                 canPreparePaidRun=self.settings.model_control_enabled,
             ),
             sources={},
+            errors=[],
+        )
+
+    async def usage_balance_snapshot(self) -> ApiEnvelope[UsageBalanceSnapshot]:
+        if self.usage_balance is None:
+            raise ServiceError(
+                ApiErrorCode.USAGE_BALANCE_UNAVAILABLE,
+                "Usage balance backend is not wired",
+                source="usageBalance",
+                retryable=False,
+                status_code=503,
+            )
+        try:
+            snapshot = await self.usage_balance.get_balance()
+        except UsageBalanceUnavailable as error:
+            raise ServiceError(
+                ApiErrorCode.USAGE_BALANCE_UNAVAILABLE,
+                str(error),
+                source="usageBalance",
+                retryable=True,
+                status_code=503,
+            ) from None
+        now = self._now()
+        return ApiEnvelope(
+            data=snapshot,
+            sources={
+                "usageBalance": SourceMeta(
+                    source="usageBalance",
+                    sourceMode=getattr(self.usage_balance, "source_mode", "real"),
+                    observedAt=snapshot.observed_at,
+                    receivedAt=now,
+                    lastSuccessfulAt=snapshot.observed_at,
+                    staleAfterSeconds=120,
+                    freshness=Freshness.FRESH,
+                )
+            },
             errors=[],
         )
 

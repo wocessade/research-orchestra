@@ -429,6 +429,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/usage-balance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Usage Balance */
+        get: operations["usage_balance_api_v1_usage_balance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/work-queues/{queue_id}/pause": {
         parameters: {
             query?: never;
@@ -688,6 +705,16 @@ export interface components {
                 [key: string]: components["schemas"]["SourceMeta"];
             };
         };
+        /** ApiEnvelope[UsageBalanceSnapshot] */
+        ApiEnvelope_UsageBalanceSnapshot_: {
+            data: components["schemas"]["UsageBalanceSnapshot"] | null;
+            /** Errors */
+            errors?: components["schemas"]["ApiError"][];
+            /** Sources */
+            sources?: {
+                [key: string]: components["schemas"]["SourceMeta"];
+            };
+        };
         /** ApiError */
         ApiError: {
             code: components["schemas"]["ApiErrorCode"];
@@ -703,7 +730,7 @@ export interface components {
          * ApiErrorCode
          * @enum {string}
          */
-        ApiErrorCode: "PREFECT_UNAVAILABLE" | "RUN_RESULT_UNAVAILABLE" | "POWER_UNAVAILABLE" | "AUTONOMY_POLICY_UNAVAILABLE" | "MODEL_CONTROL_UNAVAILABLE" | "PROJECT_CONTEXT_UNAVAILABLE" | "RESULT_MISSING" | "RESULT_INVALID" | "REVIEW_CONFLICT" | "RESOURCE_CHANGED" | "RESOURCE_NOT_ALLOWLISTED" | "COMMAND_NOT_APPLICABLE" | "COMMAND_REJECTED" | "COMMAND_OUTCOME_MISMATCH" | "COMMAND_OUTCOME_UNKNOWN" | "INFRASTRUCTURE_MISCONFIGURED" | "NOT_FOUND" | "VALIDATION_ERROR" | "INTERNAL_ERROR";
+        ApiErrorCode: "PREFECT_UNAVAILABLE" | "RUN_RESULT_UNAVAILABLE" | "POWER_UNAVAILABLE" | "AUTONOMY_POLICY_UNAVAILABLE" | "MODEL_CONTROL_UNAVAILABLE" | "USAGE_BALANCE_UNAVAILABLE" | "PROJECT_CONTEXT_UNAVAILABLE" | "RESULT_MISSING" | "RESULT_INVALID" | "REVIEW_CONFLICT" | "RESOURCE_CHANGED" | "RESOURCE_NOT_ALLOWLISTED" | "COMMAND_NOT_APPLICABLE" | "COMMAND_REJECTED" | "COMMAND_OUTCOME_MISMATCH" | "COMMAND_OUTCOME_UNKNOWN" | "INFRASTRUCTURE_MISCONFIGURED" | "NOT_FOUND" | "VALIDATION_ERROR" | "INTERNAL_ERROR";
         /** ApiErrorDetails */
         ApiErrorDetails: {
             /** Currentresource */
@@ -1644,6 +1671,36 @@ export interface components {
          * @enum {string}
          */
         UrgencyGroup: "needs-owner-now" | "has-deadline" | "for-information";
+        /** UsageBalanceSnapshot */
+        UsageBalanceSnapshot: {
+            /**
+             * Available
+             * @constant
+             */
+            available: true;
+            /**
+             * Currency
+             * @constant
+             */
+            currency: "CNY";
+            /**
+             * Observedat
+             * Format: date-time
+             */
+            observedAt: string;
+            /**
+             * Provider
+             * @constant
+             */
+            provider: "deepseek";
+            /**
+             * Sourcestatus
+             * @constant
+             */
+            sourceStatus: "up";
+            /** Totalbalance */
+            totalBalance: string;
+        };
         /** ValidRunResult */
         ValidRunResult: {
             /** Attempt */
@@ -2491,6 +2548,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    usage_balance_api_v1_usage_balance_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiEnvelope_UsageBalanceSnapshot_"];
                 };
             };
         };

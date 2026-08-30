@@ -5,11 +5,17 @@ export function envelopeHasErrors(envelope: Envelope<unknown> | undefined | null
   return Boolean(envelope?.errors.length);
 }
 
+export function envelopeHasNonFreshSources(envelope: Envelope<unknown> | undefined | null) {
+  return Object.values(envelope?.sources ?? {}).some((source) => source.freshness !== "fresh");
+}
+
 const sourceNames: Record<string, string> = {
   prefect: "Prefect",
   runResult: "RunResult Artifact",
   power: "Power Agent",
   modelControl: "模型控制",
+  usageBalance: "账户余额",
+  autonomyPolicy: "科研自主策略",
 };
 
 export function SourceStrip({ sources }: { sources: Record<string, SourceMeta> }) {

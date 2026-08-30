@@ -77,6 +77,7 @@ class ApiErrorCode(StrEnum):
     POWER_UNAVAILABLE = "POWER_UNAVAILABLE"
     AUTONOMY_POLICY_UNAVAILABLE = "AUTONOMY_POLICY_UNAVAILABLE"
     MODEL_CONTROL_UNAVAILABLE = "MODEL_CONTROL_UNAVAILABLE"
+    USAGE_BALANCE_UNAVAILABLE = "USAGE_BALANCE_UNAVAILABLE"
     PROJECT_CONTEXT_UNAVAILABLE = "PROJECT_CONTEXT_UNAVAILABLE"
     RESULT_MISSING = "RESULT_MISSING"
     RESULT_INVALID = "RESULT_INVALID"
@@ -561,6 +562,17 @@ class ModelPolicySnapshot(ImmutableWireModel):
     price_catalog: PriceCatalog
     hard_safety_baselines: HardSafetyBaselines = HardSafetyBaselines()
     revision: int = Field(ge=0)
+
+
+class UsageBalanceSnapshot(ImmutableWireModel):
+    provider: Literal["deepseek"]
+    available: Literal[True]
+    total_balance: Decimal = Field(ge=0)
+    currency: Literal["CNY"]
+    observed_at: datetime
+    source_status: Literal["up"]
+
+    _balance_observed_utc = field_validator("observed_at")(_utc_datetime)
 
 
 class RunPreparationPreview(ImmutableWireModel):

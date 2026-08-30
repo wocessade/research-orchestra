@@ -33,6 +33,8 @@ class Settings:
     test_mode: bool
     prefect_api_url: str | None
     prefect_api_key: str | None
+    deepseek_api_key: str | None
+    deepseek_api_base: str
     replica_count: int
     allowed_deployment_ids: frozenset[str]
     allowed_schedule_ids: frozenset[str]
@@ -61,6 +63,8 @@ class Settings:
             test_mode=env.get("BOGDA_CONSOLE_TEST_MODE", "0") == "1",
             prefect_api_url=env.get("PREFECT_API_URL"),
             prefect_api_key=env.get("PREFECT_API_KEY"),
+            deepseek_api_key=env.get("DEEPSEEK_API_KEY"),
+            deepseek_api_base=env.get("DEEPSEEK_API_BASE", "https://api.deepseek.com"),
             replica_count=replica_count,
             allowed_deployment_ids=_exact_set(
                 env.get("BOGDA_CONSOLE_ALLOWED_DEPLOYMENT_IDS")

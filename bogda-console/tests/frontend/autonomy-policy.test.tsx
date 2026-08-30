@@ -2,7 +2,7 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import { envelope, renderAppAt, standardRoutes } from "./helpers";
+import { envelope, renderAppAt, sourceStale, standardRoutes } from "./helpers";
 
 const FUTURE_RUNS_COPY = "只影响之后创建的运行；正在运行和已经创建的任务继续使用其冻结模式。";
 const AUTONOMOUS_GUARD_COPY = "科研结论、对外发布、新增支出和超预算实验仍需人工批准。";
@@ -174,6 +174,33 @@ describe("research autonomy controls", () => {
     const region = screen.getByRole("region", { name: "科研自主模式" });
     expect(within(region).getByText("7")).toBeVisible();
     expect(within(region).getAllByText("范围内自主").length).toBeGreaterThan(0);
+  });
+
+  it("shows a non-conflict mutation rejection", async () => {
+    const user = userEvent.setup();
+    const routes = writableRoutes(policySnapshot(), {
+      "/api/v1/autonomy-policy/global": () => new Response(JSON.stringify(envelope(null, {}, [{
+        code: "COMMAND_REJECTED",
+        message: "自主策略写入被拒绝",
+        source: "autonomyPolicy",
+        retryable: false,
+      }])), { status: 409, headers: { "Content-Type": "application/json" } }),
+    });
+    renderAppAt("/", routes);
+    await user.click(await screen.findByRole("radio", { name: "手动" }));
+    await user.click(screen.getByRole("button", { name: "确认切换" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("自主策略写入被拒绝");
+  });
+
+  it("blocks autonomy writes from a stale policy snapshot", async () => {
+    const routes = writableRoutes();
+    routes["/api/v1/autonomy-policy"] = envelope(policySnapshot(), {
+      autonomyPolicy: { ...sourceStale, source: "autonomyPolicy" },
+    });
+    renderAppAt("/", routes);
+    const region = await screen.findByRole("region", { name: "科研自主模式" });
+    expect(within(region).getByRole("radio", { name: "手动" })).toBeDisabled();
+    expect(within(region).getByText(/权威快照不是实时数据/)).toBeVisible();
   });
 
   it("disables controls on a readonly profile and names the profile", async () => {

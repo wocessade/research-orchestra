@@ -24,6 +24,7 @@ from bogda_console.contracts.models import (
     ModelBudgetSnapshot,
     ModelPolicySnapshot,
     ModelPolicyPatch,
+    UsageBalanceSnapshot,
     RunPreparationPreview,
     WorkloadEstimate,
     AllowedRunPreferences,
@@ -103,6 +104,15 @@ class ModelControlNotApplicable(Exception):
 
 class ModelControlUnavailable(Exception):
     pass
+
+
+class UsageBalanceUnavailable(Exception):
+    pass
+
+
+@runtime_checkable
+class UsageBalancePort(Protocol):
+    async def get_balance(self) -> UsageBalanceSnapshot: ...
 
 
 @runtime_checkable

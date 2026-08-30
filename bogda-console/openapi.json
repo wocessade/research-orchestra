@@ -744,6 +744,40 @@
         "title": "ApiEnvelope[RunResultView]",
         "type": "object"
       },
+      "ApiEnvelope_UsageBalanceSnapshot_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UsageBalanceSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SourceMeta"
+            },
+            "title": "Sources",
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiEnvelope[UsageBalanceSnapshot]",
+        "type": "object"
+      },
       "ApiError": {
         "additionalProperties": false,
         "properties": {
@@ -789,6 +823,7 @@
           "POWER_UNAVAILABLE",
           "AUTONOMY_POLICY_UNAVAILABLE",
           "MODEL_CONTROL_UNAVAILABLE",
+          "USAGE_BALANCE_UNAVAILABLE",
           "PROJECT_CONTEXT_UNAVAILABLE",
           "RESULT_MISSING",
           "RESULT_INVALID",
@@ -3596,6 +3631,51 @@
         "title": "UrgencyGroup",
         "type": "string"
       },
+      "UsageBalanceSnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "available": {
+            "const": true,
+            "title": "Available",
+            "type": "boolean"
+          },
+          "currency": {
+            "const": "CNY",
+            "title": "Currency",
+            "type": "string"
+          },
+          "observedAt": {
+            "format": "date-time",
+            "title": "Observedat",
+            "type": "string"
+          },
+          "provider": {
+            "const": "deepseek",
+            "title": "Provider",
+            "type": "string"
+          },
+          "sourceStatus": {
+            "const": "up",
+            "title": "Sourcestatus",
+            "type": "string"
+          },
+          "totalBalance": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Totalbalance",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "available",
+          "totalBalance",
+          "currency",
+          "observedAt",
+          "sourceStatus"
+        ],
+        "title": "UsageBalanceSnapshot",
+        "type": "object"
+      },
       "ValidRunResult": {
         "additionalProperties": true,
         "properties": {
@@ -4895,6 +4975,24 @@
           }
         },
         "summary": "Scenario"
+      }
+    },
+    "/api/v1/usage-balance": {
+      "get": {
+        "operationId": "usage_balance_api_v1_usage_balance_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_UsageBalanceSnapshot_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Usage Balance"
       }
     },
     "/api/v1/work-queues/{queue_id}/pause": {

@@ -19,15 +19,16 @@
 |---|---|---|---|
 | NOW-01 | Phase C Task 5–6：Prefect 挂起边界、fake 集成验收与维护者交接 | 已完成本地交接；真实部署/生产验证仍见 DEF-02/03/12 | [Phase C acceptance 报告](2026-08-29-bogda-paid-model-runtime-acceptance.md)、一次最终 Bogda full suite、Orchestra 兼容测试 |
 | NOW-02 | Stage D：owner 可操作的前端裁决面与状态可视化 | **本报告关闭 mock 剖面**；真实 usage/调度仍见 DEF-01/03 | [Stage D acceptance](2026-08-29-bogda-owner-console-acceptance.md)、浏览器/前端/契约矩阵 |
-| NOW-03 | Stage E：运行接线与迁移前验收 | Stage D 后继续；仍不默认授权 live spend/production mutation | 影子/强制门禁证据、回滚与运维说明 |
-| NOW-04 | Gate 6 收尾 | `20260828T064220Z` 因 USB SSD 断连和 120 次 API 失败已收口为失败；新 trial 等待 DEF-15 的 owner-approved 维护 | [Gate 6 失败报告](2026-08-29-bogda-rk3528-gate6-failure.md)、新 trial 与剩余 blocker 清单 |
+| NOW-03 | Stage E：运行接线与迁移前验收 | Task 1–4：ledger、paid-call+SQLite、官方余额 **live GET**、本机 Flash/Pro dsh stdout `pong`。缺 `usage.json` 精确对账。真 suspend 未做。Gate 6 **未通过** | [Stage E 开工](2026-08-30-bogda-stage-e-start.md)、[计划](../superpowers/plans/2026-08-30-bogda-stage-e.md) |
+| NOW-04 | Gate 6 收尾 | trial `20260830T154019Z` 进行中，预计 2026-08-31 23:40:20（北京时间）结束。受控 reboot 与独立 restore **已做**；带盘冷启动仍会被旧 e2fsck `FEATURE_C12` 挡住 | [reboot/restore](2026-08-30-bogda-rk3528-gate6-reboot-restore.md)、[新 trial](2026-08-30-bogda-rk3528-gate6-retrial-start.md) |
+| NOW-05 | Runner 开工包本地准入 | `admit_runner_packet` + 6 个契约测试已过。未接线到 Prefect worker / 3101 | [spec](../superpowers/specs/2026-08-30-bogda-runner-dsh-design.md) §5.7、[计划](../superpowers/plans/2026-08-30-bogda-runner-packet.md) |
 
 ## 必要延期项
 
 | ID | 必要结果 | 当前不做的原因 | 启动触发 | owner/前端操作面 | 目标阶段与验收 |
 |---|---|---|---|---|---|
-| DEF-01 | 接入真实只读 usage/balance API，包括鉴权、币种、120 秒新鲜度与不可达 fail-closed | Phase C 只使用 fake，避免触碰生产凭据和 3101/现网 | owner 提供/确认真实 endpoint、token 来源与只读窗口 | 全局策略页显示余额、快照时间、来源和错误；不可用时给恢复动作 | Stage E；先只读展示，再影子决策，契约测试覆盖未授权/缺字段/过期 |
-| DEF-02 | 真实 dsh/DeepSeek Flash 与 Pro 最小 smoke，确认 argv、patch、`usage.json` 和 provider exact cost | 会产生真实费用，当前未获 live spend 授权 | owner 明确批准费用上限与执行时段 | 启动前确认显示模型、最高费用、峰谷窗口；结果链接 receipt/事件 | Stage E；Flash/Pro 各一次受限调用，无秘密落盘，能精确对账 |
+| DEF-01 | 接入真实只读 usage/balance API，包括鉴权、币种、120 秒新鲜度与不可达 fail-closed | **本地 3101 契约/API/UI 已接线**；live GET 曾于 2026-08-30 成功，但 Mission 048 未再次调用真实来源 | 在 real-readonly profile 配置 `DEEPSEEK_API_KEY` 后做只读验收 | 模型策略页显示账户余额、快照时间、来源、新鲜度和独立错误状态 | Stage E；本地测试/构建与 mock UI 已闭环；生产只读验收仍待 |
+| DEF-02 | 真实 dsh/DeepSeek Flash 与 Pro 最小 smoke，确认 argv、patch、`usage.json` 和 provider exact cost | argv/patch/stdout **已通**（pong）。**无** `usage.json`；owner 于 2026-08-31 明确精确 token 回执不是当前必要项 | 需要按 token 精确对账、优化历史 p90，或余额差额不足以判断实际费用时 | 结果页链接 receipt；缺失时继续显示 `usage_unknown`，不得当作免费成功 | Stage E 后续；当前保留预留、禁止同 call 自动重试的 fail-closed 行为 |
 | DEF-03 | Prefect deployment、持久化结果存储与 worker 重调度的真实 suspend/resume 验证 | Phase C 只证明代码边界；真实 `suspend_flow_run` 要 deployment 与持久化配置 | Gate 6 允许操作目标 Prefect 环境且备份/回滚就绪 | 运行详情显示挂起原因、恢复条件、deployment/run 链接 | Stage E/Gate 6；worker 被释放，恢复后同一冻结 envelope 重检且只写一次 resume 事件 |
 | DEF-04 | usage unknown 的人工对账闭环：查看 receipt/产物、录入或拉取实际费用、批准重试/终止、释放或对账预留 | 当前仅有 fail-safe barrier，没有 owner 命令/API/窗口 | 第一条真实 provider 调用前 | 决策中心必须提供“先对账、确认重试、终止”，禁止无提示一键重试 | Stage D+E；所有动作写结构化审批事件，同 call 不重复付费 |
 | DEF-05 | 将进程内 SingleFlight ledger、call claim 和终态事件投递替换为跨进程原子预留/持久 outbox | Phase C 明确限定单进程；过早引入数据库会增加复杂度 | worker 并发大于 1、跨进程恢复或正式多节点执行前 | 全局策略页只展示并发/锁状态；不能提供绕过锁的普通开关 | Stage E/切换前；崩溃恢复、并发相同 call、终态事件失败均不会重复付费 |
@@ -37,10 +38,14 @@
 | DEF-09 | 价格目录生命周期：到期前更新、来源审计、失效 fail-closed、前端告警 | 当前目录 `review_by=2026-09-28`，不会自动更新 | 到 review_by 前或 DeepSeek 价格变更时 | 全局策略页显示版本、来源、生效/复核日期；失效时给更新入口 | Stage E 运维；新旧版本回归、未知版本拒绝、无猜价 |
 | DEF-10 | 实际消耗反馈到 workload 估算、历史 p90、安全系数和后续调用预算 | 当前只完成单次精确对账，尚未形成历史反馈闭环 | 有足够真实调用样本后 | 运行详情显示预测/实际偏差；策略页显示调整依据，不自动扩大当前预算 | Stage E 后续；偏差告警与下一次预测变化可复现 |
 | DEF-11 | Orchestra → Bogda 单向生产迁移与第三维兼容映射，最终冻结 Orchestra 为只读历史 | 迁移期禁止双调度/双事实源；当前只复用契约/patch 语义 | Stage D/E 独立验收完成并由 owner 批准切换 | 切换窗口显示任务范围、兼容映射、回滚点和不可逆影响 | Gate 6/切换阶段；任务转换测试、无 Bogda runtime import Orchestra、3100/3101 事实源不冲突 |
-| DEF-12 | 生产运维接线：密钥注入、systemd/worker、日志保留、备份/恢复、告警和回滚 | 当前明确禁止改生产、密钥、systemd、Prefect DB | Gate 6 变更窗和备份确认 | 运维窗口显示目标主机/服务/版本/回滚；敏感值永不回显 | Gate 6；runbook 演练、健康检查、回滚验证、秘密扫描通过 |
+| DEF-12 | 生产运维接线：密钥注入、systemd/worker、日志保留、备份/恢复、告警和回滚 | remount 自愈两份 unit 已于 2026-08-30 热修；仍禁止无授权 `install.sh`、改 `bogda.env`、动 live `prefect.db` | 新 Gate 6 变更窗和备份确认 | 运维窗口显示目标主机/服务/版本/回滚；敏感值永不回显 | Gate 6；runbook 演练、健康检查、回滚验证、秘密扫描通过 |
 | DEF-13 | 运行产物生命周期：prompt/stdout/stderr/receipt 的权限、保留期、清理与科研可复现引用 | Phase C 只定义落盘与脱敏，没有生产保留策略 | 正式产生真实科研产物前 | 运行详情提供可点击引用和权限状态；清理必须是显式受控动作 | Stage E；保留/清理不破坏事件引用，秘密扫描与恢复抽查通过 |
 | DEF-14 | 高风险科学/外部动作统一审批：结果 accepted/rejected/inconclusive、发布、采购、新增支出 | 决策跑道 mock 已有；真实科研结论仍走 RunResult 评审，不把 Prefect Completed 当成 accepted | 真实决策源接入后回归 | 每个窗口显示证据、费用/质量影响、不可逆后果和日志摘要 | Stage D mock 路径已测；生产审批仍待 Stage E |
-| DEF-15 | RK3528 USB/SSD 稳定性整改并重跑 Gate 6 | 失败轮发生 USB SSD 断连、ext4 journal abort、Prefect server/worker 停止；只读证据不能修复物理/运行状态 | owner 批准维护窗、设备检查、离线文件系统/SSD 健康检查和服务恢复 | 运维窗口显示目标设备、检查步骤、备份、回滚与新 trial 编号；不能把重挂载当成通过 | Gate 6；根因证据、服务恢复、全新 24h trial、每日快照、受控 reboot、独立 restore 全部通过 |
+| DEF-15 | RK3528 USB/SSD 稳定性整改并重跑 Gate 6 | 失败轮：USB 断连、ext4 journal abort、server/worker 停后不自愈。**已做：** remount 自愈 unit、Prefect 恢复、受控 reboot、独立 restore，并已启动新 24h trial。**未做：** 等待 trial 到期验收、离线 fsck / SMART | 当前 trial 到期后核验；物理检查可在下次卸载窗做 | 运维窗口显示目标设备、检查步骤、备份、回滚与新 trial 编号；不能把重挂载或 API 200 当成通过 | Gate 6；当前仍未通过，需 trial 全时段证据和剩余 blocker 全部闭环。恢复记录：[2026-08-30](2026-08-30-bogda-rk3528-prefect-restore.md) |
+| DEF-16 | 超过 20 CNY 的预算在 owner 批准后形成不可伪造、可重放审计的核心审批凭证，并允许同一冻结 envelope 继续准入 | `BudgetGuard` 已对 envelope 授权额或实际预留额 `>20 CNY` fail-closed 为 `owner_approval_required`，且运行时只能收紧该安全上限；真实 model-control/decision store 尚未接到核心 admission | 第一次需要执行 `>20 CNY` 的真实运行前 | 决策中心展示 envelope、模型、峰谷、余额和批准上限；批准后生成绑定 run/pricing/revision 的凭证 | Stage E；伪造/过期/错 run 凭证拒绝，合法凭证只消费一次，事件日志完整 |
+| DEF-17 | 运行详情可读取受控的原始 stdout/stderr/结构化运行日志，而不只显示 metadata URI | 当前 UI 能看 budget events、结果版本和产物引用，但没有安全的日志内容 API；不能把 URI 引用冒充“日志已可读” | 真实 worker 产物存储与权限模型确定后 | 运行详情提供按来源/时间/级别筛选、截断提示和下载；秘密脱敏且不得任意读宿主路径 | Stage E/运维；权限、路径穿越、截断、保留期和恢复测试通过 |
+| DEF-18 | 将 console 与 Bogda core 的 DeepSeek balance 解析实现收敛为一个共享适配器或由 core 暴露只读内部服务 | 3101 是独立可安装包，本轮为避免不可移植的相对包依赖，使用了端口隔离的 console anti-corruption adapter | real-readonly 进入生产部署前 | 前端契约不变，只替换后端注入；不得改变余额语义或泄漏凭据 | Stage E 生产化；共享契约测试覆盖两入口，删除重复 provider payload 解析 |
+| DEF-19 | 对真实 profile 建立身份与角色边界，区分 owner、只读观察者和运维管理员 | 当前 capability 由部署 profile 控制，不是用户级授权；mock 控制完整不等于生产 RBAC 完成 | 3101 对多用户或非本机开放前 | 前端显示当前身份/角色；每个动作同时由服务端授权，不能只靠禁用按钮 | 正式切换前；越权 API 测试、审计主体、会话失效与最小权限验收通过 |
 
 ## 明确不登记为必要目标
 

@@ -45,6 +45,8 @@ from bogda.model_runtime import (
     PaidModelEventError,
     PaidModelExecutionError,
     PromptArtifactV1,
+    SqliteUsageUnknownStore,
+    UsageUnknownRecoveryService,
 )
 
 
@@ -170,6 +172,7 @@ def service_for(
     id_factory: Callable[[], str] | None = None,
     catalogs: tuple = (),
     ledger=None,
+    recovery_store=None,
 ):
     actual_sink = sink or MemorySink()
     if ledger is None:
@@ -187,6 +190,14 @@ def service_for(
         event_sink=actual_sink,
         clock=lambda: NOW,
     )
+    recovery = None
+    if recovery_store is not None:
+        recovery = UsageUnknownRecoveryService(
+            store=recovery_store,
+            budget=budget,
+            event_sink=actual_sink,
+            clock=service_clock or (lambda: NOW),
+        )
     executor = FakeExecutor(result)
     service = PaidModelCallService(
         router=ModelRouter(),
@@ -195,6 +206,7 @@ def service_for(
         event_sink=actual_sink,
         executor=executor,
         clock=service_clock or (lambda: NOW),
+        recovery=recovery,
     )
     return service, actual_sink, ledger, executor
 
@@ -438,6 +450,35 @@ def test_unknown_usage_keeps_reservation_and_repeat_requires_reconciliation(tmp_
         RunEventType.MODEL_CALL_STARTED,
         RunEventType.MODEL_CALL_USAGE_UNKNOWN,
     ]
+
+
+def test_unknown_usage_opens_durable_case_after_usage_event(tmp_path: Path) -> None:
+    recovery_store = SqliteUsageUnknownStore(
+        tmp_path / "recovery.sqlite",
+        clock=lambda: NOW,
+        id_factory=lambda: "case-1",
+    )
+    service, sink, ledger, executor = service_for(
+        tmp_path,
+        ModelCallResult(outcome=ModelCallOutcome.USAGE_UNKNOWN, output="partial secret"),
+        recovery_store=recovery_store,
+    )
+
+    result = service.execute(
+        "run-1", "call-1", request(), PROMPT, tmp_path / "attempt",
+        pro_available=True, allow_low_risk_fallback=False,
+    )
+
+    assert result.status is PaidCallStatus.USAGE_UNKNOWN
+    case = recovery_store.get_case("case-1")
+    assert case.run_id == "run-1"
+    assert case.call_id == "call-1"
+    assert case.reservation_id == "reservation-1"
+    assert case.state.value == "awaiting_reconciliation"
+    assert [event.event for event in sink.events][-1] is RunEventType.MODEL_CALL_USAGE_UNKNOWN
+    assert ledger.active_total == Decimal("2")
+    assert len(executor.calls) == 1
+    recovery_store.close()
 
 
 def test_executor_exception_blocks_same_call_retry(tmp_path: Path) -> None:

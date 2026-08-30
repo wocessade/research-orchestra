@@ -23,6 +23,7 @@ from bogda.contracts import ModelTier, PricePreference, SchedulePolicy, TaskInte
 class ScheduleDisposition(StrEnum):
     START_NOW = "start_now"
     WAIT_FOR_OFF_PEAK = "wait_for_off_peak"
+    WAIT_FOR_EARLIEST = "wait_for_earliest"
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,7 +62,8 @@ def _next_pricing_boundary(instant: datetime) -> datetime:
 
 def _next_off_peak_start(start: datetime, duration: timedelta) -> datetime | None:
     candidate = start
-    for _ in range(8):
+    weekly_horizon = start + timedelta(days=7)
+    while candidate < weekly_horizon:
         if period_for_window(candidate, candidate + duration) is PricePeriod.OFF_PEAK:
             return candidate
         candidate = _next_pricing_boundary(candidate)
@@ -94,6 +96,9 @@ class PriceAwareScheduler:
         earliest_start = policy.earliest_start or now
         effective_start = max(now, earliest_start)
         deadline = policy.deadline
+        if deadline is not None and effective_start + duration > deadline:
+            raise ValueError("runtime cannot finish before deadline")
+        waiting_for_earliest = effective_start > now
 
         current_estimate = self._estimator.estimate(
             intent=intent,
@@ -117,7 +122,11 @@ class PriceAwareScheduler:
                 history=history,
             )
             return self._build_plan(
-                disposition=ScheduleDisposition.START_NOW,
+                disposition=(
+                    ScheduleDisposition.WAIT_FOR_EARLIEST
+                    if waiting_for_earliest
+                    else ScheduleDisposition.START_NOW
+                ),
                 reason="immediate",
                 scheduled_start=scheduled_start,
                 current_estimate=current_estimate,
@@ -144,7 +153,9 @@ class PriceAwareScheduler:
             waiting = scheduled_start != now
             return self._build_plan(
                 disposition=(
-                    ScheduleDisposition.WAIT_FOR_OFF_PEAK
+                    ScheduleDisposition.WAIT_FOR_EARLIEST
+                    if waiting_for_earliest and scheduled_start == effective_start
+                    else ScheduleDisposition.WAIT_FOR_OFF_PEAK
                     if waiting
                     else ScheduleDisposition.START_NOW
                 ),
@@ -170,7 +181,11 @@ class PriceAwareScheduler:
             history=history,
         )
         return self._build_plan(
-            disposition=ScheduleDisposition.START_NOW,
+            disposition=(
+                ScheduleDisposition.WAIT_FOR_EARLIEST
+                if waiting_for_earliest
+                else ScheduleDisposition.START_NOW
+            ),
             reason="deadline_forced" if deadline is not None else "already_off_peak",
             scheduled_start=scheduled_start,
             current_estimate=current_estimate,

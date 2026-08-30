@@ -134,6 +134,46 @@ def test_future_earliest_start_is_respected() -> None:
     assert result.scheduled_period is PricePeriod.OFF_PEAK
 
 
+def test_long_run_scans_to_friday_weekend_off_peak_window() -> None:
+    result = plan(
+        now=datetime(2026, 8, 31, 10, 0, tzinfo=BEIJING),
+        runtime_minutes=24 * 60,
+        policy=SchedulePolicy(
+            deadline=datetime(2026, 9, 7, 19, 0, tzinfo=BEIJING)
+        ),
+    )
+
+    assert result.disposition is ScheduleDisposition.WAIT_FOR_OFF_PEAK
+    assert result.scheduled_start == datetime(
+        2026, 9, 4, 18, 0, tzinfo=BEIJING
+    )
+    assert result.scheduled_period is PricePeriod.OFF_PEAK
+
+
+def test_future_earliest_start_has_a_waiting_disposition_even_for_immediate() -> None:
+    result = plan(
+        now=datetime(2026, 8, 28, 10, 0, tzinfo=BEIJING),
+        policy=SchedulePolicy(
+            earliest_start=datetime(2026, 8, 28, 13, 0, tzinfo=BEIJING),
+            price_preference=PricePreference.IMMEDIATE,
+        ),
+    )
+
+    assert result.disposition is ScheduleDisposition.WAIT_FOR_EARLIEST
+    assert result.scheduled_start == datetime(2026, 8, 28, 13, 0, tzinfo=BEIJING)
+
+
+def test_deadline_before_effective_completion_is_rejected() -> None:
+    with pytest.raises(ValueError, match="runtime cannot finish before deadline"):
+        plan(
+            now=datetime(2026, 8, 28, 10, 0, tzinfo=BEIJING),
+            runtime_minutes=180,
+            policy=SchedulePolicy(
+                deadline=datetime(2026, 8, 28, 12, 0, tzinfo=BEIJING)
+            ),
+        )
+
+
 def test_deadline_that_cannot_fit_off_peak_run_starts_now_and_forces_deadline() -> None:
     result = plan(
         now=datetime(2026, 8, 28, 10, 0, tzinfo=BEIJING),

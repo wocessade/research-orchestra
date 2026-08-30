@@ -33,6 +33,7 @@ from bogda.flows.research_checkpoint import (
     required_checkpoints,
     wait_for_decision,
 )
+from bogda.flows.shell_job import JobExecutionError
 
 PLAN_TYPE = "bogda.research-plan"
 PROPOSAL_TYPE = "bogda.experiment-proposal"
@@ -170,12 +171,7 @@ def run_research_cycle(
         result = run_shell(parsed, Path(attempts_root), run_id)
         save_run_result(result)
         if result.execution_status is not ExecutionStatus.COMPLETED:
-            status = (
-                "missing_artifacts"
-                if "missing" in result.summary
-                else "failed"
-            )
-            return _payload(status, result.execution_status)
+            raise JobExecutionError(result)
 
         coordinator.observe_results(f"summarize results for {parsed.job_id}")
         _pause(run_id, CheckpointKind.SCIENTIFIC_REVIEW, parsed.autonomy_mode)

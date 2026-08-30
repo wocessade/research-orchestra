@@ -2,6 +2,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from prefect.states import StateType
 
 from bogda.agents.contracts import AgentBudget
 from bogda.agents.coordinator import TOOL_PROPOSE_EXPERIMENT, TOOL_WRITE_PLAN
@@ -13,8 +14,15 @@ from bogda.contracts import (
     ScientificStatus,
     TaskIntent,
 )
-from bogda.contracts.decisions import CheckpointKind
+from bogda.contracts.decisions import (
+    CheckpointKind,
+    DecisionVerdict,
+    ResearchDecision,
+    StageStatus,
+)
 from bogda.flows import research_cycle
+from bogda.flows.research_checkpoint import CheckpointRejected
+from bogda.flows.shell_job import JobExecutionError
 
 
 RUN_ID = "36c86e99-d0a1-4399-a30c-4d6c5044444c"
@@ -205,15 +213,16 @@ def test_missing_required_artifact_is_type_a_failure_not_accepted(monkeypatch, t
     monkeypatch.setattr(research_cycle, "save_proposal", lambda *_args, **_kwargs: None)
 
     argv = [__import__("sys").executable, "-c", "pass"]
-    returned = research_cycle.run_research_cycle.fn(
-        cycle_request(tmp_path, argv),
-        str(tmp_path),
-        cooperating_model(),
-    )
+    with pytest.raises(JobExecutionError) as raised:
+        research_cycle.run_research_cycle.fn(
+            cycle_request(tmp_path, argv),
+            str(tmp_path),
+            cooperating_model(),
+        )
 
-    assert returned["execution_status"] == ExecutionStatus.FAILED.value
-    assert returned["scientific_status"] == ScientificStatus.UNREVIEWED.value
-    assert returned["status"] == "missing_artifacts"
+    assert raised.value.result.execution_status is ExecutionStatus.FAILED
+    assert raised.value.result.scientific_status is ScientificStatus.UNREVIEWED
+    assert "missing" in raised.value.result.summary
     assert saved[-1].scientific_status is ScientificStatus.UNREVIEWED
 
 
@@ -246,3 +255,38 @@ def test_budget_wall_does_not_loop_or_self_approve(monkeypatch, tmp_path) -> Non
     assert returned["scientific_status"] == ScientificStatus.UNREVIEWED.value
     assert pauses == [CheckpointKind.PLAN_APPROVAL]
     assert returned.get("execution_status") != ExecutionStatus.COMPLETED.value
+
+
+def test_rejected_checkpoint_cancels_cycle_instead_of_failing(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(
+        research_cycle,
+        "get_run_context",
+        lambda: SimpleNamespace(flow_run=SimpleNamespace(id=RUN_ID)),
+    )
+    monkeypatch.setattr(research_cycle, "save_run_result", lambda result: None)
+    monkeypatch.setattr(research_cycle, "save_plan", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(research_cycle, "save_proposal", lambda *_args, **_kwargs: None)
+
+    def reject(run_id, kind, receive=None):
+        raise CheckpointRejected(
+            ResearchDecision(
+                run_id=run_id,
+                kind=kind,
+                stage=StageStatus.DONE,
+                verdict=DecisionVerdict.REJECTED,
+                rationale="no",
+                decided_by="owner",
+                command_version="v1",
+            )
+        )
+
+    monkeypatch.setattr(research_cycle, "wait_for_decision", reject)
+
+    returned = research_cycle.run_research_cycle.fn(
+        cycle_request(tmp_path, ["python", "-V"]),
+        str(tmp_path),
+        cooperating_model(),
+    )
+
+    assert getattr(returned, "type", None) is StateType.CANCELLED
+    assert not getattr(returned, "is_failed", lambda: False)()

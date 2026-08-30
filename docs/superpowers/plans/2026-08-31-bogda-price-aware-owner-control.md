@@ -122,7 +122,7 @@ class UsageUnknownState(StrEnum):
     TERMINATED = "terminated"
 ```
 
-`UsageUnknownRecoveryService.reconcile` calls the existing budget reconciliation once and appends a `model_call_finished` event whose reason is `manual_usage_reconciliation`. `approve_retry` appends `budget_resumed` and stores a required non-empty `new_call_id`; `terminate` never releases an unknown reservation before reconciliation.
+`UsageUnknownRecoveryService.reconcile` calls the existing budget reconciliation once and appends a `model_call_finished` event whose reason is `manual_usage_reconciliation`, with stable non-secret `usage_reference="manual-reconciliation:<case-id>"` so the existing v1 event contract remains valid. `approve_retry` appends `budget_resumed` and stores a required non-empty `new_call_id`; `terminate` never releases an unknown reservation before reconciliation. Idempotency is required for owner commands and persisted business state; the existing JSONL sink remains at-least-once across a process crash until DEF-05 supplies a persistent outbox.
 
 - [ ] **Step 4: Integrate the paid-call service**
 

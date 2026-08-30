@@ -104,8 +104,8 @@ class PriceAwareScheduler:
             intent=intent,
             tier=tier,
             workload=workload,
-            start=now,
-            end=now + duration,
+            start=effective_start,
+            end=effective_start + duration,
             as_of=now,
             history=history,
         )
@@ -186,11 +186,15 @@ class PriceAwareScheduler:
                 if waiting_for_earliest
                 else ScheduleDisposition.START_NOW
             ),
-            reason="deadline_forced" if deadline is not None else "already_off_peak",
+            reason=(
+                "no_off_peak_window"
+                if candidate is None
+                else "deadline_forced"
+            ),
             scheduled_start=scheduled_start,
             current_estimate=current_estimate,
             scheduled_estimate=scheduled_estimate,
-            deadline_forced=deadline is not None,
+            deadline_forced=deadline is not None and candidate is not None,
         )
 
     @staticmethod

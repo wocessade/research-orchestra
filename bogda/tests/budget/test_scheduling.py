@@ -163,6 +163,36 @@ def test_future_earliest_start_has_a_waiting_disposition_even_for_immediate() ->
     assert result.scheduled_start == datetime(2026, 8, 28, 13, 0, tzinfo=BEIJING)
 
 
+def test_cost_baseline_uses_future_earliest_start_not_off_peak_now() -> None:
+    result = plan(
+        now=datetime(2026, 8, 28, 8, 0, tzinfo=BEIJING),
+        policy=SchedulePolicy(
+            earliest_start=datetime(2026, 8, 28, 10, 0, tzinfo=BEIJING),
+            deadline=datetime(2026, 8, 28, 13, 0, tzinfo=BEIJING),
+        ),
+    )
+
+    assert result.current_period is PricePeriod.PEAK
+    assert result.current_estimate.authorized_ceiling == Decimal("14.4")
+    assert result.scheduled_start == datetime(2026, 8, 28, 12, 0, tzinfo=BEIJING)
+    assert result.scheduled_period is PricePeriod.OFF_PEAK
+    assert result.estimated_savings == Decimal("7.2")
+
+
+def test_runtime_longer_than_every_off_peak_interval_explains_peak_fallback() -> None:
+    result = plan(
+        now=datetime(2026, 8, 31, 10, 0, tzinfo=BEIJING),
+        runtime_minutes=64 * 60,
+    )
+
+    assert result.disposition is ScheduleDisposition.START_NOW
+    assert result.scheduled_start == datetime(2026, 8, 31, 10, 0, tzinfo=BEIJING)
+    assert result.current_period is PricePeriod.PEAK
+    assert result.scheduled_period is PricePeriod.PEAK
+    assert result.reason == "no_off_peak_window"
+    assert result.deadline_forced is False
+
+
 def test_deadline_before_effective_completion_is_rejected() -> None:
     with pytest.raises(ValueError, match="runtime cannot finish before deadline"):
         plan(

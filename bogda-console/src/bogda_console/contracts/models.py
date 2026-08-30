@@ -389,6 +389,7 @@ class BudgetState(StrEnum):
     SCHEDULED_OFF_PEAK = "scheduled-off-peak"
     AWAITING_APPROVAL = "awaiting-approval"
     USAGE_UNKNOWN = "usage-unknown"
+    TERMINATED = "terminated"
 
 
 class DecisionKind(StrEnum):
@@ -415,6 +416,8 @@ class DecisionAction(ImmutableWireModel):
     irreversible_consequence: str | None = None
     requires_rationale: bool = False
     requires_confirmation: bool = True
+    actual_cost_required: bool = False
+    new_call_id_required: bool = False
 
 
 class EvidenceReference(ImmutableWireModel):

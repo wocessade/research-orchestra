@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from typing import Any, Protocol, runtime_checkable
 
 from bogda_console.contracts.models import (
@@ -133,7 +134,16 @@ class ModelControlQueryPort(Protocol):
 
 @runtime_checkable
 class ModelControlCommandPort(Protocol):
-    async def resolve_decision(self, decision_id: str, action_id: str, expected_revision: int, rationale: str | None = None) -> DecisionCenterSnapshot: ...
+    async def resolve_decision(
+        self,
+        decision_id: str,
+        action_id: str,
+        expected_revision: int,
+        rationale: str | None = None,
+        *,
+        actual_cost_cny: Decimal | None = None,
+        new_call_id: str | None = None,
+    ) -> DecisionCenterSnapshot: ...
     async def set_global_policy(self, patch: ModelPolicyPatch, expected_revision: int) -> ModelPolicySnapshot: ...
     async def set_project_policy(self, project_id: str, patch: ModelPolicyPatch | None, expected_revision: int) -> ModelPolicySnapshot: ...
     async def confirm_preparation(self, preparation_id: str, idempotency_key: str) -> RunPreparationPreview: ...

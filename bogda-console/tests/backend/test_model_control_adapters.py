@@ -28,6 +28,7 @@ from bogda_console.contracts.models import (
 from bogda_console.contracts.ports import (
     ModelControlConflict,
     ModelControlNotFound,
+    ModelControlNotApplicable,
     ModelControlUnavailable,
 )
 
@@ -210,6 +211,101 @@ async def test_unknown_run_is_not_fabricated_and_usage_unknown_has_canonical_dec
     center = await adapter.decision_center()
     assert budget.state == "usage-unknown"
     assert budget.decision_id in {item.decision_id for item in center.items}
+
+
+@pytest.mark.asyncio
+async def test_usage_unknown_reconcile_then_retry_or_terminate_lifecycle() -> None:
+    adapter = MockModelControlAdapter()
+    initial = await adapter.decision_center()
+    item = next(item for item in initial.items if item.decision_kind == "usage-unknown")
+    assert item.actions[0].actual_cost_required is True
+    assert item.actions[0].new_call_id_required is False
+
+    with pytest.raises(ModelControlNotApplicable, match="actual cost"):
+        await adapter.resolve_decision(
+            item.decision_id, "reconcile", item.revision
+        )
+
+    reconciled = await adapter.resolve_decision(
+        item.decision_id,
+        "reconcile",
+        item.revision,
+        actual_cost_cny=Decimal("0.75"),
+    )
+    next_item = next(value for value in reconciled.items if value.decision_id == item.decision_id)
+    assert [action.action_id for action in next_item.actions] == ["approve-retry", "terminate"]
+    assert next_item.actions[0].new_call_id_required is True
+    assert next_item.actions[1].new_call_id_required is False
+    budget = await adapter.run_budget("run-unknown-usage")
+    assert budget.used_cost == Decimal("0.75")
+    assert budget.events[-1].event_type == "model_call_finished"
+    assert budget.events[-1].summary == "manual_usage_reconciliation"
+
+    with pytest.raises(ModelControlNotApplicable, match="new call id"):
+        await adapter.resolve_decision(
+            item.decision_id, "approve-retry", next_item.revision
+        )
+
+    resolved = await adapter.resolve_decision(
+        item.decision_id,
+        "approve-retry",
+        next_item.revision,
+        new_call_id="call-retry-2",
+    )
+    assert item.decision_id not in {value.decision_id for value in resolved.items}
+    resumed = await adapter.run_budget("run-unknown-usage")
+    assert resumed.state == "ready"
+    assert resumed.decision_id is None
+    assert resumed.events[-1].event_type == "budget_resumed"
+    assert "call-retry-2" in (resumed.events[-1].summary or "")
+
+    with pytest.raises(ModelControlConflict):
+        await adapter.resolve_decision(
+            item.decision_id,
+            "approve-retry",
+            next_item.revision,
+            new_call_id="call-retry-3",
+        )
+
+    terminating = MockModelControlAdapter()
+    terminal_initial = await terminating.decision_center()
+    terminal_item = next(
+        value for value in terminal_initial.items if value.decision_kind == "usage-unknown"
+    )
+    after_reconcile = await terminating.resolve_decision(
+        terminal_item.decision_id,
+        "reconcile",
+        terminal_item.revision,
+        actual_cost_cny=Decimal("0.25"),
+    )
+    terminal_item = next(
+        value for value in after_reconcile.items if value.decision_id == terminal_item.decision_id
+    )
+    after_terminate = await terminating.resolve_decision(
+        terminal_item.decision_id, "terminate", terminal_item.revision
+    )
+    assert terminal_item.decision_id not in {
+        value.decision_id for value in after_terminate.items
+    }
+    assert (await terminating.run_budget("run-unknown-usage")).state == "terminated"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("actual", [Decimal("-0.01"), Decimal("NaN"), Decimal("Infinity")])
+async def test_usage_unknown_reconcile_rejects_invalid_cost(actual: Decimal) -> None:
+    adapter = MockModelControlAdapter()
+    item = next(
+        value
+        for value in (await adapter.decision_center()).items
+        if value.decision_kind == "usage-unknown"
+    )
+    with pytest.raises(ModelControlNotApplicable, match="finite and non-negative"):
+        await adapter.resolve_decision(
+            item.decision_id,
+            "reconcile",
+            item.revision,
+            actual_cost_cny=actual,
+        )
 
 
 def test_policy_and_preview_include_safety_catalog_workload_and_preference_fields() -> None:

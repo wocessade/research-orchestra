@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from typing import Literal
 
 from fastapi import APIRouter, Query, Request
@@ -46,6 +47,8 @@ class DecisionRequest(WireModel):
     action_id: str = Field(min_length=1)
     expected_revision: int = Field(ge=0)
     rationale: str | None = None
+    actual_cost_cny: Decimal | None = Field(default=None, ge=0, allow_inf_nan=False)
+    new_call_id: str | None = None
 
 
 class GlobalModelPolicyRequest(WireModel):
@@ -305,7 +308,16 @@ async def set_project_autonomy(project_id: str, body: SetProjectAutonomyRequest,
 
 @router.post("/decisions/{decision_id}", response_model=ApiEnvelope[CommandReceipt[DecisionCenterSnapshot]])
 async def resolve_decision(decision_id: str, body: DecisionRequest, request: Request):
-    return command_envelope(await commands(request).resolve_decision(decision_id, body.action_id, body.expected_revision, body.rationale))
+    return command_envelope(
+        await commands(request).resolve_decision(
+            decision_id,
+            body.action_id,
+            body.expected_revision,
+            body.rationale,
+            actual_cost_cny=body.actual_cost_cny,
+            new_call_id=body.new_call_id,
+        )
+    )
 
 
 @router.post("/model-policy/global", response_model=ApiEnvelope[CommandReceipt[ModelPolicySnapshot]])

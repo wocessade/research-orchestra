@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 
 import pytest
 from pydantic import ValidationError
 
+from bogda_console.api.routes import DecisionRequest
 from bogda_console.contracts.models import (
     ApiErrorCode,
+    DecisionAction,
     PrefectStateSnapshot,
     ProjectContext,
     RunSummary,
@@ -127,3 +130,34 @@ def test_prefect_state_preserves_raw_intermediate_name() -> None:
         terminal=False,
     )
     assert state.name == "AwaitingConcurrencySlot"
+
+
+def test_decision_action_input_flags_are_additive_and_default_false() -> None:
+    legacy = DecisionAction.model_validate(
+        {"actionId": "approve", "label": "Approve", "costImpact": "Uses budget"}
+    )
+    reconcile = DecisionAction(
+        actionId="reconcile",
+        label="Reconcile",
+        costImpact="No new call",
+        actualCostRequired=True,
+    )
+
+    assert legacy.actual_cost_required is False
+    assert legacy.new_call_id_required is False
+    assert reconcile.model_dump(by_alias=True, mode="json")["actualCostRequired"] is True
+
+    request = DecisionRequest.model_validate(
+        {
+            "actionId": "reconcile",
+            "expectedRevision": 2,
+            "actualCostCny": "0.75",
+            "newCallId": "call-2",
+        }
+    )
+    assert request.actual_cost_cny == Decimal("0.75")
+    assert request.new_call_id == "call-2"
+    with pytest.raises(ValidationError):
+        DecisionRequest(
+            actionId="reconcile", expectedRevision=2, actualCostCny=Decimal("-0.01")
+        )

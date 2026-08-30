@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any, Awaitable, Callable
 
 import httpx
@@ -96,10 +97,29 @@ class CommandService:
             )
             return self._receipt("submit", submitted.run_id, post.run)
 
-    async def resolve_decision(self, decision_id: str, action_id: str, expected_revision: int, rationale: str | None = None) -> CommandReceipt[DecisionCenterSnapshot]:
+    async def resolve_decision(
+        self,
+        decision_id: str,
+        action_id: str,
+        expected_revision: int,
+        rationale: str | None = None,
+        *,
+        actual_cost_cny: Decimal | None = None,
+        new_call_id: str | None = None,
+    ) -> CommandReceipt[DecisionCenterSnapshot]:
         async with self._lock(f"decision:{decision_id}"):
             self._require_model_control_writes()
-            snapshot = await self._mutate("modelControl", lambda: self._model_control.resolve_decision(decision_id, action_id, expected_revision, rationale))
+            snapshot = await self._mutate(
+                "modelControl",
+                lambda: self._model_control.resolve_decision(
+                    decision_id,
+                    action_id,
+                    expected_revision,
+                    rationale,
+                    actual_cost_cny=actual_cost_cny,
+                    new_call_id=new_call_id,
+                ),
+            )
             return self._receipt("resolveDecision", decision_id, snapshot)
 
     async def set_global_model_policy(self, patch: ModelPolicyPatch, expected_revision: int) -> CommandReceipt[ModelPolicySnapshot]:

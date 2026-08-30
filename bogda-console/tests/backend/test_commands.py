@@ -2,17 +2,21 @@ from __future__ import annotations
 
 import copy
 from datetime import datetime
+from decimal import Decimal
 
 import pytest
 
 from bogda_console.adapters.mock_prefect import MockPrefectAdapter
 from bogda_console.adapters.mock_run_results import MockRunResultAdapter
+from bogda_console.adapters.mock_model_control import MockModelControlAdapter
 from bogda_console.config import Settings
 from bogda_console.services.commands import CommandService
 from bogda_console.services.errors import ServiceError
 
 
-def harness(fixture: dict[str, object]) -> tuple[CommandService, MockPrefectAdapter, MockRunResultAdapter]:
+def harness(
+    fixture: dict[str, object], *, model_control=None
+) -> tuple[CommandService, MockPrefectAdapter, MockRunResultAdapter]:
     settings = Settings.from_env(
         {
             "BOGDA_CONSOLE_PROFILE": "mock-all",
@@ -25,7 +29,13 @@ def harness(fixture: dict[str, object]) -> tuple[CommandService, MockPrefectAdap
     prefect = MockPrefectAdapter(fixture)
     results = MockRunResultAdapter(fixture)
     now = datetime.fromisoformat(str(fixture["clock"]).replace("Z", "+00:00"))
-    return CommandService(settings=settings, prefect=prefect, results=results, now=lambda: now), prefect, results
+    return CommandService(
+        settings=settings,
+        prefect=prefect,
+        results=results,
+        now=lambda: now,
+        model_control=model_control,
+    ), prefect, results
 
 
 @pytest.mark.asyncio
@@ -263,3 +273,32 @@ async def test_run_result_pre_read_unavailable_is_source_scoped(fixture_loader) 
     with pytest.raises(ServiceError) as error:
         await service.review("run-review", "artifact-newest", "accepted", "checked")
     assert (error.value.code, error.value.status_code) == ("RUN_RESULT_UNAVAILABLE", 503)
+
+
+@pytest.mark.asyncio
+async def test_decision_command_forwards_backend_required_owner_inputs(fixture_loader) -> None:
+    model_control = MockModelControlAdapter()
+    service, _, _ = harness(
+        fixture_loader("normal-active"), model_control=model_control
+    )
+
+    reconciled = await service.resolve_decision(
+        "decision-usage-unknown",
+        "reconcile",
+        0,
+        actual_cost_cny=Decimal("0.50"),
+    )
+    item = next(
+        value
+        for value in reconciled.snapshot.items
+        if value.decision_id == "decision-usage-unknown"
+    )
+    resolved = await service.resolve_decision(
+        item.decision_id,
+        "approve-retry",
+        item.revision,
+        new_call_id="call-retry-command",
+    )
+
+    assert item.actions[0].new_call_id_required is True
+    assert item.decision_id not in {value.decision_id for value in resolved.snapshot.items}

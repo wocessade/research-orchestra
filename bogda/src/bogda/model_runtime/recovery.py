@@ -177,6 +177,9 @@ class UsageUnknownRecoveryPort(Protocol):
     ) -> UsageUnknownCase:
         ...
 
+    def blocks_original_call(self, run_id: str, call_id: str) -> bool:
+        ...
+
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS usage_unknown_cases (
@@ -318,6 +321,17 @@ class SqliteUsageUnknownStore:
 
     def lookup(self, case_id: str) -> UsageUnknownCase:
         return self.get_case(case_id)
+
+    def blocks_original_call(self, run_id: str, call_id: str) -> bool:
+        run = _text(run_id, "run_id")
+        call = _text(call_id, "call_id")
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT 1 FROM usage_unknown_cases "
+                "WHERE run_id = ? AND call_id = ? LIMIT 1",
+                (run, call),
+            ).fetchone()
+        return row is not None
 
     @staticmethod
     def _candidate(
@@ -585,6 +599,9 @@ class UsageUnknownRecoveryService:
 
     def get_case(self, case_id: str) -> UsageUnknownCase:
         return self._store.get_case(case_id)
+
+    def blocks_original_call(self, run_id: str, call_id: str) -> bool:
+        return self._store.blocks_original_call(run_id, call_id)
 
     def _current(self, case_id: str, expected_revision: int) -> UsageUnknownCase:
         expected = _revision(expected_revision)

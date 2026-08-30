@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 import io
 import json
+from pathlib import Path
 from urllib.error import HTTPError, URLError
 
 import pytest
@@ -26,6 +27,11 @@ from bogda.budget.usage import (
 
 NOW = datetime(2026, 8, 30, 5, 30, tzinfo=timezone.utc)
 SENTINEL = "deepseek-key-sentinel"
+CONFORMANCE = json.loads(
+    (Path(__file__).resolve().parents[3] / "contracts" / "fixtures" / "deepseek-balance-v1.json").read_text(
+        encoding="utf-8"
+    )
+)["cases"]
 
 
 def balance_payload(
@@ -120,6 +126,27 @@ def test_client_reads_cny_total_and_sends_official_balance_request() -> None:
             7.5,
         )
     ]
+
+
+@pytest.mark.parametrize("case", CONFORMANCE, ids=lambda case: case["id"])
+def test_shared_balance_payload_conformance(case: dict[str, object]) -> None:
+    operation = lambda: client(
+        FakeTransport(FakeResponse(body=case["payload"]))
+    ).get_snapshot()
+
+    if case["valid"]:
+        snapshot = operation()
+        assert snapshot.total_balance == Decimal(str(case["totalBalance"]))
+        assert snapshot.currency == "CNY"
+    else:
+        with pytest.raises(
+            (
+                UsageMonitorBalanceUnavailableError,
+                UsageMonitorCurrencyError,
+                UsageMonitorPayloadError,
+            )
+        ):
+            operation()
 
 
 def test_prefers_cny_when_usd_is_also_present() -> None:

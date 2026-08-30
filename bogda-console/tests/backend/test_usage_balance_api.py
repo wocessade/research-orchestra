@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from decimal import Decimal
+from pathlib import Path
 
 import httpx
 import pytest
@@ -9,6 +11,13 @@ import pytest
 from bogda_console.adapters.deepseek_balance import DeepSeekBalanceAdapter
 from bogda_console.config import Settings
 from bogda_console.contracts.ports import UsageBalanceUnavailable
+
+
+CONFORMANCE = json.loads(
+    (Path(__file__).resolve().parents[3] / "contracts" / "fixtures" / "deepseek-balance-v1.json").read_text(
+        encoding="utf-8"
+    )
+)["cases"]
 
 
 @pytest.mark.asyncio
@@ -45,6 +54,26 @@ async def test_deepseek_balance_adapter_normalizes_cny_without_exposing_key() ->
         "observedAt": "2026-08-31T00:20:00Z",
         "sourceStatus": "up",
     }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("case", CONFORMANCE, ids=lambda case: case["id"])
+async def test_shared_balance_payload_conformance(case: dict[str, object]) -> None:
+    adapter = DeepSeekBalanceAdapter(
+        api_key="secret-sentinel",
+        transport=httpx.MockTransport(
+            lambda _request: httpx.Response(200, json=case["payload"])
+        ),
+        now=lambda: datetime(2026, 8, 31, 0, 20, tzinfo=UTC),
+    )
+
+    if case["valid"]:
+        snapshot = await adapter.get_balance()
+        assert snapshot.total_balance == Decimal(str(case["totalBalance"]))
+        assert snapshot.currency == "CNY"
+    else:
+        with pytest.raises(UsageBalanceUnavailable):
+            await adapter.get_balance()
 
 
 @pytest.mark.asyncio

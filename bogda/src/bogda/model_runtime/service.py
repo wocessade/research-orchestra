@@ -102,6 +102,10 @@ class PaidModelCallService:
             raise ValueError("executor must implement ModelExecutionPort")
         if recovery is not None and not callable(getattr(recovery, "open_case", None)):
             raise ValueError("recovery must implement UsageUnknownRecoveryPort")
+        if recovery is not None and not callable(
+            getattr(recovery, "blocks_original_call", None)
+        ):
+            raise ValueError("recovery must implement UsageUnknownRecoveryPort")
         if clock is not None and not callable(clock):
             raise ValueError("clock must be callable")
         if (
@@ -193,6 +197,19 @@ class PaidModelCallService:
         pro_available: bool,
         allow_low_risk_fallback: bool,
     ) -> PaidCallResult:
+        if self._recovery is not None:
+            try:
+                blocked = self._recovery.blocks_original_call(run_id, call_id)
+            except Exception:
+                raise PaidModelRuntimeError(
+                    "usage unknown recovery lookup failed"
+                ) from None
+            if blocked:
+                return self._result(
+                    PaidCallStatus.RECONCILIATION_REQUIRED,
+                    requested_tier=request.budget.requested_tier,
+                    effective_tier=None,
+                )
         claim = self._claim(run_id, call_id)
         if claim is None:
             return self._result(

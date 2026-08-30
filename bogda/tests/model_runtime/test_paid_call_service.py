@@ -481,6 +481,48 @@ def test_unknown_usage_opens_durable_case_after_usage_event(tmp_path: Path) -> N
     recovery_store.close()
 
 
+def test_reopened_recovery_store_blocks_the_original_call_before_execution(
+    tmp_path: Path,
+) -> None:
+    recovery_path = tmp_path / "recovery.sqlite"
+    recovery_store = SqliteUsageUnknownStore(
+        recovery_path,
+        clock=lambda: NOW,
+        id_factory=lambda: "case-restart",
+    )
+    recovery_store.open_case(
+        run_id="run-1",
+        call_id="call-1",
+        reservation_id="prior-reservation",
+        intent=TaskIntent.EXPLORE,
+        requested_tier=ModelTier.FLASH,
+        effective_tier=ModelTier.FLASH,
+        pricing_version=PRICING,
+    )
+    recovery_store.close()
+    reopened = SqliteUsageUnknownStore(recovery_path, clock=lambda: NOW)
+    service, _, ledger, executor = service_for(
+        tmp_path,
+        finished_result(),
+        recovery_store=reopened,
+    )
+
+    result = service.execute(
+        "run-1",
+        "call-1",
+        request(),
+        PROMPT,
+        tmp_path / "restart-attempt",
+        pro_available=True,
+        allow_low_risk_fallback=False,
+    )
+
+    assert result.status is PaidCallStatus.RECONCILIATION_REQUIRED
+    assert executor.calls == []
+    assert ledger.active_total == Decimal("0")
+    reopened.close()
+
+
 def test_executor_exception_blocks_same_call_retry(tmp_path: Path) -> None:
     service, _, ledger, executor = service_for(
         tmp_path, RuntimeError("executor secret sentinel")

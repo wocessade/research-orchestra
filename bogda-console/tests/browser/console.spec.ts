@@ -220,6 +220,7 @@ test("model policy keeps immutable facts and restores inheritance after conflict
   await expect(region.getByText("仅观察，不可关闭")).toBeVisible();
   await expect(region.getByText("修订号")).toBeVisible();
 
+  await region.getByRole("button", { name: "创建项目覆盖" }).click();
   const remaining = region.getByLabel("最低剩余预算");
   await remaining.fill("12.00");
   const save = region.getByRole("button", { name: "保存项目默认" });
@@ -266,6 +267,21 @@ test("model policy keeps immutable facts and restores inheritance after conflict
   assertNoErrors();
 });
 
+test("model policy inherited summary fits the intermediate desktop rail", async ({ page }) => {
+  const assertNoErrors = collectUnexpectedBrowserErrors(page);
+  await page.setViewportSize({ width: 841, height: 900 });
+  await gotoSettled(page, "/model-policy");
+  const region = page.getByRole("region", { name: "模型策略" });
+  const effective = region.getByLabel("当前生效策略明细");
+
+  await expect(effective).toContainText("自动升级 Pro");
+  await expect(effective).toContainText("Flash 降级");
+  await expect(effective).toContainText("余额恢复");
+  await expect(effective).toContainText("关键通知");
+  await assertNoHorizontalOverflow(page);
+  assertNoErrors();
+});
+
 test("real-readonly capabilities keep policy and paid preparation closed", async ({ page }) => {
   await page.route("**/api/v1/capabilities", async (route) => {
     const response = await route.fetch();
@@ -282,7 +298,7 @@ test("real-readonly capabilities keep policy and paid preparation closed", async
   });
   const assertNoErrors = collectUnexpectedBrowserErrors(page);
   await gotoSettled(page, "/model-policy");
-  await expect(page.getByRole("button", { name: "保存项目默认" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "创建项目覆盖" })).toBeDisabled();
   await gotoSettled(page, "/infrastructure");
   await expect(page.getByRole("button", { name: "提交 alpine-assay" })).toBeDisabled();
   assertNoErrors();

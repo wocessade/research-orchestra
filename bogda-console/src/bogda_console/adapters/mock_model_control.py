@@ -10,6 +10,7 @@ from bogda_console.contracts.models import (
     DecisionCenterSnapshot,
     DecisionItem,
     EvidenceReference,
+    ModelEventRow,
     ModelBudgetSnapshot,
     ModelPolicySnapshot,
     ModelPolicyPatch,
@@ -51,7 +52,10 @@ class MockModelControlAdapter:
                 decisionId="decision-usage-unknown", decisionKind="usage-unknown", title="Usage unknown",
                 urgencyGroup=UrgencyGroup.NEEDS_OWNER_NOW, projectId="project-unknown", runId="run-unknown-usage",
                 reason="The model call cost is unknown", risk="usage", estimatedCost=Decimal("0"),
-                actions=(DecisionAction(actionId="reconcile", label="Reconcile", costImpact="No new call"),),
+                actions=(DecisionAction(
+                    actionId="reconcile", label="Reconcile", costImpact="No new call",
+                    actualCostRequired=True,
+                ),),
                 revision=0, logSummary="Reconcile usage before recovery.",
             )
         }
@@ -132,7 +136,16 @@ class MockModelControlAdapter:
         self._preparations[preparation_id] = preview
         return preview
 
-    async def resolve_decision(self, decision_id: str, action_id: str, expected_revision: int, rationale: str | None = None) -> DecisionCenterSnapshot:
+    async def resolve_decision(
+        self,
+        decision_id: str,
+        action_id: str,
+        expected_revision: int,
+        rationale: str | None = None,
+        *,
+        actual_cost_cny: Decimal | None = None,
+        new_call_id: str | None = None,
+    ) -> DecisionCenterSnapshot:
         current = await self.decision_center()
         if expected_revision != self._revision:
             raise ModelControlConflict(current)
@@ -146,8 +159,114 @@ class MockModelControlAdapter:
             raise ModelControlNotApplicable("rationale is required for this action")
         if rationale is not None:
             self._decision_rationales[decision_id] = rationale.strip()
+        if item.decision_kind == "usage-unknown":
+            return await self._resolve_usage_unknown(
+                item,
+                action_id,
+                actual_cost_cny=actual_cost_cny,
+                new_call_id=new_call_id,
+            )
         del self._items[decision_id]
         self._revision += 1
+        return await self.decision_center()
+
+    async def _resolve_usage_unknown(
+        self,
+        item: DecisionItem,
+        action_id: str,
+        *,
+        actual_cost_cny: Decimal | None,
+        new_call_id: str | None,
+    ) -> DecisionCenterSnapshot:
+        run_id = item.run_id
+        if run_id is None or run_id not in self._budgets:
+            raise ModelControlNotApplicable("usage-unknown decision has no run budget")
+        budget = self._budgets[run_id]
+        next_revision = self._revision + 1
+        occurred_at = datetime.now(UTC)
+
+        if action_id == "reconcile":
+            if actual_cost_cny is None:
+                raise ModelControlNotApplicable("actual cost is required for this action")
+            if (
+                not isinstance(actual_cost_cny, Decimal)
+                or not actual_cost_cny.is_finite()
+                or actual_cost_cny < 0
+            ):
+                raise ModelControlNotApplicable(
+                    "actual cost must be finite and non-negative"
+                )
+            event = ModelEventRow(
+                eventId=f"mock-model-event-{next_revision}",
+                eventType="model_call_finished",
+                occurredAt=occurred_at,
+                summary="manual_usage_reconciliation",
+            )
+            self._budgets[run_id] = budget.model_copy(
+                update={
+                    "state": BudgetState.AWAITING_APPROVAL,
+                    "used_cost": actual_cost_cny,
+                    "reserved_cost": Decimal("0"),
+                    "remaining_cost": max(
+                        budget.authorized_ceiling - actual_cost_cny, Decimal("0")
+                    ),
+                    "revision": next_revision,
+                    "events": (*budget.events, event),
+                }
+            )
+            self._items[item.decision_id] = item.model_copy(
+                update={
+                    "estimated_cost": actual_cost_cny,
+                    "actions": (
+                        DecisionAction(
+                            actionId="approve-retry",
+                            label="Approve retry",
+                            costImpact="Starts one new paid call",
+                            newCallIdRequired=True,
+                        ),
+                        DecisionAction(
+                            actionId="terminate",
+                            label="Terminate",
+                            costImpact="No new call",
+                            irreversibleConsequence="The run will not retry automatically.",
+                        ),
+                    ),
+                    "revision": next_revision,
+                    "log_summary": "Usage reconciled; owner retry decision required.",
+                }
+            )
+        elif action_id == "approve-retry":
+            if new_call_id is None or not new_call_id.strip():
+                raise ModelControlNotApplicable("new call id is required for this action")
+            clean_call_id = new_call_id.strip()
+            event = ModelEventRow(
+                eventId=f"mock-model-event-{next_revision}",
+                eventType="budget_resumed",
+                occurredAt=occurred_at,
+                summary=f"retry approved with new call id {clean_call_id}",
+            )
+            self._budgets[run_id] = budget.model_copy(
+                update={
+                    "state": BudgetState.READY,
+                    "decision_id": None,
+                    "revision": next_revision,
+                    "events": (*budget.events, event),
+                }
+            )
+            del self._items[item.decision_id]
+        elif action_id == "terminate":
+            self._budgets[run_id] = budget.model_copy(
+                update={
+                    "state": BudgetState.TERMINATED,
+                    "decision_id": None,
+                    "revision": next_revision,
+                }
+            )
+            del self._items[item.decision_id]
+        else:
+            raise ModelControlConflict(await self.decision_center())
+
+        self._revision = next_revision
         return await self.decision_center()
 
     async def set_global_policy(self, patch: ModelPolicyPatch, expected_revision: int) -> ModelPolicySnapshot:

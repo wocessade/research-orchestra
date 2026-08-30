@@ -976,7 +976,8 @@
           "insufficient",
           "scheduled-off-peak",
           "awaiting-approval",
-          "usage-unknown"
+          "usage-unknown",
+          "terminated"
         ],
         "title": "BudgetState",
         "type": "string"
@@ -1330,6 +1331,11 @@
             "title": "Actionid",
             "type": "string"
           },
+          "actualCostRequired": {
+            "default": false,
+            "title": "Actualcostrequired",
+            "type": "boolean"
+          },
           "costImpact": {
             "minLength": 1,
             "title": "Costimpact",
@@ -1350,6 +1356,11 @@
             "minLength": 1,
             "title": "Label",
             "type": "string"
+          },
+          "newCallIdRequired": {
+            "default": false,
+            "title": "Newcallidrequired",
+            "type": "boolean"
           },
           "qualityImpact": {
             "anyOf": [
@@ -1530,10 +1541,37 @@
             "title": "Actionid",
             "type": "string"
           },
+          "actualCostCny": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actualcostcny"
+          },
           "expectedRevision": {
             "minimum": 0.0,
             "title": "Expectedrevision",
             "type": "integer"
+          },
+          "newCallId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Newcallid"
           },
           "rationale": {
             "anyOf": [

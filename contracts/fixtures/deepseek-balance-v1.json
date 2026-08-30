@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "valid-cny-string",
+      "valid": true,
+      "totalBalance": "16.5800",
+      "payload": {
+        "is_available": true,
+        "balance_infos": [
+          {"currency": "CNY", "total_balance": "16.5800"}
+        ]
+      }
+    },
+    {
+      "id": "unavailable",
+      "valid": false,
+      "payload": {
+        "is_available": false,
+        "balance_infos": [
+          {"currency": "CNY", "total_balance": "16.58"}
+        ]
+      }
+    },
+    {
+      "id": "usd-only",
+      "valid": false,
+      "payload": {
+        "is_available": true,
+        "balance_infos": [
+          {"currency": "USD", "total_balance": "2.00"}
+        ]
+      }
+    },
+    {
+      "id": "malformed-balance-infos",
+      "valid": false,
+      "payload": {
+        "is_available": true,
+        "balance_infos": {"currency": "CNY", "total_balance": "16.58"}
+      }
+    },
+    {
+      "id": "numeric-total",
+      "valid": false,
+      "payload": {
+        "is_available": true,
+        "balance_infos": [
+          {"currency": "CNY", "total_balance": 16.58}
+        ]
+      }
+    },
+    {
+      "id": "negative-total",
+      "valid": false,
+      "payload": {
+        "is_available": true,
+        "balance_infos": [
+          {"currency": "CNY", "total_balance": "-0.01"}
+        ]
+      }
+    },
+    {
+      "id": "nan-total",
+      "valid": false,
+      "payload": {
+        "is_available": true,
+        "balance_infos": [
+          {"currency": "CNY", "total_balance": "NaN"}
+        ]
+      }
+    },
+    {
+      "id": "infinity-total",
+      "valid": false,
+      "payload": {
+        "is_available": true,
+        "balance_infos": [
+          {"currency": "CNY", "total_balance": "Infinity"}
+        ]
+      }
+    },
+    {
+      "id": "duplicate-cny",
+      "valid": false,
+      "payload": {
+        "is_available": true,
+        "balance_infos": [
+          {"currency": "CNY", "total_balance": "16.58"},
+          {"currency": "CNY", "total_balance": "16.58"}
+        ]
+      }
+    }
+  ]
+}

@@ -14,6 +14,7 @@ const stateCopy: Record<ModelBudgetSnapshot["state"], { label: string; recovery:
   "scheduled-off-peak": { label: "已安排低峰时段", recovery: "等待计划开始" },
   "awaiting-approval": { label: "等待批准", recovery: "前往决策中心" },
   "usage-unknown": { label: "用量未知", recovery: "等待权威用量恢复" },
+  terminated: { label: "运行已终止", recovery: "无需恢复；本次运行不会自动重试" },
 };
 
 const artifactKinds = new Set(["prompt", "stdout", "stderr", "receipt", "log"]);

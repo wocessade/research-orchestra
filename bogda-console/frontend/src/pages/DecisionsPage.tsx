@@ -46,6 +46,8 @@ export function DecisionsPage() {
   const [selectedAction, setSelectedAction] = useState<DecisionAction | null>(null);
   const [openedRevision, setOpenedRevision] = useState<number | null>(null);
   const [rationale, setRationale] = useState("");
+  const [actualCostCny, setActualCostCny] = useState("");
+  const [newCallId, setNewCallId] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [conflict, setConflict] = useState(false);
   const [withdrawn, setWithdrawn] = useState(false);
@@ -66,6 +68,9 @@ export function DecisionsPage() {
     && !envelopeHasErrors(decisions.data)
     && !envelopeHasErrors(capabilities.data)
     && capabilities.data?.data?.canResolveModelDecision === true;
+  const actualCostValid = !selectedAction?.actualCostRequired
+    || (actualCostCny.trim() !== "" && Number.isFinite(Number(actualCostCny)) && Number(actualCostCny) >= 0);
+  const newCallIdValid = !selectedAction?.newCallIdRequired || newCallId.trim() !== "";
 
   useEffect(() => {
     if (!location.hash || !renderedDecisionIds) return;
@@ -82,14 +87,29 @@ export function DecisionsPage() {
         setFormError("请填写操作理由，说明你为何作出这个判断。");
         throw new Error("rationale required");
       }
+      if (!actualCostValid) {
+        setFormError("请输入大于或等于 0 的实际费用（CNY）。");
+        throw new Error("actual cost required");
+      }
+      if (!newCallIdValid) {
+        setFormError("请输入新的调用 ID；不能留空。");
+        throw new Error("new call id required");
+      }
       if (conflict && !conflictAcknowledged) {
         setFormError("请重新检查当前修订和操作后再提交。");
         throw new Error("conflict reconfirmation required");
       }
       setFormError(null);
+      const body: Record<string, unknown> = {
+        actionId: selectedAction.actionId,
+        expectedRevision: openedRevision ?? snapshot?.revision ?? 0,
+        rationale: rationale.trim() || null,
+      };
+      if (selectedAction.actualCostRequired) body.actualCostCny = actualCostCny.trim();
+      if (selectedAction.newCallIdRequired) body.newCallId = newCallId.trim();
       return api.command<{ command: string; resourceId: string; acceptedAt: string; snapshot: DecisionCenterSnapshot }>(
         "/api/v1/decisions/" + selected.decisionId,
-        { actionId: selectedAction.actionId, expectedRevision: openedRevision ?? snapshot?.revision ?? 0, rationale: rationale.trim() || null },
+        body,
       );
     },
     onSuccess: (response) => {
@@ -97,10 +117,14 @@ export function DecisionsPage() {
       setSelected(null);
       setSelectedAction(null);
       setRationale("");
+      setActualCostCny("");
+      setNewCallId("");
       setConflict(false);
       setWithdrawn(false);
       setAcknowledged(false);
       setConflictAcknowledged(false);
+      setActualCostCny("");
+      setNewCallId("");
       setActionUnavailable(false);
     },
     onError: (error) => {
@@ -138,6 +162,8 @@ export function DecisionsPage() {
     setSelectedAction(null);
     setOpenedRevision(snapshot?.revision ?? 0);
     setRationale("");
+    setActualCostCny("");
+    setNewCallId("");
     setFormError(null);
     setConflict(false);
     setWithdrawn(false);
@@ -181,15 +207,17 @@ export function DecisionsPage() {
       {items.length === 0 && <div className="empty-state decision-empty"><strong>当前没有待处理决策</strong><span>新的判断会从权威来源进入这里；来源故障时不会伪造空列表。</span></div>}
       {items.length > 0 && filtered.length === 0 && <div className="empty-state decision-empty"><strong>没有匹配的决策</strong><span>权威列表仍有 {items.length} 项，请调整筛选条件。</span><button type="button" className="secondary-action" onClick={() => { setProject("全部"); setRisk("全部"); }}>清除筛选</button></div>}
 
-      <ModalDialog open={Boolean(selected)} title={selected?.title ?? "确认决策"} onClose={() => setSelected(null)} busy={mutation.isPending} footer={<><button type="button" className="secondary-action" data-autofocus onClick={() => setSelected(null)} disabled={mutation.isPending}>返回</button><button type="button" className="primary-action" onClick={() => mutation.mutate()} disabled={withdrawn || actionUnavailable || !selectedAction || !canResolve || mutation.isPending || Boolean(conflict && !conflictAcknowledged) || Boolean(selectedAction?.requiresRationale && !rationale.trim()) || Boolean(selectedAction?.requiresConfirmation && !acknowledged)}>{mutation.isPending ? "等待权威回执…" : withdrawn ? "该决策已处理" : actionUnavailable ? "选择当前操作" : selectedAction?.label ?? "选择当前操作"}</button></>}>
+      <ModalDialog open={Boolean(selected)} title={selected?.title ?? "确认决策"} onClose={() => setSelected(null)} busy={mutation.isPending} footer={<><button type="button" className="secondary-action" data-autofocus onClick={() => setSelected(null)} disabled={mutation.isPending}>返回</button><button type="button" className="primary-action" onClick={() => mutation.mutate()} disabled={withdrawn || actionUnavailable || !selectedAction || !canResolve || mutation.isPending || !actualCostValid || !newCallIdValid || Boolean(conflict && !conflictAcknowledged) || Boolean(selectedAction?.requiresRationale && !rationale.trim()) || Boolean(selectedAction?.requiresConfirmation && !acknowledged)}>{mutation.isPending ? "等待权威回执…" : withdrawn ? "该决策已处理" : actionUnavailable ? "选择当前操作" : selectedAction?.label ?? "选择当前操作"}</button></>}>
         {selected && <div className="decision-dialog">
           {conflict && <div className="command-conflict" role="alert"><strong>决策已被其他操作修改，请重新确认。</strong><span>已载入当前权威版本；你的操作理由保留，但不会自动重放。</span></div>}
           {withdrawn && <div className="command-conflict" role="alert"><strong>该决策已被处理或撤回，请关闭此窗口。</strong><span>当前权威列表中已找不到它；你的操作理由保留，但不会自动重放。</span></div>}
           {actionUnavailable && <div className="command-conflict" role="alert"><strong>原操作已不在当前权威选项中，请选择一个当前操作。</strong><span>旧操作不会被隐式替换，也不会自动重放。</span></div>}
           <p className="decision-revision"><span>提交使用列表修订 {openedRevision ?? snapshot.revision}</span> · 条目 {selected.revision}（仅展示）</p>
           <p>{selected.reason}</p>
-          {!withdrawn && selected.actions.length > 0 && <label className="decision-action-picker">选择操作<select aria-label="选择操作" value={selectedAction?.actionId ?? ""} onChange={(event) => { const next = selected.actions.find((action) => action.actionId === event.target.value); if (next) { setSelectedAction(next); setRationale(""); setAcknowledged(false); setConflictAcknowledged(false); setActionUnavailable(false); setFormError(null); } }}><option value="" disabled>请选择当前操作</option>{selected.actions.map((action) => <option key={action.actionId} value={action.actionId}>{action.label}</option>)}</select></label>}
+          {!withdrawn && selected.actions.length > 0 && <label className="decision-action-picker">选择操作<select aria-label="选择操作" value={selectedAction?.actionId ?? ""} onChange={(event) => { const next = selected.actions.find((action) => action.actionId === event.target.value); if (next) { setSelectedAction(next); setRationale(""); setActualCostCny(""); setNewCallId(""); setAcknowledged(false); setConflictAcknowledged(false); setActionUnavailable(false); setFormError(null); } }}><option value="" disabled>请选择当前操作</option>{selected.actions.map((action) => <option key={action.actionId} value={action.actionId}>{action.label}</option>)}</select></label>}
           {selectedAction && <dl className="dialog-facts"><div><dt>费用影响</dt><dd>{selectedAction.costImpact}</dd></div><div><dt>质量影响</dt><dd>{selectedAction.qualityImpact ?? "未声明"}</dd></div><div><dt>风险</dt><dd>{selected.risk}</dd></div><div><dt>不可逆后果</dt><dd>{selectedAction.irreversibleConsequence ?? "未声明"}</dd></div></dl>}
+          {selectedAction?.actualCostRequired && <label className="decision-owner-input">实际费用（CNY）<input aria-label="实际费用（CNY）" type="number" inputMode="decimal" min="0" step="any" value={actualCostCny} onChange={(event) => { setActualCostCny(event.target.value); setFormError(null); }} required /><span>填写供应商最终结算金额；不会据此自动发起新调用。</span></label>}
+          {selectedAction?.newCallIdRequired && <label className="decision-owner-input">新的调用 ID<input aria-label="新的调用 ID" type="text" value={newCallId} onChange={(event) => { setNewCallId(event.target.value); setFormError(null); }} placeholder="例如 call-retry-2" required /><span>必须是这次重试的新标识，原调用不会被复用。</span></label>}
           <section><h3>证据</h3><div className="evidence-chips">{selected.evidence.map((reference) => reference.uri ? <a className="evidence-chip" href={reference.uri} key={reference.kind + ":" + reference.refId}>{reference.label}</a> : <span className="evidence-chip" key={reference.kind + ":" + reference.refId}>{reference.label}</span>)}</div></section>
           <section><h3>精确日志摘要</h3><p className="log-summary">{selected.logSummary}</p></section>
           {selected.risk.toLowerCase() === "high" && <p className="decision-high-risk">高风险操作需要明确确认。</p>}

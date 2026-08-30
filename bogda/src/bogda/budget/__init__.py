@@ -41,6 +41,11 @@ from bogda.budget.estimation import (
     WorkloadEstimate,
     WorkloadEstimator,
 )
+from bogda.budget.scheduling import (
+    PriceAwareSchedulePlan,
+    PriceAwareScheduler,
+    ScheduleDisposition,
+)
 from bogda.budget.guard import (
     DEFAULT_AUTOMATIC_APPROVAL_CEILING_CNY,
     BudgetDecision,
@@ -106,6 +111,9 @@ __all__ = [
     "TokenWorkload",
     "WorkloadEstimate",
     "WorkloadEstimator",
+    "PriceAwareSchedulePlan",
+    "PriceAwareScheduler",
+    "ScheduleDisposition",
     "BudgetDecision",
     "DEFAULT_AUTOMATIC_APPROVAL_CEILING_CNY",
     "BudgetDecisionKind",

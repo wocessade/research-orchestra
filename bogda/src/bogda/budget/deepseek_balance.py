@@ -66,8 +66,9 @@ def _cny_info(infos: object) -> dict[str, object]:
             raise UsageMonitorPayloadError()
         currency = item.get("currency")
         if currency == "CNY":
-            if cny is None:
-                cny = item
+            if cny is not None:
+                raise UsageMonitorPayloadError()
+            cny = item
             continue
         if isinstance(currency, str) and currency:
             saw_other_currency = True

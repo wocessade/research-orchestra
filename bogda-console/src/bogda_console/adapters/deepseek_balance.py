@@ -58,11 +58,15 @@ class DeepSeekBalanceAdapter:
             payload: Any = response.json()
             if payload.get("is_available") is not True:
                 raise ValueError
-            cny = next(
-                item
-                for item in payload["balance_infos"]
-                if item.get("currency") == "CNY"
-            )
+            infos = payload["balance_infos"]
+            if not isinstance(infos, list) or not infos or any(
+                not isinstance(item, dict) for item in infos
+            ):
+                raise ValueError
+            cny_items = [item for item in infos if item.get("currency") == "CNY"]
+            if len(cny_items) != 1:
+                raise ValueError
+            cny = cny_items[0]
             raw_total = cny["total_balance"]
             if not isinstance(raw_total, str):
                 raise ValueError

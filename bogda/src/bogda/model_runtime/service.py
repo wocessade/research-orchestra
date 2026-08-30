@@ -20,6 +20,7 @@ from bogda.model_runtime.contracts import (
     PromptArchivePort,
 )
 from bogda.model_runtime.routing import ModelRouter, RouteDecisionKind
+from bogda.model_runtime.recovery import UsageUnknownRecoveryPort
 
 
 class PaidModelRuntimeError(RuntimeError):
@@ -85,6 +86,7 @@ class PaidModelCallService:
         budget: BudgetAdmissionService,
         event_sink: RunEventSink,
         executor: ModelExecutionPort,
+        recovery: UsageUnknownRecoveryPort | None = None,
         clock: Callable[[], datetime] | None = None,
         timeout_seconds: float = 300.0,
     ) -> None:
@@ -98,6 +100,12 @@ class PaidModelCallService:
             raise ValueError("event_sink must implement RunEventSink")
         if not callable(getattr(executor, "invoke", None)):
             raise ValueError("executor must implement ModelExecutionPort")
+        if recovery is not None and not callable(getattr(recovery, "open_case", None)):
+            raise ValueError("recovery must implement UsageUnknownRecoveryPort")
+        if recovery is not None and not callable(
+            getattr(recovery, "blocks_original_call", None)
+        ):
+            raise ValueError("recovery must implement UsageUnknownRecoveryPort")
         if clock is not None and not callable(clock):
             raise ValueError("clock must be callable")
         if (
@@ -112,6 +120,7 @@ class PaidModelCallService:
         self._budget = budget
         self._event_sink = event_sink
         self._executor = executor
+        self._recovery = recovery
         self._clock = clock or (lambda: datetime.now(timezone.utc))
         self._timeout_seconds = timeout_seconds
         self._call_states: dict[tuple[str, str], PaidCallStatus | object] = {}
@@ -188,6 +197,19 @@ class PaidModelCallService:
         pro_available: bool,
         allow_low_risk_fallback: bool,
     ) -> PaidCallResult:
+        if self._recovery is not None:
+            try:
+                blocked = self._recovery.blocks_original_call(run_id, call_id)
+            except Exception:
+                raise PaidModelRuntimeError(
+                    "usage unknown recovery lookup failed"
+                ) from None
+            if blocked:
+                return self._result(
+                    PaidCallStatus.RECONCILIATION_REQUIRED,
+                    requested_tier=request.budget.requested_tier,
+                    effective_tier=None,
+                )
         claim = self._claim(run_id, call_id)
         if claim is None:
             return self._result(
@@ -368,6 +390,23 @@ class PaidModelCallService:
                     reason="usage_unknown",
                 )
             )
+            if self._recovery is not None:
+                try:
+                    self._recovery.open_case(
+                        run_id=run_id,
+                        call_id=call_id,
+                        reservation_id=reservation.id,
+                        intent=request.intent,
+                        requested_tier=decision.requested_tier,
+                        effective_tier=decision.effective_tier,
+                        pricing_version=request.budget.pricing_version,
+                        prompt_hash=artifact.sha256,
+                        prompt_artifact=artifact.path,
+                    )
+                except Exception:
+                    raise PaidModelRuntimeError(
+                        "usage unknown recovery case failed"
+                    ) from None
             return self._result(
                 PaidCallStatus.USAGE_UNKNOWN,
                 requested_tier=decision.requested_tier,

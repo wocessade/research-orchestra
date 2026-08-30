@@ -17,6 +17,14 @@ from bogda.contracts.tasks import (
 )
 from bogda.contracts.budgets import BudgetSource, RunBudgetEnvelope
 from bogda.contracts.events import RunEventType, RunEventV1
+from bogda.contracts.runner_packet import (
+    AdmitDecision,
+    AdmitStatus,
+    AttachmentKind,
+    AttachmentRef,
+    RunnerPacket,
+    admit_runner_packet,
+)
 
 __all__ = [
     "ArtifactRecord",
@@ -36,4 +44,10 @@ __all__ = [
     "RunBudgetEnvelope",
     "RunEventType",
     "RunEventV1",
+    "AdmitDecision",
+    "AdmitStatus",
+    "AttachmentKind",
+    "AttachmentRef",
+    "RunnerPacket",
+    "admit_runner_packet",
 ]

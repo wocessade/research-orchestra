@@ -86,6 +86,89 @@ function routes(projectId = "bogda-main") {
 }
 
 describe("ModelPolicyPage", () => {
+  it("keeps inherited project policy compact until the owner creates an override", async () => {
+    const user = userEvent.setup();
+    const result = routes();
+    result["/api/v1/model-policy?projectId=bogda-main"] = envelope({
+      ...policy,
+      projectId: "bogda-main",
+      source: "global",
+      inheritsGlobal: true,
+      revision: 0,
+    }, {
+      modelControl: { ...sourceFresh, source: "modelControl" },
+    });
+
+    renderAppAt("/model-policy", result);
+
+    const region = await screen.findByRole("region", { name: "模型策略" });
+    expect(within(region).getByText("全局策略 → 项目默认")).toBeVisible();
+    expect(within(region).getByRole("heading", { name: "当前生效策略" })).toBeVisible();
+    const effective = within(region).getByLabelText("当前生效策略明细");
+    expect(within(effective).getByText("自动升级 Pro").parentElement).toHaveTextContent("允许");
+    expect(within(effective).getByText("Flash 降级").parentElement).toHaveTextContent("允许");
+    expect(within(effective).getByText("余额恢复").parentElement).toHaveTextContent("手动继续");
+    expect(within(effective).getByText("关键通知").parentElement).toHaveTextContent("开启");
+    expect(within(region).queryByLabelText("最低剩余预算")).not.toBeInTheDocument();
+
+    await user.click(within(region).getByRole("button", { name: "创建项目覆盖" }));
+
+    expect(within(region).getByText("准备覆盖")).toBeVisible();
+    expect(within(region).getByRole("group", { name: "预算与安全余量" })).toBeVisible();
+    expect(within(region).getByLabelText("最低剩余预算")).toBeEnabled();
+    expect(within(region).getByRole("button", { name: "保存项目默认" })).toBeDisabled();
+
+    await user.click(within(region).getByRole("button", { name: "取消创建覆盖" }));
+    expect(within(region).getByRole("heading", { name: "当前生效策略" })).toBeVisible();
+  });
+
+  it("clears a rejected inherited-override message when creation is cancelled", async () => {
+    const user = userEvent.setup();
+    const result = routes();
+    result["/api/v1/model-policy?projectId=bogda-main"] = envelope({
+      ...policy,
+      projectId: "bogda-main",
+      source: "global",
+      inheritsGlobal: true,
+      revision: 0,
+    }, {
+      modelControl: { ...sourceFresh, source: "modelControl" },
+    });
+    result["/api/v1/model-policy/projects/bogda-main"] = () => new Response(
+      JSON.stringify(envelope(null, {}, [{
+        code: "COMMAND_REJECTED",
+        message: "策略写入被服务端拒绝",
+        source: "modelControl",
+        retryable: false,
+      }])),
+      { status: 409, headers: { "Content-Type": "application/json" } },
+    );
+
+    renderAppAt("/model-policy", result);
+    const region = await screen.findByRole("region", { name: "模型策略" });
+    await user.click(within(region).getByRole("button", { name: "创建项目覆盖" }));
+    await user.clear(within(region).getByLabelText("最低剩余预算"));
+    await user.type(within(region).getByLabelText("最低剩余预算"), "9.00");
+    await user.click(within(region).getByRole("button", { name: "保存项目默认" }));
+    await user.click(screen.getByRole("button", { name: "确认保存" }));
+    expect(await within(region).findByRole("alert")).toHaveTextContent("策略写入被服务端拒绝");
+
+    await user.click(within(region).getByRole("button", { name: "取消创建覆盖" }));
+
+    expect(within(region).queryByRole("alert")).not.toBeInTheDocument();
+    expect(within(region).getByRole("heading", { name: "当前生效策略" })).toBeVisible();
+  });
+
+  it("groups routing preferences as described switches instead of bare checkboxes", async () => {
+    renderAppAt("/model-policy", routes());
+
+    const region = await screen.findByRole("region", { name: "模型策略" });
+    const routing = await within(region).findByRole("group", { name: "模型路由" });
+    expect(within(routing).getByRole("switch", { name: "包内自动升级 Pro" })).toBeChecked();
+    expect(within(routing).getByText("Auto 在预算允许时可升级到 Pro。")).toBeVisible();
+    expect(within(routing).getByRole("switch", { name: "低风险允许 Flash 降级" })).toBeChecked();
+  });
+
   it("separates immutable safety facts from editable project defaults", async () => {
     renderAppAt("/model-policy", routes());
     const region = await screen.findByRole("region", { name: "模型策略" });

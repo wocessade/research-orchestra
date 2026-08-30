@@ -8,6 +8,7 @@ import pytest
 
 from bogda_console.adapters.deepseek_balance import DeepSeekBalanceAdapter
 from bogda_console.config import Settings
+from bogda_console.contracts.ports import UsageBalanceUnavailable
 
 
 @pytest.mark.asyncio
@@ -44,6 +45,20 @@ async def test_deepseek_balance_adapter_normalizes_cny_without_exposing_key() ->
         "observedAt": "2026-08-31T00:20:00Z",
         "sourceStatus": "up",
     }
+
+
+@pytest.mark.asyncio
+async def test_deepseek_balance_adapter_rejects_non_string_money() -> None:
+    adapter = DeepSeekBalanceAdapter(
+        api_key="secret-sentinel",
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200, json={
+            "is_available": True,
+            "balance_infos": [{"currency": "CNY", "total_balance": 37.125}],
+        })),
+    )
+
+    with pytest.raises(UsageBalanceUnavailable, match="response is invalid"):
+        await adapter.get_balance()
 
 
 @pytest.mark.asyncio

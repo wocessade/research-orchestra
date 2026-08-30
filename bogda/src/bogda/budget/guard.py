@@ -170,6 +170,10 @@ class BudgetGuard:
             )
         except ValueError as exc:
             raise ValueError("automatic_approval_ceiling_cny must be a non-negative Decimal") from exc
+        if self._automatic_approval_ceiling_cny > DEFAULT_AUTOMATIC_APPROVAL_CEILING_CNY:
+            raise ValueError(
+                "automatic_approval_ceiling_cny cannot exceed the 20 CNY safety baseline"
+            )
         self._ledger = ledger
         self._catalogs = MappingProxyType(catalogs)
         self._fixed_now = now
@@ -328,7 +332,10 @@ class BudgetGuard:
                 requested=requested,
                 pricing_version=pricing_version,
             )
-        if requested > self._automatic_approval_ceiling_cny:
+        if (
+            envelope.authorized_ceiling > self._automatic_approval_ceiling_cny
+            or requested > self._automatic_approval_ceiling_cny
+        ):
             available = (
                 ceiling_balance - active - minimum
                 if ceiling_balance is not None

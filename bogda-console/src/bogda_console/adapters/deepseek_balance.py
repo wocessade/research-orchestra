@@ -63,7 +63,10 @@ class DeepSeekBalanceAdapter:
                 for item in payload["balance_infos"]
                 if item.get("currency") == "CNY"
             )
-            total = Decimal(cny["total_balance"])
+            raw_total = cny["total_balance"]
+            if not isinstance(raw_total, str):
+                raise ValueError
+            total = Decimal(raw_total)
             if not total.is_finite() or total < 0:
                 raise ValueError
         except (AttributeError, KeyError, StopIteration, TypeError, ValueError, InvalidOperation):

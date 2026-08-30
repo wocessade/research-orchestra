@@ -208,17 +208,32 @@ def test_over_twenty_cny_requires_owner_approval_before_provider_checks() -> Non
     assert decision.requested_reservation == Decimal("20.01")
 
 
-def test_automatic_approval_ceiling_is_explicit_and_validated() -> None:
+def test_high_authorized_envelope_cannot_bypass_approval_with_small_reservation() -> None:
+    guard, _ = make_guard()
+
+    decision = guard.evaluate(
+        snapshot=snapshot(balance="200"),
+        envelope=envelope(ceiling="100", minimum="5"),
+        reservation_cny=Decimal("1"),
+    )
+
+    assert decision.kind is BudgetDecisionKind.OWNER_APPROVAL_REQUIRED
+    assert decision.requested_reservation == Decimal("1")
+
+
+def test_automatic_approval_ceiling_can_only_be_tightened() -> None:
     ledger = SingleFlightBudgetLedger()
     guard = BudgetGuard(
         ledger,
         now=NOW,
-        automatic_approval_ceiling_cny=Decimal("25"),
+        automatic_approval_ceiling_cny=Decimal("15"),
     )
-    assert guard.automatic_approval_ceiling_cny == Decimal("25")
+    assert guard.automatic_approval_ceiling_cny == Decimal("15")
 
     with pytest.raises(ValueError, match="automatic_approval_ceiling_cny"):
         BudgetGuard(ledger, automatic_approval_ceiling_cny=Decimal("-1"))
+    with pytest.raises(ValueError, match="automatic_approval_ceiling_cny"):
+        BudgetGuard(ledger, automatic_approval_ceiling_cny=Decimal("20.01"))
 
 
 @pytest.mark.parametrize(

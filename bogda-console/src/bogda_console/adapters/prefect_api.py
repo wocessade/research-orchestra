@@ -67,11 +67,13 @@ class PrefectApiAdapter:
         self,
         *,
         api_url: str,
+        auth_string: str | None = None,
         api_key: str | None = None,
         client_factory: ClientFactory | None = None,
         allowed_deployment_ids: frozenset[str] = frozenset(),
     ) -> None:
         self.api_url = api_url
+        self.auth_string = auth_string
         self.api_key = api_key
         self.allowed_deployment_ids = allowed_deployment_ids
         self._client_factory = client_factory or self._default_client
@@ -81,6 +83,8 @@ class PrefectApiAdapter:
         return None
 
     def _default_client(self) -> PrefectClient:
+        if self.auth_string is not None:
+            return PrefectClient(self.api_url, auth_string=self.auth_string)
         return PrefectClient(self.api_url, api_key=self.api_key)
 
     async def health(self) -> bool:

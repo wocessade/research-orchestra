@@ -32,6 +32,7 @@ class Settings:
     fixture_scenario: str
     test_mode: bool
     prefect_api_url: str | None
+    prefect_api_auth_string: str | None
     prefect_api_key: str | None
     deepseek_api_key: str | None
     deepseek_api_base: str
@@ -53,6 +54,8 @@ class Settings:
         replica_count = int(env.get("BOGDA_CONSOLE_REPLICA_COUNT", "1"))
         if replica_count < 1:
             raise ValueError("BOGDA_CONSOLE_REPLICA_COUNT must be at least 1")
+        if profile == "allowlisted-test" and replica_count != 1:
+            raise ValueError("allowlisted-test requires exactly one replica")
         return cls(
             profile=profile,
             public_host=env.get("BOGDA_CONSOLE_PUBLIC_HOST", "127.0.0.1"),
@@ -62,6 +65,7 @@ class Settings:
             fixture_scenario=env.get("BOGDA_CONSOLE_FIXTURE", "normal-active"),
             test_mode=env.get("BOGDA_CONSOLE_TEST_MODE", "0") == "1",
             prefect_api_url=env.get("PREFECT_API_URL"),
+            prefect_api_auth_string=env.get("PREFECT_API_AUTH_STRING"),
             prefect_api_key=env.get("PREFECT_API_KEY"),
             deepseek_api_key=env.get("DEEPSEEK_API_KEY"),
             deepseek_api_base=env.get("DEEPSEEK_API_BASE", "https://api.deepseek.com"),

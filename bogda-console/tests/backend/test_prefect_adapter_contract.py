@@ -126,6 +126,29 @@ class FakePrefectClient:
         self.queue_paused = kwargs["is_paused"]
 
 
+def test_default_client_passes_server_auth_string_to_prefect(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    class ConstructorSpy:
+        def __init__(self, api, **kwargs):
+            captured["api"] = api
+            captured["kwargs"] = kwargs
+
+    monkeypatch.setattr("bogda_console.adapters.prefect_api.PrefectClient", ConstructorSpy)
+    adapter = PrefectApiAdapter(
+        api_url="http://127.0.0.1:8999/api",
+        auth_string="auth-sentinel",
+        api_key="api-key-sentinel",
+    )
+
+    adapter._default_client()
+
+    assert captured == {
+        "api": "http://127.0.0.1:8999/api",
+        "kwargs": {"auth_string": "auth-sentinel"},
+    }
+
+
 @pytest.fixture
 def fake_adapter():
     client = FakePrefectClient()

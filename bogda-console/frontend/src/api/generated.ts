@@ -784,8 +784,18 @@ export interface components {
         BudgetState: "ready" | "stale" | "insufficient" | "scheduled-off-peak" | "awaiting-approval" | "usage-unknown" | "terminated";
         /** CapabilitySnapshot */
         CapabilitySnapshot: {
+            /** Alloweddeploymentids */
+            allowedDeploymentIds?: string[];
+            /** Allowedqueueids */
+            allowedQueueIds?: string[];
+            /** Allowedscheduleids */
+            allowedScheduleIds?: string[];
+            /** Allowedworkpoolnames */
+            allowedWorkPoolNames?: string[];
             /** Cancancelrun */
             canCancelRun: boolean;
+            /** Candecidecheckpoint */
+            canDecideCheckpoint: boolean;
             /** Canpauseschedule */
             canPauseSchedule: boolean;
             /** Canpauseworkqueue */

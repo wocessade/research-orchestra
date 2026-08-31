@@ -15,13 +15,23 @@ function formatAbsolute(value: string | null | undefined) {
   return value ? new Date(value).toLocaleString("zh-CN", { hour12: false }) : "—";
 }
 
-function PoolLedger({ pool, canPause, onAction }: { pool: PoolSnapshot; canPause: boolean; onAction: (action: PendingAction) => void }) {
+function inScope(values: string[] | undefined, value: string | null | undefined) {
+  return Boolean(value && values?.includes(value));
+}
+
+function disabledReason(enabled: boolean, inResourceScope: boolean, profile?: string) {
+  if (enabled && inResourceScope) return null;
+  if (!enabled) return `当前 profile 为 ${profile ?? "unknown"}，只读，不能执行此操作。`;
+  return "不在测试白名单";
+}
+
+function PoolLedger({ pool, capabilities, onAction }: { pool: PoolSnapshot; capabilities?: CapabilitySnapshot; onAction: (action: PendingAction) => void }) {
   const isDorm = pool.name === "dorm-x86";
   return <article className="pool-ledger">
     <header><div><p className="page-kicker">Work pool</p><h2>{pool.name}</h2></div><span className={`plain-status plain-status--${pool.status.toLowerCase()}`}>{pool.status}</span></header>
     <div className="capacity-line"><strong>{isDorm ? `共享并发 ${pool.activeSlots} / ${pool.concurrencyLimit ?? "—"}` : `并发 ${pool.activeSlots} / ${pool.concurrencyLimit ?? "—"}`}</strong><span>{isDorm ? "CPU 与 GPU 任务共用这一上限" : "Prefect 工作池容量"}</span></div>
     <section aria-labelledby={`${pool.name}-workers`}><h3 id={`${pool.name}-workers`}>Workers</h3>{pool.workers?.length ? <ul className="infra-list">{pool.workers.map((worker) => <li key={worker.workerId}><span><strong>{worker.name}</strong><small>Heartbeat {formatAbsolute(worker.lastHeartbeatTime)}</small></span><em className={`plain-status plain-status--${worker.status.toLowerCase()}`}>{worker.status}</em></li>)}</ul> : <p className="muted">没有 Worker 记录。</p>}</section>
-    <section aria-labelledby={`${pool.name}-queues`}><h3 id={`${pool.name}-queues`}>Work queues</h3>{pool.queues?.length ? <ul className="infra-list">{pool.queues.map((queue) => <li key={queue.queueId}><span><strong>{queue.name}</strong><small>{queue.status} · {queue.isPaused ? "已暂停" : "接收运行"}</small></span><button type="button" className="quiet-action" disabled={!canPause} onClick={() => onAction({ kind: "queue", queue })}>{queue.isPaused ? `恢复队列 ${queue.name}` : `暂停队列 ${queue.name}`}</button></li>)}</ul> : <p className="muted">没有队列记录。</p>}</section>
+    <section aria-labelledby={`${pool.name}-queues`}><h3 id={`${pool.name}-queues`}>Work queues</h3>{pool.queues?.length ? <ul className="infra-list">{pool.queues.map((queue) => { const scope = inScope(capabilities?.allowedQueueIds, queue.queueId) && inScope(capabilities?.allowedWorkPoolNames, pool.name); const enabled = capabilities?.canPauseWorkQueue === true && scope; const reason = disabledReason(capabilities?.canPauseWorkQueue === true, scope, capabilities?.profile); return <li key={queue.queueId}><span><strong>{queue.name}</strong><small>{queue.status} · {queue.isPaused ? "已暂停" : "接收运行"}</small></span><div><button type="button" className="quiet-action" disabled={!enabled} onClick={() => onAction({ kind: "queue", queue })}>{queue.isPaused ? `恢复队列 ${queue.name}` : `暂停队列 ${queue.name}`}</button>{reason && <small className="readonly-note">{reason}</small>}</div></li>; })}</ul> : <p className="muted">没有队列记录。</p>}</section>
   </article>;
 }
 
@@ -58,7 +68,6 @@ export function InfrastructurePage() {
   const [notice, setNotice] = useState<string | null>(null);
   const cap = capabilities.data?.data;
   const capReady = capabilities.isSuccess && !envelopeHasErrors(capabilities.data);
-  const canPauseQueue = capReady && cap?.canPauseWorkQueue === true;
   const canSubmitDeployment = capReady && cap?.canSubmitRegisteredDeployment === true;
   const canPauseSched = capReady && cap?.canPauseSchedule === true;
 
@@ -100,9 +109,9 @@ export function InfrastructurePage() {
 
     <section className="power-observation" aria-labelledby="power-title"><div><p className="page-kicker">Power agent / mock adapter</p><h2 id="power-title">宿舍机电源状态</h2></div>{data.dormPower ? <div className="power-facts"><strong>{data.dormPower.mode}</strong><span>Agent {data.dormPower.agentReachable === true ? "可达" : data.dormPower.agentReachable === false ? "不可达" : "未知"}</span><span>Sleep inhibition {data.dormPower.sleepInhibited === true ? "开启" : data.dormPower.sleepInhibited === false ? "关闭" : "未知"}</span><time dateTime={data.dormPower.lastTransitionAt ?? undefined}>{formatAbsolute(data.dormPower.lastTransitionAt)}</time>{powerMeta?.sourceMode === "mock" && <em>模拟数据</em>}</div> : <p className="muted">Power Agent 数据不可用。</p>}</section>
 
-    <div className="pool-grid">{data.pools?.map((pool) => <PoolLedger key={pool.name} pool={pool} canPause={canPauseQueue} onAction={setAction} />) ?? <p className="muted">Prefect 工作池数据不可用。</p>}</div>
+    <div className="pool-grid">{data.pools?.map((pool) => <PoolLedger key={pool.name} pool={pool} capabilities={cap ?? undefined} onAction={setAction} />) ?? <p className="muted">Prefect 工作池数据不可用。</p>}</div>
 
-    <section className="deployment-section section-block" aria-labelledby="deployments-title"><div className="section-heading"><p>Registered</p><h2 id="deployments-title">已注册 Deployments</h2><span>{deployments.data?.data?.items.length ?? "—"} 个</span></div>{deployments.isPending ? <QueryLoading /> : deployments.isError || !deployments.data?.data ? <QueryFailure title="Deployment 来源暂不可用" /> : deployments.data.data.items.map((deployment) => <article className="deployment-record" key={deployment.deploymentId}><div><p className="page-kicker">{deployment.flowName}</p><h3>{deployment.name}</h3><span>{deployment.workPoolName} / {deployment.workQueueName}</span></div><div className="deployment-actions"><button type="button" className="primary-action" disabled={!canSubmitDeployment || !deployment.allowlisted} onClick={() => setSelectedDeployment(deployment)}>提交 {deployment.name}</button></div>{Boolean(deployment.schedules?.length) && <ul className="schedule-list">{deployment.schedules?.map((schedule) => <li key={schedule.scheduleId}><span><strong>{schedule.label}</strong><small>{schedule.active ? "active" : "paused"}</small></span><button type="button" className="quiet-action" disabled={!canPauseSched} onClick={() => setAction({ kind: "schedule", deployment, schedule })}>{schedule.active ? `暂停日程 ${schedule.label}` : `恢复日程 ${schedule.label}`}</button></li>)}</ul>}</article>)}</section>
+    <section className="deployment-section section-block" aria-labelledby="deployments-title"><div className="section-heading"><p>Registered</p><h2 id="deployments-title">已注册 Deployments</h2><span>{deployments.data?.data?.items.length ?? "—"} 个</span></div>{deployments.isPending ? <QueryLoading /> : deployments.isError || !deployments.data?.data ? <QueryFailure title="Deployment 来源暂不可用" /> : deployments.data.data.items.map((deployment) => { const submitReason = disabledReason(canSubmitDeployment, deployment.allowlisted, cap?.profile); return <article className="deployment-record" key={deployment.deploymentId}><div><p className="page-kicker">{deployment.flowName}</p><h3>{deployment.name}</h3><span>{deployment.workPoolName} / {deployment.workQueueName}</span></div><div className="deployment-actions"><button type="button" className="primary-action" disabled={Boolean(submitReason)} onClick={() => setSelectedDeployment(deployment)}>提交 {deployment.name}</button>{submitReason && <small className="readonly-note">{submitReason}</small>}</div>{Boolean(deployment.schedules?.length) && <ul className="schedule-list">{deployment.schedules?.map((schedule) => { const scope = inScope(cap?.allowedDeploymentIds, deployment.deploymentId) && inScope(cap?.allowedScheduleIds, schedule.scheduleId); const enabled = canPauseSched && scope; const reason = disabledReason(canPauseSched, scope, cap?.profile); return <li key={schedule.scheduleId}><span><strong>{schedule.label}</strong><small>{schedule.active ? "active" : "paused"}</small></span><div><button type="button" className="quiet-action" disabled={!enabled} onClick={() => setAction({ kind: "schedule", deployment, schedule })}>{schedule.active ? `暂停日程 ${schedule.label}` : `恢复日程 ${schedule.label}`}</button>{reason && <small className="readonly-note">{reason}</small>}</div></li>; })}</ul>}</article>; })}</section>
 
     <ConfirmDialog open={Boolean(action)} title={action?.kind === "queue" ? `${action.queue.isPaused ? "恢复" : "暂停"}队列 ${action.queue.name}` : `${action?.schedule.active ? "暂停" : "恢复"}日程 ${action?.schedule.label}`} confirmLabel={action?.kind === "queue" ? `确认${action.queue.isPaused ? "恢复" : "暂停"}` : `确认${action?.schedule.active ? "暂停" : "恢复"}`} onClose={() => setAction(null)} onConfirm={confirmAction} busy={actionMutation.isPending}>请求会提交给 Prefect；界面等待回执后才更新。{actionMutation.isError && <span className="command-error" role="alert">操作未获得权威回执；没有自动重试。</span>}</ConfirmDialog>
     <RunPreparation

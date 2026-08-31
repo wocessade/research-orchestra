@@ -47,12 +47,12 @@ def write_observation(path: Path, payload: dict[str, Any]) -> Path:
     return path
 
 
-def healthy_observation(*, pid: int = MANAGED_PID) -> dict[str, Any]:
+def healthy_observation(*, pid: int = MANAGED_PID, profile: str = "mock-all") -> dict[str, Any]:
     return {
         "state": {"pid": pid, "startTime": HEALTHY_START},
         "process": {"pid": pid, "running": True, "startTime": HEALTHY_START},
         "listener": {"port": 3101, "pid": pid},
-        "capabilities": {"reachable": True, "httpStatus": 200, "profile": "mock-all"},
+        "capabilities": {"reachable": True, "httpStatus": 200, "profile": profile},
     }
 
 
@@ -205,6 +205,95 @@ def test_plan_pins_loopback_3101_and_does_not_bind_3100(tmp_path: Path) -> None:
     command = " ".join(plan["command"])
     assert "-m bogda_console" in command
     assert "3100" not in command
+
+
+def test_plan_forwards_real_profile_settings_without_exposing_credentials(tmp_path: Path) -> None:
+    secrets = ["auth-sentinel", "prefect-key-sentinel", "deepseek-key-sentinel"]
+    completed = run_launcher(
+        "plan",
+        script=LAUNCHER,
+        cwd=tmp_path,
+        state_dir=tmp_path / "state",
+        extra_env={
+            "BOGDA_CONSOLE_PROFILE": "real-readonly",
+            "PREFECT_API_URL": "http://prefect.test/api",
+            "PREFECT_API_AUTH_STRING": secrets[0],
+            "PREFECT_API_KEY": secrets[1],
+            "DEEPSEEK_API_KEY": secrets[2],
+        },
+    )
+    assert completed.returncode == 0, _output(completed)
+    output = _output(completed)
+    plan = parse_json(completed)
+
+    assert plan["env"]["BOGDA_CONSOLE_PROFILE"] == "real-readonly"
+    assert plan["env"]["PREFECT_API_URL"] == "http://prefect.test/api"
+    assert plan["env"]["PREFECT_API_AUTH_STRING"] == "[set]"
+    assert plan["env"]["PREFECT_API_KEY"] == "[set]"
+    assert plan["env"]["DEEPSEEK_API_KEY"] == "[set]"
+    for secret in secrets:
+        assert secret not in output
+
+
+def test_plan_forwards_allowlisted_profile_scope_and_does_not_inherit_mock_scope(tmp_path: Path) -> None:
+    completed = run_launcher(
+        "plan",
+        script=LAUNCHER,
+        cwd=tmp_path,
+        state_dir=tmp_path / "state",
+        extra_env={
+            "BOGDA_CONSOLE_PROFILE": "allowlisted-test",
+            "PREFECT_API_URL": "http://prefect.test/api",
+            "BOGDA_CONSOLE_REPLICA_COUNT": "1",
+            "BOGDA_CONSOLE_ALLOWED_DEPLOYMENT_IDS": "deployment-z,deployment-a",
+            "BOGDA_CONSOLE_ALLOWED_SCHEDULE_IDS": "schedule-z,schedule-a",
+            "BOGDA_CONSOLE_ALLOWED_QUEUE_IDS": "queue-z,queue-a",
+            "BOGDA_CONSOLE_ALLOWED_WORK_POOL_NAMES": "pool-z,pool-a",
+        },
+    )
+    assert completed.returncode == 0, _output(completed)
+    env = parse_json(completed)["env"]
+    assert env["BOGDA_CONSOLE_PROFILE"] == "allowlisted-test"
+    assert env["PREFECT_API_URL"] == "http://prefect.test/api"
+    assert env["BOGDA_CONSOLE_REPLICA_COUNT"] == "1"
+    assert env["BOGDA_CONSOLE_ALLOWED_DEPLOYMENT_IDS"] == "deployment-z,deployment-a"
+    assert env["BOGDA_CONSOLE_ALLOWED_SCHEDULE_IDS"] == "schedule-z,schedule-a"
+    assert env["BOGDA_CONSOLE_ALLOWED_QUEUE_IDS"] == "queue-z,queue-a"
+    assert env["BOGDA_CONSOLE_ALLOWED_WORK_POOL_NAMES"] == "pool-z,pool-a"
+
+
+def test_plan_real_profile_defaults_to_empty_allowlist_scope(tmp_path: Path) -> None:
+    completed = run_launcher(
+        "plan",
+        script=LAUNCHER,
+        cwd=tmp_path,
+        state_dir=tmp_path / "state",
+        extra_env={
+            "BOGDA_CONSOLE_PROFILE": "real-readonly",
+            "PREFECT_API_URL": "http://prefect.test/api",
+        },
+    )
+    assert completed.returncode == 0, _output(completed)
+    env = parse_json(completed)["env"]
+    assert env["BOGDA_CONSOLE_ALLOWED_DEPLOYMENT_IDS"] == ""
+    assert env["BOGDA_CONSOLE_ALLOWED_SCHEDULE_IDS"] == ""
+    assert env["BOGDA_CONSOLE_ALLOWED_QUEUE_IDS"] == ""
+    assert env["BOGDA_CONSOLE_ALLOWED_WORK_POOL_NAMES"] == ""
+
+
+def test_probe_accepts_an_explicit_real_profile_as_healthy(tmp_path: Path) -> None:
+    completed = run_launcher(
+        "probe",
+        script=LAUNCHER,
+        cwd=tmp_path,
+        state_dir=tmp_path / "state",
+        observation=healthy_observation(profile="real-readonly"),
+        extra_env={"BOGDA_CONSOLE_PROFILE": "real-readonly"},
+    )
+    assert completed.returncode == 0, _output(completed)
+    payload = parse_json(completed)
+    assert payload["status"] == "healthy"
+    assert payload["launchReady"] is True
 
 
 def test_start_refuses_missing_venv_and_prints_readme_repair(tmp_path: Path) -> None:

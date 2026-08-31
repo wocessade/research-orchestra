@@ -129,12 +129,63 @@ describe("research checkpoints", () => {
       canCancelRun: false,
       canPauseSchedule: false,
       canPauseWorkQueue: false,
+      canDecideCheckpoint: false,
       canReviewScientificResult: false,
       canSetAutonomyMode: false,
+      allowedDeploymentIds: [],
+      allowedScheduleIds: [],
+      allowedQueueIds: [],
+      allowedWorkPoolNames: [],
     }, {});
     renderAppAt("/runs/run-checkpoint", routes);
     expect(await screen.findByRole("button", { name: "批准" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "拒绝" })).toBeDisabled();
-    expect(screen.getByText(/当前 profile 为 real-readonly/)).toBeVisible();
+    expect(screen.getByText("当前 profile 为 real-readonly，只读，不能决定人工检查点。")).toBeVisible();
+  });
+
+  it("uses checkpoint capability instead of scientific review capability", async () => {
+    const routes = checkpointRoutes();
+    routes["/api/v1/capabilities"] = envelope({
+      profile: "allowlisted-test",
+      projectId: "bogda-main",
+      effectiveAutonomyMode: "supervised",
+      canSubmitRegisteredDeployment: true,
+      canCancelRun: true,
+      canPauseSchedule: true,
+      canPauseWorkQueue: true,
+      canDecideCheckpoint: false,
+      canReviewScientificResult: true,
+      canSetAutonomyMode: false,
+      allowedDeploymentIds: ["deployment-dorm"],
+      allowedScheduleIds: ["schedule-dorm"],
+      allowedQueueIds: ["queue-cpu"],
+      allowedWorkPoolNames: ["dorm-x86"],
+    }, {});
+    renderAppAt("/runs/run-checkpoint", routes);
+    expect(await screen.findByRole("button", { name: "批准" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "拒绝" })).toBeDisabled();
+  });
+
+  it("keeps checkpoint controls disabled when the run deployment is outside scope", async () => {
+    const routes = checkpointRoutes();
+    routes["/api/v1/capabilities"] = envelope({
+      profile: "allowlisted-test",
+      projectId: "bogda-main",
+      effectiveAutonomyMode: "supervised",
+      canSubmitRegisteredDeployment: true,
+      canCancelRun: true,
+      canPauseSchedule: true,
+      canPauseWorkQueue: true,
+      canDecideCheckpoint: true,
+      canReviewScientificResult: true,
+      canSetAutonomyMode: false,
+      allowedDeploymentIds: ["another-deployment"],
+      allowedScheduleIds: [],
+      allowedQueueIds: [],
+      allowedWorkPoolNames: [],
+    }, {});
+    renderAppAt("/runs/run-checkpoint", routes);
+    expect(await screen.findByRole("button", { name: "批准" })).toBeDisabled();
+    expect(screen.getAllByText("不在测试白名单").length).toBeGreaterThan(0);
   });
 });

@@ -13,13 +13,14 @@ from bogda_console.services.errors import SourceUnavailable
 from bogda_console.services.queries import QueryService
 
 
-def service_for(fixture: dict[str, object]) -> QueryService:
+def service_for(fixture: dict[str, object], **overrides: str) -> QueryService:
     settings = Settings.from_env(
         {
             "BOGDA_CONSOLE_ALLOWED_DEPLOYMENT_IDS": "deployment-service,deployment-dorm",
             "BOGDA_CONSOLE_ALLOWED_SCHEDULE_IDS": "schedule-service,schedule-dorm",
             "BOGDA_CONSOLE_ALLOWED_QUEUE_IDS": "queue-service,queue-cpu,queue-gpu",
             "BOGDA_CONSOLE_ALLOWED_WORK_POOL_NAMES": "pi-service,dorm-x86",
+            **overrides,
         }
     )
     clock = datetime.fromisoformat(str(fixture["clock"]).replace("Z", "+00:00"))
@@ -30,6 +31,49 @@ def service_for(fixture: dict[str, object]) -> QueryService:
         power=MockPowerAdapter(fixture),
         now=lambda: clock,
     )
+
+
+@pytest.mark.asyncio
+async def test_capabilities_report_sorted_allowlist_scope_and_checkpoint_decision(fixture_loader) -> None:
+    service = service_for(
+        fixture_loader("normal-active"),
+        BOGDA_CONSOLE_PROFILE="allowlisted-test",
+        BOGDA_CONSOLE_ALLOWED_DEPLOYMENT_IDS="deployment-z,deployment-a",
+        BOGDA_CONSOLE_ALLOWED_SCHEDULE_IDS="schedule-z,schedule-a",
+        BOGDA_CONSOLE_ALLOWED_QUEUE_IDS="queue-z,queue-a",
+        BOGDA_CONSOLE_ALLOWED_WORK_POOL_NAMES="pool-z,pool-a",
+    )
+
+    snapshot = (await service.capabilities()).data
+
+    assert snapshot.can_decide_checkpoint is True
+    assert snapshot.can_review_scientific_result is True
+    assert snapshot.allowed_deployment_ids == ["deployment-a", "deployment-z"]
+    assert snapshot.allowed_schedule_ids == ["schedule-a", "schedule-z"]
+    assert snapshot.allowed_queue_ids == ["queue-a", "queue-z"]
+    assert snapshot.allowed_work_pool_names == ["pool-a", "pool-z"]
+
+
+@pytest.mark.asyncio
+async def test_readonly_capabilities_report_configured_scope_without_enabling_commands(fixture_loader) -> None:
+    service = service_for(
+        fixture_loader("normal-active"),
+        BOGDA_CONSOLE_PROFILE="real-readonly",
+        BOGDA_CONSOLE_ALLOWED_DEPLOYMENT_IDS="deployment-a",
+        BOGDA_CONSOLE_ALLOWED_SCHEDULE_IDS="schedule-a",
+        BOGDA_CONSOLE_ALLOWED_QUEUE_IDS="queue-a",
+        BOGDA_CONSOLE_ALLOWED_WORK_POOL_NAMES="pool-a",
+    )
+
+    snapshot = (await service.capabilities()).data
+
+    assert snapshot.can_decide_checkpoint is False
+    assert snapshot.can_review_scientific_result is False
+    assert snapshot.can_submit_registered_deployment is False
+    assert snapshot.allowed_deployment_ids == ["deployment-a"]
+    assert snapshot.allowed_schedule_ids == ["schedule-a"]
+    assert snapshot.allowed_queue_ids == ["queue-a"]
+    assert snapshot.allowed_work_pool_names == ["pool-a"]
 
 
 @pytest.mark.asyncio

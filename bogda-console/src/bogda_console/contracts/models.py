@@ -330,11 +330,16 @@ class CapabilitySnapshot(WireModel):
     can_cancel_run: bool
     can_pause_schedule: bool
     can_pause_work_queue: bool
+    can_decide_checkpoint: bool
     can_review_scientific_result: bool
     can_set_autonomy_mode: bool
     can_resolve_model_decision: bool
     can_set_model_policy: bool
     can_prepare_paid_run: bool
+    allowed_deployment_ids: list[str] = Field(default_factory=list)
+    allowed_schedule_ids: list[str] = Field(default_factory=list)
+    allowed_queue_ids: list[str] = Field(default_factory=list)
+    allowed_work_pool_names: list[str] = Field(default_factory=list)
 
 
 class RunFilters(WireModel):

@@ -60,6 +60,7 @@ class Container:
                 raise ValueError("PREFECT_API_URL is required for real Prefect profiles")
             prefect = PrefectApiAdapter(
                 api_url=settings.prefect_api_url,
+                auth_string=settings.prefect_api_auth_string,
                 api_key=settings.prefect_api_key,
                 allowed_deployment_ids=settings.allowed_deployment_ids,
             )

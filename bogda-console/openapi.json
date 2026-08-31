@@ -985,8 +985,40 @@
       "CapabilitySnapshot": {
         "additionalProperties": false,
         "properties": {
+          "allowedDeploymentIds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Alloweddeploymentids",
+            "type": "array"
+          },
+          "allowedQueueIds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowedqueueids",
+            "type": "array"
+          },
+          "allowedScheduleIds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowedscheduleids",
+            "type": "array"
+          },
+          "allowedWorkPoolNames": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowedworkpoolnames",
+            "type": "array"
+          },
           "canCancelRun": {
             "title": "Cancancelrun",
+            "type": "boolean"
+          },
+          "canDecideCheckpoint": {
+            "title": "Candecidecheckpoint",
             "type": "boolean"
           },
           "canPauseSchedule": {
@@ -1047,6 +1079,7 @@
           "canCancelRun",
           "canPauseSchedule",
           "canPauseWorkQueue",
+          "canDecideCheckpoint",
           "canReviewScientificResult",
           "canSetAutonomyMode",
           "canResolveModelDecision",

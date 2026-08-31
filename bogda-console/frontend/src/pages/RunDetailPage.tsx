@@ -14,6 +14,16 @@ function formatAbsolute(value: string | null | undefined) {
   return value ? new Date(value).toLocaleString("zh-CN", { hour12: false }) : "—";
 }
 
+function inScope(values: string[] | undefined, value: string | null | undefined) {
+  return Boolean(value && values?.includes(value));
+}
+
+function disabledReason(enabled: boolean, inResourceScope: boolean, profile: string | undefined, action: string) {
+  if (enabled && inResourceScope) return null;
+  if (!enabled) return `当前 profile 为 ${profile ?? "unknown"}，只读，不能${action}。`;
+  return "不在测试白名单";
+}
+
 function ResultPanel({ view, executionType }: { view: RunResultView; executionType: string }) {
   if (view.availability === "missing") return <div className="result-alert result-alert--missing"><p className="page-kicker">RESULT / MISSING</p><h2>RunResult 缺失</h2><p>该运行尚无同 key、同 type 的 RunResult Artifact；科研状态不可用。</p></div>;
   if (view.availability === "invalid" || !view.result) return <div className="result-alert result-alert--invalid"><p className="page-kicker">RESULT / INVALID</p><h2>最新 RunResult 无效</h2><p className="mono">{view.artifactId}</p><ul>{view.validationIssues?.map((issue) => <li key={issue}>{issue}</li>)}</ul><p>较早版本不会覆盖最新版本的权威性。</p></div>;
@@ -26,7 +36,7 @@ function ResultPanel({ view, executionType }: { view: RunResultView; executionTy
   </>;
 }
 
-function ReviewControl({ runId, view, enabled, profile, onReviewed }: { runId: string; view: RunResultView; enabled: boolean; profile?: string; onReviewed: (view: RunResultView) => void }) {
+function ReviewControl({ runId, view, enabled, profile, reason, onReviewed }: { runId: string; view: RunResultView; enabled: boolean; profile?: string; reason?: string | null; onReviewed: (view: RunResultView) => void }) {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState("accepted");
   const [summary, setSummary] = useState("");
@@ -57,7 +67,7 @@ function ReviewControl({ runId, view, enabled, profile, onReviewed }: { runId: s
       <label>评审说明<textarea rows={4} value={summary} onChange={(event) => setSummary(event.target.value)} disabled={!enabled || mutation.isPending} /></label>
       <button type="submit" className="primary-action" disabled={!enabled || mutation.isPending}>{mutation.isPending ? "等待 RunResult 回执…" : "提交评审"}</button>
     </form>
-    {!enabled && <p className="readonly-note">当前 profile 为 {profile ?? "unknown"}，只读，不能提交科研评审。</p>}
+    {!enabled && <p className="readonly-note">{reason ?? `当前 profile 为 ${profile ?? "unknown"}，只读，不能提交科研评审。`}</p>}
     {conflict && <div className="command-conflict" role="alert"><strong>结果已被其他评审更新</strong><span>表单内容已保留。请先检查最新 Artifact：</span><code>{conflict.artifactId}</code><button type="button" className="quiet-action" onClick={() => { if (!conflict.artifactId) return; setBaseArtifactId(conflict.artifactId); setAdoptedArtifactId(conflict.artifactId); mutation.reset(); }}>确认采用最新版本</button></div>}
     {adoptedArtifactId && <p className="command-notice" role="status">已确认采用最新 Artifact {adoptedArtifactId}；再次提交将创建新版本。</p>}
     {mutation.isError && !conflict && <div className="command-error" role="alert">评审未获得权威回执；没有自动重试。</div>}
@@ -69,12 +79,14 @@ function CheckpointControl({
   checkpoint,
   enabled,
   profile,
+  reason,
   onDecided,
 }: {
   runId: string;
   checkpoint: NonNullable<RunDetail["checkpoint"]>;
   enabled: boolean;
   profile?: string;
+  reason?: string | null;
   onDecided: (detail: RunDetail) => void;
 }) {
   const [rationale, setRationale] = useState("");
@@ -122,7 +134,7 @@ function CheckpointControl({
       <button type="button" className="primary-action" disabled={!enabled || mutation.isPending} onClick={() => void decide("approved")}>{mutation.isPending ? "等待回执…" : "批准"}</button>
       <button type="button" className="danger-outline-action" disabled={!enabled || mutation.isPending} onClick={() => void decide("rejected")}>拒绝</button>
     </div>
-    {!enabled && <p className="readonly-note">当前 profile 为 {profile ?? "unknown"}，只读，不能决定人工检查点。</p>}
+    {!enabled && <p className="readonly-note">{reason ?? `当前 profile 为 ${profile ?? "unknown"}，只读，不能决定人工检查点。`}</p>}
     {conflict && <div className="command-conflict" role="alert"><strong>检查点已被更新</strong><span>说明已保留。请先采用当前版本后再提交。</span><code>{conflict.commandVersion}</code><button type="button" className="quiet-action" onClick={() => { if (!conflict.commandVersion) return; setCommandVersion(conflict.commandVersion); setAdoptedVersion(conflict.commandVersion); mutation.reset(); }}>采用当前版本</button></div>}
     {adoptedVersion && <p className="command-notice" role="status">已采用当前检查点版本 {adoptedVersion}。</p>}
     {mutation.isError && !conflict && <div className="command-error" role="alert">检查点未获得权威回执；没有自动重试。</div>}
@@ -156,8 +168,16 @@ export function RunDetailPage() {
   const science = reviewSnapshot?.result ? { availability: "available", artifactId: reviewSnapshot.artifactId, artifactCreatedAt: reviewSnapshot.artifactCreatedAt, scientificStatus: reviewSnapshot.result.scientific_status, reviewSummary: reviewSnapshot.result.review_summary, validationIssues: [] } : run.scientific;
   const capabilities = capabilitiesQuery.data?.data;
   const capReady = capabilitiesQuery.isSuccess && !envelopeHasErrors(capabilitiesQuery.data);
-  const canCancel = capReady && capabilities?.canCancelRun === true;
-  const canReview = capReady && capabilities?.canReviewScientificResult === true;
+  const runInScope = inScope(capabilities?.allowedDeploymentIds, run.deploymentId);
+  const canCancelCapability = capReady && capabilities?.canCancelRun === true;
+  const canReviewCapability = capReady && capabilities?.canReviewScientificResult === true;
+  const canDecideCapability = capReady && capabilities?.canDecideCheckpoint === true;
+  const canCancel = canCancelCapability && runInScope;
+  const canReview = canReviewCapability && runInScope;
+  const canDecide = canDecideCapability && runInScope;
+  const cancelReason = disabledReason(canCancelCapability, runInScope, capabilities?.profile, "取消运行");
+  const reviewReason = disabledReason(canReviewCapability, runInScope, capabilities?.profile, "提交科研评审");
+  const checkpointReason = disabledReason(canDecideCapability, runInScope, capabilities?.profile, "决定人工检查点");
 
   async function cancelRun() {
     const response = await cancelMutation.mutateAsync(run).catch(() => null);
@@ -168,7 +188,7 @@ export function RunDetailPage() {
 
   return <article className="page run-detail">
     <Link className="back-link" to="/runs">← 返回运行账簿</Link>
-    <header className="page-header page-header--split"><div><p className="page-kicker">Run / {run.runId}</p><h1>{run.name}</h1><p className="lede">{run.deploymentName ?? "未注册 Deployment"} · {run.workPoolName ?? "—"} / {run.workQueueName ?? "—"}</p></div>{!run.state.terminal && <button type="button" className="danger-outline-action" disabled={!canCancel} onClick={() => setCancelOpen(true)}>取消运行</button>}</header>
+    <header className="page-header page-header--split"><div><p className="page-kicker">Run / {run.runId}</p><h1>{run.name}</h1><p className="lede">{run.deploymentName ?? "未注册 Deployment"} · {run.workPoolName ?? "—"} / {run.workQueueName ?? "—"}</p></div>{!run.state.terminal && <div><button type="button" className="danger-outline-action" disabled={!canCancel} onClick={() => setCancelOpen(true)}>取消运行</button>{cancelReason && <small className="readonly-note">{cancelReason}</small>}</div>}</header>
     <SourceStrip sources={{ ...envelope.sources, ...(resultQuery.data?.sources ?? {}) }} />
     <EnvelopeErrors errors={[...envelope.errors, ...(resultQuery.data?.errors ?? [])]} />
     <section className="authority-bands" aria-label="执行与科研状态">
@@ -177,11 +197,11 @@ export function RunDetailPage() {
     </section>
     <section className="detail-section context-section" aria-labelledby="context-title"><div className="detail-heading"><h2 id="context-title">项目上下文</h2><p>只读上下文。有效自主模式在创建时冻结，不在此修改。</p></div>{detail.projectContext ? <dl className="fact-grid"><div><dt>项目</dt><dd>{detail.projectContext.projectId}</dd></div><div><dt>冻结模式</dt><dd>{detail.projectContext.effectiveAutonomyMode}</dd></div><div><dt>模式来源</dt><dd>{detail.projectContext.modeSource}</dd></div><div><dt>可写</dt><dd>否</dd></div></dl> : <p className="muted">项目上下文不可用。</p>}</section>
     <RunBudgetPanel runId={runId} />
-    {detail.checkpoint && !detail.checkpoint.verdict && <CheckpointControl runId={runId} checkpoint={detail.checkpoint} enabled={canReview} profile={capabilities?.profile} onDecided={setDetailSnapshot} />}
+    {detail.checkpoint && !detail.checkpoint.verdict && <CheckpointControl runId={runId} checkpoint={detail.checkpoint} enabled={canDecide} profile={capabilities?.profile} reason={checkpointReason} onDecided={setDetailSnapshot} />}
     {resultQuery.isPending && <QueryLoading />}
     {resultQuery.isError && <QueryFailure title="RunResult 暂不可用" />}
     {resultView && <ResultPanel view={resultView} executionType={run.state.type} />}
-    {resultView?.availability === "available" && resultView.result && <ReviewControl runId={runId} view={resultView} enabled={canReview} profile={capabilities?.profile} onReviewed={setReviewSnapshot} />}
+    {resultView?.availability === "available" && resultView.result && <ReviewControl runId={runId} view={resultView} enabled={canReview} profile={capabilities?.profile} reason={reviewReason} onReviewed={setReviewSnapshot} />}
     <section className="detail-section" aria-labelledby="versions-title"><div className="detail-heading"><h2 id="versions-title">RunResult 版本</h2><p>由新到旧；第一条是当前科研权威版本。</p></div>{versionsQuery.data?.data?.items.length ? <ol className="version-list">{versionsQuery.data.data.items.map((version, index) => <li key={version.artifactId}><span>{index === 0 ? "当前" : `历史 ${index}`}</span><strong>{version.artifactId}</strong><time dateTime={version.createdAt}>{formatAbsolute(version.createdAt)}</time><em>{version.availability}</em></li>)}</ol> : versionsQuery.isPending ? <QueryLoading /> : <p className="muted">没有可显示的版本。</p>}</section>
     <section className="detail-section" aria-labelledby="request-title"><div className="detail-heading"><h2 id="request-title">运行请求</h2><p>Prefect 参数与标签，只读展示。</p></div><pre className="request-code">{JSON.stringify({ parameters: detail.parameters, tags: detail.tags }, null, 2)}</pre></section>
     {cancelMutation.isError && <div className="command-error persistent-command-error" role="alert">取消请求未获得权威回执；运行状态保持原样，没有自动重试。</div>}

@@ -115,6 +115,21 @@ describe("guarded commands", () => {
     expect(idempotencyKeys[0]).toBe(idempotencyKeys[1]);
   });
 
+  it("requires the run deployment to be allowlisted before cancel or review", async () => {
+    const { routes, run } = activeRunRoutes();
+    routes["/api/v1/runs/run-active"] = envelope({
+      ...((routes["/api/v1/runs/run-active"] as any).data),
+      run: { ...run, deploymentId: "outside-deployment" },
+    });
+    routes["/api/v1/runs/run-active/result"] = envelope({ ...validResult, result: { ...validResult.result, run_id: "run-active" } }, { runResult: { ...sourceFresh, source: "runResult" } });
+    routes["/api/v1/runs/run-active/result/versions"] = envelope({ items: [], nextCursor: null }, { runResult: { ...sourceFresh, source: "runResult" } });
+    routes["/api/v1/capabilities"] = envelope({ ...(standardRoutes()["/api/v1/capabilities"] as any).data, allowedDeploymentIds: [] });
+    renderAppAt("/runs/run-active", routes);
+    expect(await screen.findByRole("button", { name: "取消运行" })).toBeDisabled();
+    expect(await screen.findByRole("button", { name: "提交评审" })).toBeDisabled();
+    expect(screen.getAllByText("不在测试白名单").length).toBeGreaterThan(0);
+  });
+
   it("uses the server command version for queue and schedule actions", async () => {
     const user = userEvent.setup();
     const routes = standardRoutes();
@@ -153,10 +168,30 @@ describe("guarded commands", () => {
 
   it("disables write controls in real-readonly", async () => {
     const routes = standardRoutes();
-    routes["/api/v1/capabilities"] = envelope({ profile: "real-readonly", projectId: "bogda-main", effectiveAutonomyMode: "supervised", canSubmitRegisteredDeployment: false, canCancelRun: false, canPauseSchedule: false, canPauseWorkQueue: false, canReviewScientificResult: false, canSetAutonomyMode: false }, {});
+    routes["/api/v1/capabilities"] = envelope({ profile: "real-readonly", projectId: "bogda-main", effectiveAutonomyMode: "supervised", canSubmitRegisteredDeployment: false, canCancelRun: false, canPauseSchedule: false, canPauseWorkQueue: false, canDecideCheckpoint: false, canReviewScientificResult: false, canSetAutonomyMode: false, allowedDeploymentIds: [], allowedScheduleIds: [], allowedQueueIds: [], allowedWorkPoolNames: [] }, {});
     renderAppAt("/infrastructure", routes);
     expect(await screen.findByRole("button", { name: "提交 alpine-assay" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "暂停队列 cpu" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "暂停日程 manual window" })).toBeDisabled();
+  });
+
+  it("requires both deployment and schedule scope before opening schedule confirmation", async () => {
+    const routes = standardRoutes();
+    routes["/api/v1/capabilities"] = envelope({ ...(routes["/api/v1/capabilities"] as any).data, allowedDeploymentIds: ["another-deployment"], allowedScheduleIds: ["schedule-dorm"] });
+    renderAppAt("/infrastructure", routes);
+    const scheduleButton = await screen.findByRole("button", { name: "暂停日程 manual window" });
+    expect(scheduleButton).toBeDisabled();
+    expect(screen.getAllByText("不在测试白名单").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "确认暂停" })).not.toBeInTheDocument();
+  });
+
+  it("requires both work pool and queue scope before opening queue confirmation", async () => {
+    const routes = standardRoutes();
+    routes["/api/v1/capabilities"] = envelope({ ...(routes["/api/v1/capabilities"] as any).data, allowedQueueIds: ["queue-cpu"], allowedWorkPoolNames: ["another-pool"] });
+    renderAppAt("/infrastructure", routes);
+    const queueButton = await screen.findByRole("button", { name: "暂停队列 cpu" });
+    expect(queueButton).toBeDisabled();
+    expect(screen.getAllByText("不在测试白名单").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "确认暂停" })).not.toBeInTheDocument();
   });
 });

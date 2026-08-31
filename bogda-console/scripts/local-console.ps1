@@ -37,15 +37,44 @@ $RunnerPath = Join-Path $StateDir "run_bogda_console.py"
 $DryRun = $env:BOGDA_CONSOLE_LAUNCHER_DRY_RUN -eq "1"
 $ObservationFile = $env:BOGDA_CONSOLE_LAUNCHER_OBSERVATION
 
-$ChildEnv = @{
-    BOGDA_CONSOLE_PROFILE                 = "mock-all"
-    BOGDA_CONSOLE_TEST_MODE               = "0"
-    BOGDA_CONSOLE_PUBLIC_HOST             = $BindHost
-    BOGDA_CONSOLE_PUBLIC_PORT             = "$Port"
+$ProfileExplicit = -not [string]::IsNullOrWhiteSpace($env:BOGDA_CONSOLE_PROFILE)
+$SelectedProfile = if ($ProfileExplicit) { $env:BOGDA_CONSOLE_PROFILE } else { "mock-all" }
+$MockAllowlistDefaults = @{
     BOGDA_CONSOLE_ALLOWED_DEPLOYMENT_IDS  = "deployment-service,deployment-dorm"
     BOGDA_CONSOLE_ALLOWED_SCHEDULE_IDS    = "schedule-service,schedule-dorm"
     BOGDA_CONSOLE_ALLOWED_QUEUE_IDS       = "queue-service,queue-cpu,queue-gpu"
     BOGDA_CONSOLE_ALLOWED_WORK_POOL_NAMES = "pi-service,dorm-x86"
+}
+
+if (-not $ProfileExplicit) {
+    $ChildEnv = @{
+        BOGDA_CONSOLE_PROFILE                 = "mock-all"
+        BOGDA_CONSOLE_TEST_MODE               = "0"
+        BOGDA_CONSOLE_PUBLIC_HOST             = $BindHost
+        BOGDA_CONSOLE_PUBLIC_PORT             = "$Port"
+        BOGDA_CONSOLE_ALLOWED_DEPLOYMENT_IDS  = $MockAllowlistDefaults.BOGDA_CONSOLE_ALLOWED_DEPLOYMENT_IDS
+        BOGDA_CONSOLE_ALLOWED_SCHEDULE_IDS    = $MockAllowlistDefaults.BOGDA_CONSOLE_ALLOWED_SCHEDULE_IDS
+        BOGDA_CONSOLE_ALLOWED_QUEUE_IDS       = $MockAllowlistDefaults.BOGDA_CONSOLE_ALLOWED_QUEUE_IDS
+        BOGDA_CONSOLE_ALLOWED_WORK_POOL_NAMES = $MockAllowlistDefaults.BOGDA_CONSOLE_ALLOWED_WORK_POOL_NAMES
+    }
+} else {
+    $ChildEnv = @{
+        BOGDA_CONSOLE_PROFILE                 = $SelectedProfile
+        BOGDA_CONSOLE_TEST_MODE               = if ($null -ne $env:BOGDA_CONSOLE_TEST_MODE) { $env:BOGDA_CONSOLE_TEST_MODE } else { "0" }
+        BOGDA_CONSOLE_PUBLIC_HOST             = $BindHost
+        BOGDA_CONSOLE_PUBLIC_PORT             = "$Port"
+        BOGDA_CONSOLE_REPLICA_COUNT           = if ($null -ne $env:BOGDA_CONSOLE_REPLICA_COUNT) { $env:BOGDA_CONSOLE_REPLICA_COUNT } else { "1" }
+        BOGDA_CONSOLE_ALLOWED_DEPLOYMENT_IDS  = if ($null -ne $env:BOGDA_CONSOLE_ALLOWED_DEPLOYMENT_IDS) { $env:BOGDA_CONSOLE_ALLOWED_DEPLOYMENT_IDS } elseif ($SelectedProfile -eq "mock-all") { $MockAllowlistDefaults.BOGDA_CONSOLE_ALLOWED_DEPLOYMENT_IDS } else { "" }
+        BOGDA_CONSOLE_ALLOWED_SCHEDULE_IDS    = if ($null -ne $env:BOGDA_CONSOLE_ALLOWED_SCHEDULE_IDS) { $env:BOGDA_CONSOLE_ALLOWED_SCHEDULE_IDS } elseif ($SelectedProfile -eq "mock-all") { $MockAllowlistDefaults.BOGDA_CONSOLE_ALLOWED_SCHEDULE_IDS } else { "" }
+        BOGDA_CONSOLE_ALLOWED_QUEUE_IDS       = if ($null -ne $env:BOGDA_CONSOLE_ALLOWED_QUEUE_IDS) { $env:BOGDA_CONSOLE_ALLOWED_QUEUE_IDS } elseif ($SelectedProfile -eq "mock-all") { $MockAllowlistDefaults.BOGDA_CONSOLE_ALLOWED_QUEUE_IDS } else { "" }
+        BOGDA_CONSOLE_ALLOWED_WORK_POOL_NAMES = if ($null -ne $env:BOGDA_CONSOLE_ALLOWED_WORK_POOL_NAMES) { $env:BOGDA_CONSOLE_ALLOWED_WORK_POOL_NAMES } elseif ($SelectedProfile -eq "mock-all") { $MockAllowlistDefaults.BOGDA_CONSOLE_ALLOWED_WORK_POOL_NAMES } else { "" }
+    }
+    if ($SelectedProfile -ne "mock-all") {
+        foreach ($key in @("PREFECT_API_URL", "PREFECT_API_AUTH_STRING", "PREFECT_API_KEY", "DEEPSEEK_API_KEY", "DEEPSEEK_API_BASE")) {
+            $value = [Environment]::GetEnvironmentVariable($key)
+            if ($null -ne $value) { $ChildEnv[$key] = $value }
+        }
+    }
 }
 
 function Write-HostMessage([string]$Text) {
@@ -79,9 +108,12 @@ function ConvertTo-StartTimeString($Value) {
 }
 
 function New-EnvObject {
+    $secretKeys = @("PREFECT_API_AUTH_STRING", "PREFECT_API_KEY", "DEEPSEEK_API_KEY")
     $envObject = New-Object psobject
     foreach ($key in @($ChildEnv.Keys | Sort-Object)) {
-        $envObject | Add-Member -NotePropertyName $key -NotePropertyValue ([string]$ChildEnv[$key])
+        $value = [string]$ChildEnv[$key]
+        if ($secretKeys -contains $key -and $value) { $value = "[set]" }
+        $envObject | Add-Member -NotePropertyName $key -NotePropertyValue $value
     }
     return $envObject
 }
@@ -221,7 +253,7 @@ function Test-ManagedMatch($Snapshot) {
 
 function Test-HealthyCapabilities($Snapshot) {
     $cap = $Snapshot.capabilities
-    return ($cap.reachable -and $cap.httpStatus -eq 200 -and [string]$cap.profile -eq "mock-all")
+    return ($cap.reachable -and $cap.httpStatus -eq 200 -and [string]$cap.profile -eq $SelectedProfile)
 }
 
 function Test-LaunchReady($Snapshot) {

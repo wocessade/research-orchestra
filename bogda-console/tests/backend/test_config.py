@@ -46,9 +46,14 @@ def test_real_readonly_disables_all_commands() -> None:
     assert settings.review_enabled is False
 
 
-def test_multiple_replicas_disable_review() -> None:
-    settings = Settings.from_env(
-        {"BOGDA_CONSOLE_PROFILE": "allowlisted-test", "BOGDA_CONSOLE_REPLICA_COUNT": "2"}
-    )
-    assert settings.review_enabled is False
+def test_prefect_auth_string_is_preserved_for_server_side_client() -> None:
+    settings = Settings.from_env({"PREFECT_API_AUTH_STRING": "auth-sentinel"})
+    assert settings.prefect_api_auth_string == "auth-sentinel"
+
+
+def test_allowlisted_test_requires_exactly_one_replica() -> None:
+    with pytest.raises(ValueError, match="allowlisted-test requires exactly one replica"):
+        Settings.from_env(
+            {"BOGDA_CONSOLE_PROFILE": "allowlisted-test", "BOGDA_CONSOLE_REPLICA_COUNT": "2"}
+        )
 

@@ -77,6 +77,20 @@ async def test_readonly_capabilities_report_configured_scope_without_enabling_co
 
 
 @pytest.mark.asyncio
+async def test_multi_replica_mock_all_disables_checkpoint_decisions(fixture_loader) -> None:
+    service = service_for(
+        fixture_loader("normal-active"),
+        BOGDA_CONSOLE_PROFILE="mock-all",
+        BOGDA_CONSOLE_REPLICA_COUNT="2",
+    )
+
+    snapshot = (await service.capabilities()).data
+
+    assert snapshot.can_decide_checkpoint is False
+    assert snapshot.can_review_scientific_result is False
+
+
+@pytest.mark.asyncio
 async def test_run_list_projects_science_without_merging_authorities(fixture_loader) -> None:
     service = service_for(fixture_loader("normal-active"))
     response = await service.runs(RunFilters(), None, 50)

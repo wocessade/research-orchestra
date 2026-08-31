@@ -267,6 +267,32 @@ async def test_stale_checkpoint_version_stops_before_resume(fixture_loader) -> N
 
 
 @pytest.mark.asyncio
+async def test_checkpoint_decision_is_disabled_for_multi_replica_mock_all(
+    fixture_loader,
+) -> None:
+    service, prefect, _ = harness(fixture_loader("normal-active"))
+    service.settings = Settings.from_env(
+        {
+            "BOGDA_CONSOLE_PROFILE": "mock-all",
+            "BOGDA_CONSOLE_REPLICA_COUNT": "2",
+            "BOGDA_CONSOLE_ALLOWED_DEPLOYMENT_IDS": "deployment-service,deployment-dorm",
+        }
+    )
+    fixture = fixture_loader("normal-active")
+    fixture["prefect"]["runs"].insert(0, _paused_checkpoint_run())
+    prefect = MockPrefectAdapter(fixture)
+    service.prefect = prefect
+
+    with pytest.raises(ServiceError) as error:
+        await service.decide_checkpoint(
+            "run-checkpoint", "checkpoint-v1", "approved", "not safe to write"
+        )
+
+    assert error.value.code == "RESOURCE_NOT_ALLOWLISTED"
+    assert prefect.resume_calls == []
+
+
+@pytest.mark.asyncio
 async def test_run_result_pre_read_unavailable_is_source_scoped(fixture_loader) -> None:
     service, _, results = harness(fixture_loader("result-missing-invalid-conflict"))
     results._source["source"]["available"] = False

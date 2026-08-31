@@ -36,6 +36,7 @@ $StderrLog = Join-Path $StateDir "stderr.log"
 $RunnerPath = Join-Path $StateDir "run_bogda_console.py"
 $DryRun = $env:BOGDA_CONSOLE_LAUNCHER_DRY_RUN -eq "1"
 $ObservationFile = $env:BOGDA_CONSOLE_LAUNCHER_OBSERVATION
+$SecretEnvKeys = @("PREFECT_API_AUTH_STRING", "PREFECT_API_KEY", "DEEPSEEK_API_KEY")
 
 $ProfileExplicit = -not [string]::IsNullOrWhiteSpace($env:BOGDA_CONSOLE_PROFILE)
 $SelectedProfile = if ($ProfileExplicit) { $env:BOGDA_CONSOLE_PROFILE } else { "mock-all" }
@@ -78,11 +79,28 @@ if (-not $ProfileExplicit) {
 }
 
 function Write-HostMessage([string]$Text) {
-    [Console]::Out.WriteLine($Text)
+    [Console]::Out.WriteLine((Redact-ConfiguredSecrets $Text))
 }
 
 function ConvertTo-CompactJson($Object) {
     return ($Object | ConvertTo-Json -Depth 8 -Compress)
+}
+
+function Get-ConfiguredSecretValues {
+    $values = @()
+    foreach ($key in $SecretEnvKeys) {
+        $value = [Environment]::GetEnvironmentVariable($key)
+        if (-not [string]::IsNullOrEmpty($value)) { $values += $value }
+    }
+    return $values
+}
+
+function Redact-ConfiguredSecrets([string]$Text) {
+    if ($null -eq $Text) { return "" }
+    foreach ($secret in (Get-ConfiguredSecretValues)) {
+        $Text = $Text.Replace($secret, "[redacted]")
+    }
+    return $Text
 }
 
 function Read-JsonFile([string]$Path) {
@@ -388,11 +406,33 @@ function Save-State([int]$ProcessId, [string]$StartTime) {
 function Write-Runner {
     New-Item -ItemType Directory -Force -Path $StateDir | Out-Null
     $code = @"
+import os
 import runpy
 import sys
 
-sys.stdout = open(r"$($StdoutLog.Replace('\', '\\'))", "a", encoding="utf-8", buffering=1)
-sys.stderr = open(r"$($StderrLog.Replace('\', '\\'))", "a", encoding="utf-8", buffering=1)
+secret_values = tuple(
+    os.environ[key]
+    for key in ("PREFECT_API_AUTH_STRING", "PREFECT_API_KEY", "DEEPSEEK_API_KEY")
+    if os.environ.get(key)
+)
+
+class RedactingStream:
+    def __init__(self, target):
+        self.target = target
+
+    def write(self, text):
+        for secret in secret_values:
+            text = text.replace(secret, "[redacted]")
+        return self.target.write(text)
+
+    def flush(self):
+        return self.target.flush()
+
+    def __getattr__(self, name):
+        return getattr(self.target, name)
+
+sys.stdout = RedactingStream(open(r"$($StdoutLog.Replace('\', '\\'))", "a", encoding="utf-8", buffering=1))
+sys.stderr = RedactingStream(open(r"$($StderrLog.Replace('\', '\\'))", "a", encoding="utf-8", buffering=1))
 runpy.run_module("bogda_console", run_name="__main__")
 "@
     [System.IO.File]::WriteAllText($RunnerPath, $code)
@@ -425,7 +465,7 @@ function Get-LogTail([string]$Path, [int]$Lines = 40) {
     if (-not (Test-Path -LiteralPath $Path)) { return "" }
     $content = Get-Content -LiteralPath $Path -Tail $Lines -ErrorAction SilentlyContinue
     if ($null -eq $content) { return "" }
-    return ($content -join [Environment]::NewLine)
+    return (Redact-ConfiguredSecrets ($content -join [Environment]::NewLine))
 }
 
 function Wait-UntilHealthy($Process) {

@@ -240,6 +240,12 @@ class CommandService:
     ) -> CommandReceipt[RunDetail]:
         async with self._lock(f"checkpoint:{run_id}"):
             self._require_commands()
+            if not self.settings.review_enabled:
+                self._raise(
+                    ApiErrorCode.RESOURCE_NOT_ALLOWLISTED,
+                    403,
+                    "checkpoint decisions disabled",
+                )
             detail = await self._pre_read("prefect", lambda: self.prefect.get_run(run_id))
             self._authorize_run(detail.run)
             checkpoint = detail.checkpoint

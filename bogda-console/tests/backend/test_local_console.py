@@ -112,6 +112,48 @@ def materialize_runtime(root: Path, *, venv: bool, dist: bool) -> None:
         (dist_dir / "index.html").write_text("<html></html>", encoding="utf-8")
 
 
+def write_controlled_child(root: Path, *, profile: str) -> None:
+    (root / "bogda_console.py").write_text(
+        f"""
+import http.server
+import json
+import os
+import sys
+import threading
+
+for key in ("PREFECT_API_AUTH_STRING", "PREFECT_API_KEY", "DEEPSEEK_API_KEY"):
+    value = os.environ.get(key)
+    if value:
+        print(f"stdout {{key}}={{value}}", flush=True)
+        print(f"stderr {{key}}={{value}}", file=sys.stderr, flush=True)
+
+class Handler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path != "/api/v1/capabilities":
+            self.send_response(404)
+            self.end_headers()
+            return
+        payload = {{"data": {{"profile": {profile!r}}}}}
+        body = json.dumps(payload).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, format, *args):
+        return
+
+server = http.server.ThreadingHTTPServer(("127.0.0.1", 3101), Handler)
+shutdown = threading.Timer(2, server.shutdown)
+shutdown.daemon = True
+shutdown.start()
+server.serve_forever()
+""",
+        encoding="utf-8",
+    )
+
+
 def copy_launcher(tmp_path: Path) -> Path:
     assert LAUNCHER.is_file(), f"missing launcher script: {LAUNCHER}"
     scripts = tmp_path / "scripts"
@@ -119,6 +161,44 @@ def copy_launcher(tmp_path: Path) -> Path:
     target = scripts / "local-console.ps1"
     shutil.copy(LAUNCHER, target)
     return target
+
+
+def point_launcher_to_python(script: Path) -> None:
+    python = str(Path(getattr(sys, "_base_executable", sys.executable)).resolve()).replace("'", "''")
+    text = script.read_text(encoding="utf-8")
+    text = text.replace(
+        '$Python = [System.IO.Path]::GetFullPath((Join-Path $Root ".venv\\Scripts\\python.exe"))',
+        f"$Python = '{python}'",
+    )
+    text = text.replace(
+        "}\n\nfunction Write-HostMessage",
+        "}\n\n$ChildEnv['PYTHONPATH'] = $Root\n\nfunction Write-HostMessage",
+        1,
+    )
+    script.write_text(text, encoding="utf-8")
+
+
+def cleanup_controlled_state(state_dir: Path) -> None:
+    state_path = state_dir / "state.json"
+    if state_path.is_file():
+        try:
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            pid = int(state["pid"])
+        except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
+            pid = None
+        if pid is not None:
+            subprocess.run(
+                ["taskkill.exe", "/PID", str(pid), "/T", "/F"],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                check=False,
+                timeout=5,
+            )
+    for name in ("state.json", "stdout.log", "stderr.log", "run_bogda_console.py"):
+        path = state_dir / name
+        if path.is_file():
+            path.unlink()
 
 
 def run_launcher(
@@ -497,6 +577,73 @@ def test_probe_marks_healthy_child_listener_as_launch_ready(tmp_path: Path) -> N
     payload = parse_json(completed)
     assert payload["launchReady"] is True
     assert payload["launchPid"] == FOREIGN_PID
+
+
+def test_start_redacts_configured_secrets_from_child_logs_and_failure_tail(
+    tmp_path: Path,
+) -> None:
+    state_dirs = [tmp_path / "state", tmp_path / "failing" / "state"]
+    try:
+        script = copy_launcher(tmp_path)
+        materialize_runtime(tmp_path, venv=False, dist=True)
+        point_launcher_to_python(script)
+        write_controlled_child(tmp_path, profile="real-readonly")
+        secrets = {
+            "PREFECT_API_AUTH_STRING": "AUTH_SENTINEL_FOR_LAUNCHER_TEST",
+            "PREFECT_API_KEY": "PREFECT_KEY_SENTINEL_FOR_LAUNCHER_TEST",
+            "DEEPSEEK_API_KEY": "DEEPSEEK_KEY_SENTINEL_FOR_LAUNCHER_TEST",
+        }
+        completed = run_launcher(
+            "start",
+            script=script,
+            cwd=tmp_path,
+            state_dir=tmp_path / "state",
+            extra_env={
+                "BOGDA_CONSOLE_PROFILE": "real-readonly",
+                "PREFECT_API_AUTH_STRING": secrets["PREFECT_API_AUTH_STRING"],
+                "PREFECT_API_KEY": secrets["PREFECT_API_KEY"],
+                "DEEPSEEK_API_KEY": secrets["DEEPSEEK_API_KEY"],
+            },
+            dry_run=False,
+        )
+        assert completed.returncode == 0, _output(completed)
+        output = _output(completed)
+        assert all(secret not in output for secret in secrets.values())
+        logs = list((tmp_path / "state").glob("*.log"))
+        assert {path.name for path in logs} == {"stdout.log", "stderr.log"}
+        for path in logs:
+            text = path.read_text(encoding="utf-8")
+            assert "[redacted]" in text
+            assert all(secret not in text for secret in secrets.values())
+
+        failing_root = tmp_path / "failing"
+        failing_root.mkdir()
+        failing_script = copy_launcher(failing_root)
+        materialize_runtime(failing_root, venv=False, dist=True)
+        point_launcher_to_python(failing_script)
+        write_controlled_child(failing_root, profile="wrong-profile")
+        failing_script_text = failing_script.read_text(encoding="utf-8")
+        failing_script.write_text(
+            failing_script_text.replace("$ReadyTimeoutSeconds = 15", "$ReadyTimeoutSeconds = 1"),
+            encoding="utf-8",
+        )
+        failed = run_launcher(
+            "start",
+            script=failing_script,
+            cwd=tmp_path / "failing",
+            state_dir=tmp_path / "failing" / "state",
+            extra_env={
+                "BOGDA_CONSOLE_PROFILE": "real-readonly",
+                **secrets,
+            },
+            dry_run=False,
+        )
+        assert failed.returncode != 0
+        failure_output = _output(failed)
+        assert all(secret not in failure_output for secret in secrets.values())
+    finally:
+        for state_dir in state_dirs:
+            cleanup_controlled_state(state_dir)
 
 
 def test_powershell_7_preserves_iso_start_time_from_saved_state(tmp_path: Path) -> None:

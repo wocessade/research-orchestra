@@ -19,7 +19,7 @@
 |---|---|---|---|
 | NOW-01 | Phase C Task 5–6：Prefect 挂起边界、fake 集成验收与维护者交接 | 已完成本地交接；真实部署/生产验证仍见 DEF-02/03/12 | [Phase C acceptance 报告](2026-08-29-bogda-paid-model-runtime-acceptance.md)、一次最终 Bogda full suite、Orchestra 兼容测试 |
 | NOW-02 | Stage D：owner 可操作的前端裁决面与状态可视化 | **本报告关闭 mock 剖面**；真实 usage/调度仍见 DEF-01/03 | [Stage D acceptance](2026-08-29-bogda-owner-console-acceptance.md)、浏览器/前端/契约矩阵 |
-| NOW-03 | Stage E：运行接线与迁移前验收 | Task 1–4：ledger、paid-call+SQLite、官方余额 **live GET**、本机 Flash/Pro dsh stdout `pong`。缺 `usage.json` 精确对账。真 suspend 未做。Gate 6 **未通过** | [Stage E 开工](2026-08-30-bogda-stage-e-start.md)、[计划](../superpowers/plans/2026-08-30-bogda-stage-e.md) |
+| NOW-03 | Stage E：运行接线与迁移前验收 | Task 1–4：ledger、paid-call+SQLite、官方余额 **live GET**、本机 Flash/Pro dsh stdout `pong`。缺 `usage.json` 精确对账。真 suspend 未做。Gate 6 **已通过**；3101 real Prefect 接线与迁移前边界仍待 Gate 7 Tasks 1–3 | [Stage E 开工](2026-08-30-bogda-stage-e-start.md)、[计划](../superpowers/plans/2026-08-30-bogda-stage-e.md)、[Gate 7 entry decision](2026-09-01-bogda-gate7-entry-decision.md) |
 | NOW-04 | Gate 6 收尾 | **已完成。** trial `20260830T154019Z` 覆盖 24h08m56s，275 个样本零缺口、零 API/DB/OOM 失败；受控 reboot、正常 fsck/mount、独立 restore 与最终日志复核全部通过 | [最终验收](2026-08-31-bogda-rk3528-gate6-final-acceptance.md)、[e2fsck/重试日志](2026-08-30-bogda-rk3528-e2fsck-remediation.md) |
 | NOW-05 | Runner 开工包本地准入 | `admit_runner_packet` + 6 个契约测试已过。未接线到 Prefect worker / 3101 | [spec](../superpowers/specs/2026-08-30-bogda-runner-dsh-design.md) §5.7、[计划](../superpowers/plans/2026-08-30-bogda-runner-packet.md) |
 

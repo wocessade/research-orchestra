@@ -59,6 +59,9 @@ npm run build
 
 ## 3101 本地运行手册
 
+真实 Prefect 的 S1/S2 验收步骤见 [real-shadow-runbook.md](docs/real-shadow-runbook.md)；
+日常开发和演示仍使用下面的 `mock-all` 启动方式。
+
 日常推荐用启动器管理 3101 上的 `mock-all` 演示。它只启动当前工作树或主目录
 自己的 `.venv\Scripts\python.exe` 和 `frontend\dist`，状态文件写在
 `%LOCALAPPDATA%\BogdaConsole\`，不安装依赖、不跑 `npm ci`、不触碰 3100。
@@ -184,6 +187,7 @@ Stop-Process -Id $bogdaListener.OwningProcess
 | `BOGDA_CONSOLE_FIXTURE` | `normal-active` | mock 启动场景 |
 | `BOGDA_CONSOLE_TEST_MODE` | `0` | 为 `1` 时开放 mock 场景切换端点 |
 | `PREFECT_API_URL` | 无 | 两个 real profile 必填 |
+| `PREFECT_API_AUTH_STRING` | 无 | real profile 的服务端认证字符串，只保存在服务端环境 |
 | `PREFECT_API_KEY` | 无 | Prefect API 可选凭据，只保存在服务端 |
 | `BOGDA_CONSOLE_REPLICA_COUNT` | `1` | 评审追加仅允许单副本进程 |
 | `BOGDA_CONSOLE_ALLOWED_DEPLOYMENT_IDS` | 空 | 精确 Deployment UUID/ID，逗号分隔 |

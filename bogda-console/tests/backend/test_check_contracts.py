@@ -14,6 +14,27 @@ def test_same_text_with_lf_versus_crlf_is_not_drift() -> None:
     assert contract_bytes_equal(lf, crlf)
 
 
+def test_real_shadow_runbook_contains_operational_contract() -> None:
+    runbook = Path(__file__).resolve().parents[2] / "docs" / "real-shadow-runbook.md"
+    text = runbook.read_text(encoding="utf-8")
+
+    required_terms = (
+        "real-readonly",
+        "allowlisted-test",
+        "PREFECT_API_AUTH_STRING",
+        "BOGDA_CONSOLE_REPLICA_COUNT=1",
+        "BOGDA_CONSOLE_ALLOWED_DEPLOYMENT_IDS",
+        "BOGDA_CONSOLE_ALLOWED_SCHEDULE_IDS",
+        "BOGDA_CONSOLE_ALLOWED_QUEUE_IDS",
+        "BOGDA_CONSOLE_ALLOWED_WORK_POOL_NAMES",
+        "3100",
+        "authoritative post-read",
+    )
+
+    missing = [term for term in required_terms if term not in text]
+    assert not missing, f"runbook is missing required terms: {missing}"
+
+
 def test_non_newline_content_change_is_drift() -> None:
     committed = b"export interface Run {\n  id: string;\n}\n"
     generated = b"export interface Run {\n  id: number;\n}\n"

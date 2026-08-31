@@ -2,7 +2,7 @@
 
 日期：2026-08-30（北京）
 
-状态：执行中；本文件是运行日志，不代表 Gate 6 已通过。
+状态：已完成；trial `20260830T154019Z` 于 2026-08-31 通过 Gate 6。
 
 ## 授权与边界
 
@@ -78,7 +78,7 @@ live `prefect.db` 在维护前后 SHA-256 均为 `aee98aa10579a5e53101c35cf6efc5
 - [x] 归档旧 `samples.jsonl`，生成并记录新 trial id。
 - [x] 执行一次受控重启，验证带盘自动 fsck、挂载和服务恢复。
 - [x] 在独立目录完成 snapshot restore verify，不覆盖 live DB。
-- [ ] 继续采集 24 小时并最终执行 `health summarize`。
+- [x] 继续采集 24 小时并最终执行 `health summarize`。
 
 新 trial：`20260830T154019Z`。旧 trial `20260830T034154Z` 的 63,639-byte `samples.jsonl` 已归档为 `archive/samples-20260830T034154Z.jsonl`。首样本时间 `2026-08-30T15:40:20.419427Z`，`api_ok=true`、`database_integrity=ok`、`oom_kill_count=0`、swap 使用量 0，server/worker/timers 状态符合预期。
 
@@ -100,8 +100,9 @@ live `prefect.db` 在维护前后 SHA-256 均为 `aee98aa10579a5e53101c35cf6efc5
 
 ## 后续必要事项
 
-- 24 小时窗口结束后，按 runbook 逐字段核对采样跨度、缺失区间、API 失败、磁盘、内存和 OOM 证据。
-- 将本轮实际命令、输出摘要、trial id、截止时间、恢复目录和 SHA-256 追加到本文件。
-- Gate 6 未满足全部验收条件前，不进入“通过”结论。
-- 已安排一次性任务心跳于北京时间 2026-08-31 23:45 收口本 trial；避免在窗口内高频人工轮询消耗额度。
-- 后续维护项：消除 `python -m bogda.ops.snapshot` 的 `runpy` 重复导入警告；评估将静态 e2fsck 安装/回滚步骤固化为有测试的运维脚本，避免依赖手工命令。两项均不应为了本轮 Gate 6 临时扩大改动面。
+- [x] 24 小时窗口结束后，逐字段核对采样跨度、缺失区间、API、数据库、磁盘、内存、swap 与 OOM 证据。
+- [x] 核对所有样本中的受控 unit 状态，并复查当前 mount、fsck、服务重启计数、内核错误与服务 warning 日志。
+- [x] 重新只读校验 snapshot 与独立 restore 的 SHA-256 和 SQLite integrity。
+- [x] 形成[最终 Gate 6 验收报告](2026-08-31-bogda-rk3528-gate6-final-acceptance.md)。
+
+后续只剩 Gate 6 之外的产品接线与迁移裁决；不得把本次通过解释为自动授权 3100 切换或真实 Prefect 写入。

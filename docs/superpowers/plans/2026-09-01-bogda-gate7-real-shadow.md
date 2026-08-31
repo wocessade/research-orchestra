@@ -94,11 +94,13 @@ Expected: no stale Gate 6 failure remains in current-status rows; historical fai
 - Modify: `bogda-console/src/bogda_console/adapters/prefect_api.py`
 - Modify: `bogda-console/src/bogda_console/contracts/models.py`
 - Modify: `bogda-console/src/bogda_console/services/queries.py`
+- Modify: `bogda-console/scripts/local-console.ps1`
 - Modify: `bogda-console/frontend/src/pages/InfrastructurePage.tsx`
 - Modify: `bogda-console/frontend/src/pages/RunDetailPage.tsx`
 - Modify: `bogda-console/tests/backend/test_config.py`
 - Modify: `bogda-console/tests/backend/test_prefect_adapter_contract.py`
 - Modify: `bogda-console/tests/backend/test_query_service.py`
+- Modify: `bogda-console/tests/backend/test_local_console.py`
 - Modify: `bogda-console/tests/frontend/commands.test.tsx`
 - Modify: `bogda-console/tests/frontend/checkpoints.test.tsx`
 - Modify: `bogda-console/tests/frontend/helpers.tsx`
@@ -106,7 +108,7 @@ Expected: no stale Gate 6 failure remains in current-status rows; historical fai
 - Regenerate: `bogda-console/frontend/src/api/generated.ts`
 
 **Interfaces:**
-- Consumes: `PREFECT_API_URL`, server-side `PREFECT_API_AUTH_STRING` or optional `PREFECT_API_KEY`, `Settings.allowed_*`, `RunSummary.deployment_id`, `DeploymentSummary.allowlisted`, nested pool/queue snapshots.
+- Consumes: `PREFECT_API_URL`, server-side `PREFECT_API_AUTH_STRING` or optional `PREFECT_API_KEY`, launcher process environment, `Settings.allowed_*`, `RunSummary.deployment_id`, `DeploymentSummary.allowlisted`, nested pool/queue snapshots.
 - Produces: `CapabilitySnapshot.canDecideCheckpoint` plus sorted `allowedDeploymentIds`, `allowedScheduleIds`, `allowedQueueIds`, and `allowedWorkPoolNames` arrays.
 
 - [ ] **Step 1: Write failing configuration tests**
@@ -134,7 +136,19 @@ assert snapshot.can_review_scientific_result is True
 
 For `real-readonly`, assert both booleans are false and every allowlist array is empty unless explicitly configured; configured values may be reported but do not enable commands.
 
-- [ ] **Step 4: Write failing frontend resource-applicability tests**
+- [ ] **Step 4: Write failing launcher profile/secret tests**
+
+Use launcher dry-run/plan observations to prove:
+
+```text
+default launch remains mock-all with existing mock fixture allowlists
+explicit real-readonly forwards PREFECT_API_URL and PREFECT_API_AUTH_STRING to the child
+explicit allowlisted-test forwards exact allowlists and replica count
+PREFECT_API_AUTH_STRING, PREFECT_API_KEY, and DEEPSEEK_API_KEY values never appear in plan/status/stdout; plan metadata reports only "[set]"
+real profiles do not inherit mock fixture allowlists when the variables are absent
+```
+
+- [ ] **Step 5: Write failing frontend resource-applicability tests**
 
 Cover these cases:
 
@@ -147,27 +161,31 @@ checkpoint uses canDecideCheckpoint, not canReviewScientificResult
 non-allowlisted resources show a visible "不在测试白名单" reason and never open a confirmation dialog
 ```
 
-- [ ] **Step 5: Run the focused tests and observe failure**
+- [ ] **Step 6: Run the focused tests and observe failure**
 
 Run:
 
 ```powershell
 $env:PYTHONPATH = "$PWD\src"
-& 'D:\pythonProject\bogda-console\.venv\Scripts\python.exe' -m pytest -q tests/backend/test_config.py tests/backend/test_prefect_adapter_contract.py tests/backend/test_query_service.py
+& 'D:\pythonProject\bogda-console\.venv\Scripts\python.exe' -m pytest -q tests/backend/test_config.py tests/backend/test_prefect_adapter_contract.py tests/backend/test_query_service.py tests/backend/test_local_console.py
 npm run test:frontend -- --run ../tests/frontend/commands.test.tsx ../tests/frontend/checkpoints.test.tsx
 ```
 
 Expected: failures identify the missing capability fields, replica fail-fast, and resource-specific UI gating.
 
-- [ ] **Step 6: Implement the minimal server-side auth and capability contracts**
+- [ ] **Step 7: Implement the minimal server-side auth and capability contracts**
 
 `Settings.from_env` must read `PREFECT_API_AUTH_STRING` without transforming it and reject multi-replica `allowlisted-test`. `Container.build` passes it to `PrefectApiAdapter`, whose `_default_client` passes it to `PrefectClient(auth_string=...)`. `CapabilitySnapshot` must add the five fields above. `QueryService.capabilities()` must populate booleans from existing properties and arrays from `sorted(settings.allowed_*)`; no Prefect query occurs in the capability endpoint.
 
-- [ ] **Step 7: Implement frontend applicability without local authorization claims**
+- [ ] **Step 8: Make the launcher profile-aware and secret-safe**
+
+Default behavior remains the current mock launcher. When `BOGDA_CONSOLE_PROFILE` is explicit, pass the documented real-profile variables from the parent environment to the child. Mock allowlist defaults apply only to `mock-all`; real profiles default to empty exact sets. `New-EnvObject` must replace values of `PREFECT_API_AUTH_STRING`, `PREFECT_API_KEY`, and `DEEPSEEK_API_KEY` with `[set]` and must never write the real value to observation, state, stdout, or stderr.
+
+- [ ] **Step 9: Implement frontend applicability without local authorization claims**
 
 Use the capability scope only to render applicability. Backend checks remain authoritative. A disabled action explains whether the profile is read-only or the resource is outside the exact S2 allowlist. Do not cache a successful mutation as authorization for another resource.
 
-- [ ] **Step 8: Regenerate contracts and run focused verification**
+- [ ] **Step 10: Regenerate contracts and run focused verification**
 
 Run:
 
@@ -175,18 +193,18 @@ Run:
 $env:PYTHONPATH = "$PWD\src"
 & 'D:\pythonProject\bogda-console\.venv\Scripts\python.exe' scripts/export_openapi.py
 npm run check:contracts
-& 'D:\pythonProject\bogda-console\.venv\Scripts\python.exe' -m pytest -q tests/backend/test_config.py tests/backend/test_prefect_adapter_contract.py tests/backend/test_query_service.py tests/backend/test_openapi.py
+& 'D:\pythonProject\bogda-console\.venv\Scripts\python.exe' -m pytest -q tests/backend/test_config.py tests/backend/test_prefect_adapter_contract.py tests/backend/test_query_service.py tests/backend/test_local_console.py tests/backend/test_openapi.py
 npm run test:frontend -- --run ../tests/frontend/commands.test.tsx ../tests/frontend/checkpoints.test.tsx
 npm run build
 ```
 
 Expected: all focused tests and generated-contract drift checks pass.
 
-- [ ] **Step 9: Commit the resource capability change**
+- [ ] **Step 11: Commit the real-profile safety change**
 
 ```powershell
-git add bogda-console/src bogda-console/frontend/src bogda-console/tests bogda-console/openapi.json
-git commit -m "feat(console): scope S2 controls to allowed resources"
+git add bogda-console/src bogda-console/frontend/src bogda-console/scripts/local-console.ps1 bogda-console/tests bogda-console/openapi.json
+git commit -m "feat(console): harden real shadow controls"
 ```
 
 ---

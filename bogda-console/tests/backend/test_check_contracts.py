@@ -35,6 +35,24 @@ def test_real_shadow_runbook_contains_operational_contract() -> None:
     assert not missing, f"runbook is missing required terms: {missing}"
 
 
+def test_real_shadow_runbook_has_exactly_six_phases() -> None:
+    runbook = Path(__file__).resolve().parents[2] / "docs" / "real-shadow-runbook.md"
+    headings = [
+        line
+        for line in runbook.read_text(encoding="utf-8").splitlines()
+        if line.startswith("## ")
+    ]
+
+    assert headings == [
+        "## 1. Ownership preflight",
+        "## 2. 3100 before-check",
+        "## 3. S1 start/read/compare",
+        "## 4. Restore",
+        "## 5. S2 dedicated-resource setup",
+        "## 6. S2 command matrix/restore",
+    ]
+
+
 def test_non_newline_content_change_is_drift() -> None:
     committed = b"export interface Run {\n  id: string;\n}\n"
     generated = b"export interface Run {\n  id: number;\n}\n"

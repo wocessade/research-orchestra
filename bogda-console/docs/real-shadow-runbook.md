@@ -70,17 +70,13 @@ $preflightEvidence = [ordered]@{
   launcherStatus = $preflight.status; launcherManagedProfile = $preflight.profile
   launcherEnv = $envSnapshot
   listener = @(Get-NetTCPConnection -LocalAddress 127.0.0.1 -LocalPort 3101 -State Listen -ErrorAction SilentlyContinue | Select-Object LocalAddress,LocalPort,OwningProcess)
-  authConfigured = ([bool]$env:PREFECT_API_AUTH_STRING -or [bool]$env:PREFECT_API_KEY)
+  prefectApiAuthStringConfigured = [bool]$env:PREFECT_API_AUTH_STRING
+  prefectApiKeyConfigured = [bool]$env:PREFECT_API_KEY
 }
 $preflightEvidence | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $EvidenceRoot "preflight.json") -Encoding utf8
 ```
 
-`status=foreign-listener`, an unparseable ownership result, or a PID/start-time
-mismatch is unknown ownership. Do not stop that PID. A managed `healthy` or
-`degraded` process may be stopped only through `Invoke-CheckedLauncher`.
-
-Snapshot/restore is limited to these non-secret variables; set/unset presence
-is retained so a later phase restores the operator shell exactly:
+Snapshot/restore is limited to these non-secret variables; set/unset presence is retained so later phases restore the operator shell exactly:
 
 | Variable group | S1 change | S2 change | Restore |
 | --- | --- | --- | --- |
@@ -91,8 +87,7 @@ is retained so a later phase restores the operator shell exactly:
 
 ## 2. 3100 before-check
 
-Any non-200 result is the same `3100` regression hard stop. Do not record a
-distinct HTTP error code or response body.
+Any non-200 result is the same `3100` regression hard stop.
 
 ```powershell
 $check3100 = {
@@ -104,6 +99,20 @@ $check3100 = {
   if (-not $ok) { throw "HARD STOP: 3100 regression" }
 }
 & $check3100 "3100-before.json"
+```
+
+For any S1/S2 source, receipt, or authoritative post-read failure, invoke this
+path: it stops only launcher-owned process, restores captured non-secret values
+and managed profile, rechecks 3100, and never deletes or natively rolls back.
+
+```powershell
+function Invoke-EmergencyRollback {
+  $current = Invoke-CheckedLauncher status
+  if ($current.status -in @("healthy","degraded")) { Invoke-CheckedLauncher stop }
+  foreach ($name in $envSnapshot.Keys) { if ($envSnapshot[$name].set) { Set-Item "Env:$name" $envSnapshot[$name].value } else { Remove-Item "Env:$name" -ErrorAction SilentlyContinue } }
+  if ($preflight.status -in @("healthy","degraded")) { Invoke-CheckedLauncher start; Invoke-CheckedLauncher status -ExpectedProfile $preflight.profile }
+  & $check3100 "3100-after-emergency-rollback.json"
+}
 ```
 
 Repeat the same `http200`-only check as `3100-after-s1.json` in Phase 4 and as
@@ -132,6 +141,25 @@ Read `/api/v1/capabilities`, `/overview`, `/runs?limit=100`,
 counts, pool/queue/worker names, `state.type`, `state.name`, RunResult artifact
 IDs, profile, and `can*` booleans only. A non-200 or malformed response is a
 source error.
+
+```powershell
+$S1Evidence = Join-Path $EvidenceRoot "s1"
+$projection = [ordered]@{
+  capabilities = Invoke-RestMethod "http://127.0.0.1:3101/api/v1/capabilities"
+  overview = Invoke-RestMethod "http://127.0.0.1:3101/api/v1/overview"
+  runs = Invoke-RestMethod "http://127.0.0.1:3101/api/v1/runs?limit=100"
+  deployments = Invoke-RestMethod "http://127.0.0.1:3101/api/v1/deployments?limit=100"
+  infrastructure = Invoke-RestMethod "http://127.0.0.1:3101/api/v1/infrastructure"
+}
+$selected = @(
+  @($projection.runs.data.items | % { @{ kind="run"; id=$_.runId } })
+  @($projection.deployments.data.items | % { @{ kind="deployment"; id=$_.deploymentId } })
+  @($projection.infrastructure.data.pools | % { @{ kind="pool"; id=$_.name } })
+  @($projection.infrastructure.data.pools | % { $_.queues } | % { @{ kind="queue"; id=$_.queueId } })
+)
+if ($selected.Count -eq 0) { throw "HARD STOP: Prefect source error" }
+$selected | ConvertTo-Json | Set-Content (Join-Path $S1Evidence "projection-selected.json") -Encoding utf8
+```
 
 Minimal direct authority example (the same selector is rerun for each
 authoritative post-read):
@@ -163,10 +191,12 @@ async def main():
             print(json.dumps({"name":x.name, "concurrencyLimit":x.concurrency_limit, "workerCount":len(ws)}, sort_keys=True))
 asyncio.run(main())
 '@
-$authorityId = [string]($projection.runs.data.items | Select-Object -First 1).runId # repeat for each selected ID
-if ($authorityId) { $authority = & $Python -c $authorityScript "run" $authorityId 2>$null }
-if ($LASTEXITCODE -ne 0) { throw "HARD STOP: Prefect source error" }
-if ($authorityId) { ($authority -join "`n") | ConvertFrom-Json | ConvertTo-Json | Set-Content (Join-Path $S1Evidence "authority-post-read.json") -Encoding utf8 }
+$authorityRecords = foreach ($item in $selected) {
+  $authority = & $Python -c $authorityScript $item.kind $item.id 2>$null
+  if ($LASTEXITCODE -ne 0 -or -not $authority) { throw "HARD STOP: Prefect source error" }
+  ($authority -join "`n") | ConvertFrom-Json
+}
+$authorityRecords | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $S1Evidence "authority-post-read.json") -Encoding utf8
 ```
 
 Compare projection and authority by ID, not list order, for deployment/run/
@@ -189,17 +219,15 @@ if (-not $continueWithS2) {
 & $check3100 "3100-after-s1.json"
 ```
 
-When S1 ends here, restore the actual `launcherManagedProfile` from preflight;
-if no managed process existed, leave `3101` stopped. Record S1 comparison and
-restore under `evidence/s1/`.
+When S1 ends here, restore the actual preflight managed profile, or leave `3101`
+stopped if none existed; record comparison and restore under `evidence/s1/`.
 
 ## 5. S2 dedicated-resource setup
 
-Use the repository's existing Prefect client methods in this compact recipe;
-the recipe is not a reusable CRUD library. Create a flow, process work pool,
-queue, deployment, and inactive interval schedule whose names all start with
-`bogda-s2-acceptance-20260901-`. Set pool concurrency to 1 and attach no worker.
-The recipe must return and record only these non-secret values:
+Use existing Prefect client methods in this compact, non-reusable recipe. Create
+a flow, process pool, queue, deployment, and inactive interval schedule whose
+names start with `bogda-s2-acceptance-20260901-`; set concurrency to 1 with no
+worker. Return only these non-secret values:
 `flowId/flowName`, `poolId/poolName`, `queueId/queueName`,
 `deploymentId/deploymentName`, `scheduleId/scheduleSlug`, `scheduleActive`,
 `concurrencyLimit`, and `workerCount`.
@@ -207,23 +235,27 @@ The recipe must return and record only these non-secret values:
 ```python
 # Existing PrefectClient, with PREFECT_API_URL and either credential inherited.
 prefix = "bogda-s2-acceptance-20260901-<unique-suffix>"
-flow_id = await client.create_flow_from_name(prefix + "flow")
+flow_name = prefix + "flow"
+flow_id = await client.create_flow_from_name(flow_name)
 pool = await client.create_work_pool(WorkPoolCreate(name=prefix + "pool", type="prefect-process", concurrency_limit=1, is_paused=False))
 queue = await client.create_work_queue(name=prefix + "queue", work_pool_name=pool.name, is_paused=True, concurrency_limit=1)
-schedule = DeploymentScheduleCreate(schedule=IntervalSchedule(interval=timedelta(days=3650)), active=False, slug=prefix + "schedule")
-deployment_id = await client.create_deployment(flow_id=flow_id, name=prefix + "deployment", work_pool_name=pool.name, work_queue_name=queue.name, schedules=[schedule], paused=True)
+schedule_slug = prefix + "schedule"
+schedule = DeploymentScheduleCreate(schedule=IntervalSchedule(interval=timedelta(days=3650)), active=False, slug=schedule_slug)
+deployment_name = prefix + "deployment"
+deployment_id = await client.create_deployment(flow_id=flow_id, name=deployment_name, work_pool_name=pool.name, work_queue_name=queue.name, schedules=[schedule], paused=True)
 schedule_id = (await client.read_deployment_schedules(deployment_id))[0].id
-print({"flowId": flow_id, "poolId": pool.id, "poolName": pool.name, "queueId": queue.id, "queueName": queue.name, "deploymentId": deployment_id, "scheduleId": schedule_id, "scheduleActive": False, "concurrencyLimit": 1, "workerCount": 0})
+print({"prefix": prefix, "flowId": flow_id, "flowName": flow_name, "poolId": pool.id, "poolName": pool.name, "queueId": queue.id, "queueName": queue.name, "deploymentId": deployment_id, "deploymentName": deployment_name, "scheduleId": schedule_id, "scheduleSlug": schedule_slug, "scheduleActive": False, "concurrencyLimit": 1, "workerCount": 0})
 ```
 
-Do not print the client or environment. Before populating S2 scopes, confirm
-the returned names have the required prefix, IDs belong to those returned
-resources, schedule is inactive, pool concurrency is 1, and worker count is 0.
-A production resource, `pi-service`, `dorm-x86`, existing deployment, or
-non-test allowlist member means the resource is not eligible for S2; do not
-populate the allowlist. This is not a device identity check.
+Do not print the client or environment. Bind the one sanitized recipe line, then
+validate that its names and IDs are the resources being allowlisted:
 
 ```powershell
+$recipeOutput = <one sanitized JSON line emitted by the recipe above>
+$s2 = $recipeOutput | ConvertFrom-Json; $prefix = [string]$s2.prefix
+foreach ($field in "flowName","poolName","queueName","deploymentName","scheduleSlug") { if (-not ([string]$s2.$field).StartsWith($prefix, [StringComparison]::Ordinal)) { throw "HARD STOP: non-test allowlist member" } }
+if (@("flowId","poolId","queueId","deploymentId","scheduleId" | % { [string]::IsNullOrWhiteSpace([string]$s2.$_) }) -contains $true) { throw "HARD STOP: non-test allowlist member" }
+if ($s2.scheduleActive -or $s2.concurrencyLimit -ne 1 -or $s2.workerCount -ne 0) { throw "HARD STOP: non-test allowlist member" }
 $env:BOGDA_CONSOLE_PROFILE = "allowlisted-test"
 $env:BOGDA_CONSOLE_REPLICA_COUNT = "1"
 $env:BOGDA_CONSOLE_PUBLIC_HOST = "127.0.0.1"; $env:BOGDA_CONSOLE_PUBLIC_PORT = "3101"; $env:BOGDA_CONSOLE_BFF_PORT = "3102"
@@ -235,15 +267,14 @@ Invoke-CheckedLauncher start
 Invoke-CheckedLauncher status -ExpectedProfile "allowlisted-test"
 ```
 
-Record the resource JSON under `evidence/s2/`. A replica count other than
+Record resource JSON under `evidence/s2/`; a replica count other than
 `BOGDA_CONSOLE_REPLICA_COUNT=1` is a hard stop.
 
 ## 6. S2 command matrix/restore
 
-Each row is executed once through `3101`: capture `data.command` and
-`data.resourceId` plus selected snapshot fields, then rerun the minimal
-authority selector for the affected ID. A non-2xx command, missing receipt,
-source error, or failed authoritative post-read is a hard stop; do not retry.
+Execute each row once through `3101`, capture `data.command` and
+`data.resourceId`, then rerun the authority selector. A non-2xx command, missing
+receipt, source error, or failed authoritative post-read is a hard stop.
 
 | Action | 3101 endpoint and exact input | Authoritative post-read |
 | --- | --- | --- |
@@ -262,14 +293,12 @@ if ($null -eq $receipt.data.command -or $null -eq $receipt.data.resourceId) { th
 $receipt.data | Select-Object command,resourceId | ConvertTo-Json | Set-Content (Join-Path $S2Evidence "receipt.json") -Encoding utf8
 ```
 
-Seed a RunResult Artifact only after submit, with `key="bogda-run-$runId"`,
-`type="bogda.run-result"`, and `flow_run_id=$runId`; record its `artifactId`,
-`runId`, key, and type. Seed a checkpoint fixture only after submit, with
-`key="bogda-decision-scientific_review-$runId"`,
-`type="bogda.research-decision"`, `flow_run_id=$runId`, and a recorded
-`command_version`. Never use another run or print artifact data. If the
-checkpoint is not returned for this run, record `inapplicable` and the exact
-missing precondition instead of faking success.
+After submit, seed the RunResult Artifact with `key="bogda-run-$runId"`,
+`type="bogda.run-result"`, and `flow_run_id=$runId`; seed the checkpoint fixture
+with `key="bogda-decision-scientific_review-$runId"`,
+`type="bogda.research-decision"`, `flow_run_id=$runId`, and `command_version`.
+Record identifiers only; if the checkpoint is absent for this run, record
+`inapplicable` and its exact missing precondition.
 
 ```python
 # Existing PrefectClient; emit identifiers only, never artifact data.
@@ -278,10 +307,9 @@ checkpoint = await client.create_artifact(ArtifactCreate(key=f"bogda-decision-sc
 print({"runId": run_id, "artifactId": artifact.id, "checkpointArtifactId": checkpoint.id})
 ```
 
-Before ending S2, record actual schedule/queue paused or resumed state, pool
-concurrency 1, worker count 0, all receipt/post-read IDs, and cancel any
-remaining nonterminal run belonging to the prefixed deployment through the same
-cancel receipt/post-read path. Do not delete Prefect acceptance records.
+Before ending S2, record actual schedule/queue state, pool concurrency 1, worker
+count 0, and all receipt/post-read IDs; cancel remaining nonterminal runs in the
+prefixed deployment through the same path. Do not delete acceptance records.
 
 ```powershell
 $deploymentId = [string]$s2.deploymentId; $poolName = [string]$s2.poolName
@@ -290,7 +318,10 @@ foreach ($run in @($remaining | Where-Object { -not $_.state.terminal })) {
   $cancel = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:3101/api/v1/runs/$($run.runId)/cancel" -ContentType "application/json" -Body (@{ expected_command_version = $run.commandVersion } | ConvertTo-Json)
   if ($null -eq $cancel.data.command -or $null -eq $cancel.data.resourceId) { throw "HARD STOP: failed authoritative post-read" }
   $cancelPost = Invoke-RestMethod "http://127.0.0.1:3101/api/v1/runs/$($run.runId)"
-  # Re-run the authority selector for this run and save only IDs/state.
+  $authority = & $Python -c $authorityScript "run" $run.runId 2>$null
+  if ($LASTEXITCODE -ne 0 -or -not $authority) { throw "HARD STOP: Prefect source error" }
+  $authorityPost = ($authority -join "`n") | ConvertFrom-Json
+  if ((-not [bool]$cancelPost.data.run.state.terminal -and $cancelPost.data.run.state.name -ne "Cancelled") -or -not ($authorityPost.stateType -match "CANCELLED$" -or $authorityPost.stateName -match "Cancelled$")) { throw "HARD STOP: failed authoritative post-read" }
 }
 $finalDeployment = (Invoke-RestMethod "http://127.0.0.1:3101/api/v1/deployments/$deploymentId").data
 $finalInfrastructure = (Invoke-RestMethod "http://127.0.0.1:3101/api/v1/infrastructure").data
@@ -305,6 +336,5 @@ if ($preflight.status -in @("healthy","degraded")) { Invoke-CheckedLauncher star
 & $check3100 "3100-after-s2.json"
 ```
 
-The final report records the actual final states, sanitized evidence paths,
-rollback state, and any checkpoint limitation. Keep the dedicated S2 records
-identifiable for acceptance.
+The final report records final states, sanitized evidence paths, rollback state,
+checkpoint limitation, and identifiable dedicated S2 records.

@@ -18,6 +18,9 @@ mkdir -p "$STAGE_LOCAL"
 cp -a "$ROOT/bogda-console/src" "$STAGE_LOCAL/src"
 cp -a "$ROOT/bogda-console/pyproject.toml" "$STAGE_LOCAL/pyproject.toml"
 cp -a "$ROOT/bogda-console/frontend/dist" "$STAGE_LOCAL/dist"
+if [ -d "$ROOT/bogda-console/fixtures" ]; then
+    cp -a "$ROOT/bogda-console/fixtures" "$STAGE_LOCAL/fixtures"
+fi
 cp -a "$ROOT/bogda/deploy/console/bogda-console.service" "$STAGE_LOCAL/"
 cp -a "$ROOT/bogda/deploy/console/maintain.sh" "$STAGE_LOCAL/"
 cp -a "$ROOT/bogda/deploy/console/dsh-maintain.md" "$STAGE_LOCAL/"

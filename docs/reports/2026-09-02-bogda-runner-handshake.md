@@ -31,16 +31,18 @@ BOGDA_CONSOLE_ALLOWED_QUEUE_IDS=<runner-queue-id>
 BOGDA_CONSOLE_ALLOWED_WORK_POOL_NAMES=<runner-pool-name>
 ```
 
-共享文件（console 与 worker 必须是同一路径，建议 NAS）：
+共享文件（console 与 worker 必须是同一路径，建议 NAS；**先建目录、后放库文件**，HMAC 只在机器上生成）：
 
 ```
-BOGDA_ARTIFACT_ROOT=<worker-artifact-root>
-BOGDA_USAGE_UNKNOWN_DB=<worker-usage-unknown.sqlite>
-BOGDA_APPROVAL_DB=<shared-approval.sqlite>
-BOGDA_APPROVAL_HMAC_KEY=<32-byte-hex>
+# sudo bash bogda/deploy/shared/prepare_runner_share.sh
+BOGDA_ARTIFACT_ROOT=/mnt/nas/.bogda/runner/artifacts
+BOGDA_USAGE_UNKNOWN_DB=/mnt/nas/.bogda/runner/usage-unknown.sqlite
+BOGDA_APPROVAL_DB=/mnt/nas/.bogda/runner/approvals.sqlite
+# 小附件：/mnt/nas/.bogda/inbox/<run_id>/<file>  （单文件 ≤ 8MiB；禁止 D:\）
+# BOGDA_APPROVAL_HMAC_KEY 只写进盒子/runner 环境，不入库
 ```
 
-生成 HMAC（只在本机跑，不要提交、不要贴进聊天）：
+生成 HMAC（只在本机或盒子上跑，不要提交、不要贴进聊天）：
 
 ```
 python -c "import secrets; print(secrets.token_hex(32))"

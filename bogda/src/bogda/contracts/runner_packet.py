@@ -4,17 +4,21 @@ import re
 from enum import StrEnum
 from typing import Self
 
+from pathlib import PurePosixPath
+
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from bogda.contracts.models import JobRequest, ResourceClass
 
 PI_SERVICE_POOL = "pi-service"
 RESEARCH_POOL = "dorm-x86"
+INBOX_ROOT = "/mnt/nas/.bogda/inbox"
 RESEARCH_TASK_TYPES = frozenset(
     {"paper_reproduce", "paper_reproduce_slice", "research"}
 )
 _WINDOWS_PATH = re.compile(r"^[A-Za-z]:[\\/]|^\\\\")
 _GIT_COMMIT = re.compile(r"^[0-9a-f]{7,40}$")
+_INBOX_TOKEN = re.compile(r"^[A-Za-z0-9._-]{1,180}$")
 
 
 class AttachmentKind(StrEnum):
@@ -50,6 +54,7 @@ class AttachmentRef(BaseModel):
         elif self.kind is AttachmentKind.INBOX:
             if not self.path:
                 raise ValueError("inbox attachments require path")
+            _assert_inbox_path(self.path)
         return self
 
 
@@ -73,6 +78,23 @@ class AdmitDecision(BaseModel):
 
     status: AdmitStatus
     reasons: tuple[str, ...] = ()
+
+
+def _assert_inbox_path(path: str) -> None:
+    posix = PurePosixPath(path)
+    try:
+        relative = posix.relative_to(INBOX_ROOT)
+    except ValueError as error:
+        raise ValueError("inbox path must be under /mnt/nas/.bogda/inbox") from error
+    if len(relative.parts) != 2:
+        raise ValueError("inbox path must be /mnt/nas/.bogda/inbox/<run_id>/<file>")
+    run_id, name = relative.parts
+    if run_id in {".", ".."} or name in {".", ".."}:
+        raise ValueError("inbox path must not contain parent segments")
+    if not _INBOX_TOKEN.fullmatch(run_id) or not _INBOX_TOKEN.fullmatch(name):
+        raise ValueError("inbox path tokens must be run-id safe")
+    if ".." in run_id or ".." in name:
+        raise ValueError("inbox path must not contain parent segments")
 
 
 def _is_research(request: JobRequest) -> bool:

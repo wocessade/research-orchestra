@@ -83,12 +83,28 @@ def test_light_job_may_use_pi_service() -> None:
     packet = _packet(
         work_pool="pi-service",
         attachments=(
-            AttachmentRef(kind=AttachmentKind.INBOX, path="runs/jr-packet-1/fail.log"),
+            AttachmentRef(
+                kind=AttachmentKind.INBOX,
+                path="/mnt/nas/.bogda/inbox/jr-packet-1/fail.log",
+            ),
         ),
         gpu_class=None,
     )
     decision = admit_runner_packet(job, packet)
     assert decision.status is AdmitStatus.ADMITTED
+
+
+def test_inbox_attachment_must_live_under_nas_inbox() -> None:
+    with pytest.raises(ValidationError, match="inbox"):
+        AttachmentRef(kind=AttachmentKind.INBOX, path="runs/jr-packet-1/fail.log")
+
+
+def test_inbox_attachment_rejects_parent_segments() -> None:
+    with pytest.raises(ValidationError, match="inbox"):
+        AttachmentRef(
+            kind=AttachmentKind.INBOX,
+            path="/mnt/nas/.bogda/inbox/jr-packet-1/../secret.pdf",
+        )
 
 
 def test_packet_rejects_scientific_status_field() -> None:

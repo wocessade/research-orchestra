@@ -87,7 +87,7 @@ Implemented: local shell flow, attempt directories, required artifact checks, ve
 - `RunEventV1` is the versioned structured-log contract. Model-call events pair on `call_id`; ordinary events may carry prompt hashes/artifact references and never store full prompts, responses, credentials, or authorization headers.
 
 - Core schema-v1 entry points are exported from `bogda.contracts`: `JobRequest`, `RunBudgetEnvelope`, `SchedulePolicy`, `RunEventV1`, `TaskIntent`, `ModelTier`, and `ExecutorKind`. Supporting public enums include `PricePreference`, `BudgetSource`, and `RunEventType`.
-- Research worker freeze (`RunnerPacket` + `admit_runner_packet`): git+commit / staged / inbox only; `pi-service` rejects GPU/research `task_type`. Not wired to live Prefect.
+- Research worker freeze (`RunnerPacket` + `admit_runner_packet`): git+commit / staged / inbox only (`/mnt/nas/.bogda/inbox/<run_id>/<file>`, 8MiB). `pi-service` rejects GPU/research `task_type`. Not wired to live Prefect.
 
 ## Phase B budget kernel (accepted locally)
 

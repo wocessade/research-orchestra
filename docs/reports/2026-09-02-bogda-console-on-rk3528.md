@@ -54,7 +54,9 @@ Git Bash 用 `E:\Git\bin\bash.exe`。不要走 Prefect `install.sh`。不要 `mo
 | 问「现在卡在哪」 | 3101 总览/运行详情 + 简报 Artifact | dsh 聊天看不到 Prefect 权威状态 |
 | 短摘要、失败译成人话 | 盒子 **Prefect 入队** → `pi-service` 拉一次 Flash dsh → 退出（intent `brief`） | 不是 3101 WebSocket 常驻会话 |
 | 配环境 / 复现 / 长思考 | **runner 开机后** 的 runner dsh | 盒子 4GB，且 runner 尚未接池 |
-| 文件到计算端 | git+commit、runner 已暂存路径、或 NAS `inbox/<run_id>/` 体积帽 | `D:\` 直连、本机 skill 树、聊天里贴 PDF 都不通 |
+| 文件到计算端 | git+commit、runner 已暂存路径、或 NAS `/mnt/nas/.bogda/inbox/<run_id>/`（≤8MiB/文件） | `D:\` 直连、本机 skill 树、聊天里贴 PDF 都不通 |
+
+目录由 `bogda/deploy/shared/prepare_runner_share.sh` 创建。3101 仍不 `BindsTo` USB NAS。
 
 文件直连 worker 的缺口不是聊天能补的：填单机关机后，PDF/skill/`D:\` 本来就不在盒子上。要离机继续，材料必须事先变成计算端可解析引用（见 [`2026-08-30-bogda-runner-dsh-design.md`](../superpowers/specs/2026-08-30-bogda-runner-dsh-design.md) §5.3）。runner 没开机时只能做控制面批准和盒子轻任务，不能假装实验还在跑。
 

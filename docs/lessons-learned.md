@@ -135,3 +135,4 @@
 62. **`real-readonly` 仍会读 fixtures**：`create_app` 无条件 `MockPowerAdapter(load_fixture(...))`。漏拷 `bogda-console/fixtures` 会 crash loop，`tailscale serve` 仍占 `:3101` 返回 404。规则：部署必须带 fixtures；缺文件 fail-closed，不要 optional copy。
 63. **`tailscale serve --http=3101` 认 MagicDNS 不认裸 IP**：`http://rk3528.tail6d8b09.ts.net:3101/` 200，`http://100.78.158.80:3101/` 404。规则：文档和健康检查用主机名。
 64. **已占用 `main` 的仓不要 `move_agent_to_root` 进别的 worktree**：Cursor 会先 checkpoint 再 `git checkout main`，而 `main` 已在 `D:\pythonProject`。规则：多 worktree 任务用绝对路径改文件，不要切根到会抢 `main` 的目录。
+65. **离机审批用 3101 按钮，不要聊天连 dsh**：自由文本会绕过机械白名单；文件也到不了 runner。规则：材料用 git/inbox/计算端路径；盒子 dsh 只 `maintain.sh` 或 Prefect 白名单 `brief`。

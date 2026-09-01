@@ -9,6 +9,8 @@ sudo -n /opt/bogda-console/maintain.sh logs
 sudo -n /opt/bogda-console/maintain.sh restart
 ```
 
+`health` 探 `GET /`、一个 `/assets/*.js`、以及只读 `GET /api/v1/capabilities`。`restart` 等到 loopback 200 再探这三项（最多约 30s）。`logs` 附带 `ss` 里的 3101 与 `tailscale serve status`。
+
 禁止：
 
 - 读 `/etc/bogda/console.env` / `bogda.env`
@@ -16,7 +18,9 @@ sudo -n /opt/bogda-console/maintain.sh restart
 - 把研究 Flow 丢进 `pi-service`
 - 动 3100
 - 开 `tailscale funnel`
+- `npm` / `git pull` / 发前端
 - 常驻会话等人说话
+- 在 3101 上挂聊天框去连 runner dsh（见报告「聊天框」节）
 
 进程由 systemd 保活。dsh 是手脚：看一眼、必要时 restart。挂着不动不打模型请求则不烧 token；本任务仍应干完退出。
 

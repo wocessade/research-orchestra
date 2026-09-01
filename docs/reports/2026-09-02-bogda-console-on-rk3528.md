@@ -16,7 +16,7 @@
 | Prefect | `http://127.0.0.1:4200/api`，auth 从 `/etc/bogda/bogda.env` 拷进 `/etc/bogda/console.env` |
 | USB | 不 `BindsTo=mnt-nas` |
 | 保活 | systemd `Restart=on-failure` |
-| dsh | 只跑 `/opt/bogda-console/maintain.sh status\|logs\|restart\|health`，干完退出 |
+| dsh | 只跑 `maintain.sh` 四动词；`health` 探 `/` + `/assets` + `/api/v1/capabilities`；`restart` 等到 200 |
 
 `http://100.78.158.80:3101/` 会 404：`tailscale serve` 按 MagicDNS 主机名代理，不要用裸 IP 当入口。
 
@@ -43,3 +43,20 @@ Git Bash 用 `E:\Git\bin\bash.exe`。不要走 Prefect `install.sh`。不要 `mo
 ## dsh 维护
 
 见 `bogda/deploy/console/dsh-maintain.md`。挂着不动且不再请求模型则不烧 token；仍不要把 dsh 7×24 挂着当守护进程。
+
+## 聊天框连 worker dsh（2026-09-02 决定：不做）
+
+目标「不用填单那台 Windows 也能审批、把项目推一步」成立，但 **不要**在 3101 上挂一个连着 worker dsh 的聊天框。
+
+| 想做的事 | 正确落点 | 为什么不走聊天→dsh |
+|---|---|---|
+| 批准暂停 / >20 CNY / checkpoint | 3101 已有结构化按钮（要 `allowlisted-test` + `owner` + runner 精确白名单） | 自由文本会绕过机械白名单 |
+| 问「现在卡在哪」 | 3101 总览/运行详情 + 简报 Artifact | dsh 聊天看不到 Prefect 权威状态 |
+| 短摘要、失败译成人话 | 盒子 **Prefect 入队** → `pi-service` 拉一次 Flash dsh → 退出（intent `brief`） | 不是 3101 WebSocket 常驻会话 |
+| 配环境 / 复现 / 长思考 | **runner 开机后** 的 runner dsh | 盒子 4GB，且 runner 尚未接池 |
+| 文件到计算端 | git+commit、runner 已暂存路径、或 NAS `inbox/<run_id>/` 体积帽 | `D:\` 直连、本机 skill 树、聊天里贴 PDF 都不通 |
+
+文件直连 worker 的缺口不是聊天能补的：填单机关机后，PDF/skill/`D:\` 本来就不在盒子上。要离机继续，材料必须事先变成计算端可解析引用（见 [`2026-08-30-bogda-runner-dsh-design.md`](../superpowers/specs/2026-08-30-bogda-runner-dsh-design.md) §5.3）。runner 没开机时只能做控制面批准和盒子轻任务，不能假装实验还在跑。
+
+下一跳仍是握手文档里的白名单 + 共享文件，不是 IM。
+

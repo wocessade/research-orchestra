@@ -53,7 +53,7 @@
 - Pi/RK 部署窗口：deploy_broker.sh 已含 exam-watch；taskfile 收紧、artifact 校验、taskkill 树杀等与仓库对齐仍挂
 - Bogda Gate 6：**通过**（2026-08-31，trial `20260830T154019Z`）。见 [`docs/reports/2026-08-31-bogda-rk3528-gate6-final-acceptance.md`](docs/reports/2026-08-31-bogda-rk3528-gate6-final-acceptance.md)
 - Gate 7：**S1 只读影子 + S2 专用白名单写入已通过**（合入 `e79f79b`）。不是 3100 切换，不是生产科研任务。证据 [`2026-09-01-bogda-gate7-entry-decision.md`](docs/reports/2026-09-01-bogda-gate7-entry-decision.md)、[`S1`](docs/reports/2026-09-01-bogda-console-s1-real-shadow.md)、[`S2`](docs/reports/2026-09-01-bogda-console-s2-allowlisted-shadow.md)。盒子上仍留 S2 验收资源 `bogda-s2-acceptance-20260901-...`（未删）
-- **下一跳（runner 到手前软件已合）**：NOW-06 已并入本线。3101 **已在 RK3528 现网**（`bogda-console.service`，loopback + `tailscale serve`；入口 **MagicDNS** `http://rk3528.tail6d8b09.ts.net:3101/`，裸 IP `:3101` 404；首发 `real-readonly`/`observer`）。dsh 运维只许 `/opt/bogda-console/maintain.sh`。owner 接 runner 后按 [`2026-09-02-bogda-runner-handshake.md`](docs/reports/2026-09-02-bogda-runner-handshake.md) 填精确白名单。**仍缺** DEF-03 真 checkpoint。**不要**接 Wake Bridge、**不要**改 3100、**不要**把研究任务丢进 `pi-service`。部署 [`2026-09-02-bogda-console-on-rk3528.md`](docs/reports/2026-09-02-bogda-console-on-rk3528.md)
+- **下一跳（runner 到手前软件已合）**：NOW-06 已并入本线。3101 **已在 RK3528 现网**（MagicDNS `http://rk3528.tail6d8b09.ts.net:3101/`；`real-readonly`/`observer`）。盒上 dsh 只许 `maintain.sh` 四动词（health 已加深：`/` + `/assets` + `/api/v1/capabilities`；restart 等到 200）。**不做** 3101 聊天框连 worker dsh；离机审批走 3101 结构化按钮 + NAS inbox，见 [`2026-09-02-bogda-console-on-rk3528.md`](docs/reports/2026-09-02-bogda-console-on-rk3528.md)。owner 接 runner 后按 [`2026-09-02-bogda-runner-handshake.md`](docs/reports/2026-09-02-bogda-runner-handshake.md) 填精确白名单。**仍缺** DEF-03 真 checkpoint。**不要**接 Wake Bridge、**不要**改 3100、**不要**把研究任务丢进 `pi-service`。
 - **Orchestra 冻结（2026-09-02）**：现网已 `disable --now orchestra-timer.timer`（夜间雷达停）。**未停**：broker、exam-watch、backup、housekeeping、Samba、3100、Prefect。恢复：`sudo systemctl enable --now orchestra-timer.timer`。记录 [`2026-09-02-orchestra-pre-runner-freeze.md`](docs/reports/2026-09-02-orchestra-pre-runner-freeze.md)
 - SSH：维护优先 Tailscale `rk3528` / `100.78.158.80`；直连 `10.77.0.1` 可能 host key 失败
 - 4B 已空：Orchestra + Samba NAS + Bogda 均在 RK3528（`10.77.0.1` / `\\10.77.0.1\nas` / Prefect `:4200`）。4B 可断电。
@@ -61,6 +61,6 @@
 - 雷达→Zotero 直连推迟到开学后再设计（`docs/superpowers/plans/2026-08-20-radar-digest-reading-note.md`）
 - **GUI 控制台 v2 主入口 3100**（Homepage v1 仅回退）；留言=`orchestra/console/messages.md`；`ORCHESTRA_MONITOR_TOKEN` 已配用户环境变量（值绝不入库/入对话）。v1.5 tailnet 手机访问 3100 仍挂账。Bogda 3101 见上条（盒子 Tailscale）
 - 锐评有意不做：全文证据扫描器、原子 `releases/<sha>` 发布、Hermes / OpenClaw
-- 待用户拍板：SD 旧副本删除、512G SSD 用途、宿舍 NAS、QQ bot、**触发式 agent 与 dsh 能力面**（闲时不烧 token；dsh 白名单未设计）
+- 待用户拍板：SD 旧副本删除、512G SSD 用途、宿舍 NAS、QQ bot、**触发式 agent**（闲时不烧 token；盒子 `brief` 入队未接）。3101 聊天框连 worker dsh **已否**（离机审批用 3101 按钮 + NAS inbox）
 - 宿舍 runner：**采购暂停**（2026-08-30，硬件涨价）。该层暂由第二台笔记本顶替；**未**接 Prefect `dorm-x86`、Wake Bridge、或提高并发。RFC 三档预算不再当采购清单
 - 注释惯例：xju-desktop（以及未来的独立仓库）只以文档引用，不 gitlink 嵌入；会话调试产物统一 D:\Temp\.codex-session

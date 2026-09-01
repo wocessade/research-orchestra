@@ -133,3 +133,26 @@ def test_valid_credential_admits_above_automatic_ceiling(tmp_path) -> None:
 
 def test_envelope_digest_changes_when_ceiling_changes() -> None:
     assert envelope_digest(envelope(ceiling="25")) != envelope_digest(envelope(ceiling="30"))
+
+
+def test_worker_can_consume_open_credential_from_shared_db(tmp_path) -> None:
+    store = SqliteApprovalStore(tmp_path / "approval.sqlite", hmac_key=KEY, clock=lambda: NOW)
+    env = envelope()
+    issued = store.issue(
+        run_id="run-1",
+        envelope=env,
+        actor_id="owner-1",
+        ttl=timedelta(minutes=10),
+    )
+
+    opened = store.get_open("run-1")
+    assert opened is not None
+    assert opened.credential_id == issued.credential_id
+    assert opened.mac == issued.mac
+    assert store.get_open("run-missing") is None
+
+    consumed = store.consume_open(run_id="run-1", envelope=env)
+    assert consumed.credential_id == issued.credential_id
+    assert store.get_open("run-1") is None
+    with pytest.raises(ApprovalError, match="unknown"):
+        store.consume_open(run_id="run-1", envelope=env)

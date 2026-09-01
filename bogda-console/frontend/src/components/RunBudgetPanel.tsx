@@ -1,8 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
 import { api, ApiClientError } from "../api/client";
-import type { Schemas } from "../api/types";
+import type { CommandReceipt, Schemas } from "../api/types";
 import { EnvelopeErrors, QueryLoading, SourceStrip } from "./EnvelopeState";
 
 type ModelBudgetSnapshot = Schemas["ModelBudgetSnapshot"];
@@ -34,11 +35,42 @@ function statusCopy(snapshot: ModelBudgetSnapshot) {
   return Array.from(new Set(snapshot.state === "usage-unknown" ? [...usageUnknownSafety, ...conditions] : conditions));
 }
 
-export function RunBudgetPanel({ runId }: { runId: string }) {
+export function RunBudgetPanel({
+  runId,
+  canIssueApproval = false,
+}: {
+  runId: string;
+  canIssueApproval?: boolean;
+}) {
   const query = useQuery({
     queryKey: ["run-model-budget", runId],
     queryFn: () => api.get<ModelBudgetSnapshot>(`/api/v1/runs/${runId}/model-budget`),
     enabled: Boolean(runId),
+  });
+  const policyQuery = useQuery({
+    queryKey: ["model-policy"],
+    queryFn: () => api.get<Schemas["ModelPolicySnapshot"]>("/api/v1/model-policy"),
+    enabled: canIssueApproval,
+  });
+  const [issuedId, setIssuedId] = useState<string | null>(null);
+  const mint = useMutation({
+    mutationFn: async () => {
+      const snapshot = query.data?.data;
+      if (!snapshot) throw new Error("budget snapshot missing");
+      const policy = policyQuery.data?.data;
+      const pricingVersion = policy?.priceCatalog?.version;
+      const requested = snapshot.effectiveModelTier ?? snapshot.requestedModelTier;
+      if (requested !== "flash" && requested !== "pro") throw new Error("requested tier must be flash or pro");
+      if (!pricingVersion) throw new Error("price catalog version missing");
+      return api.command<CommandReceipt<Schemas["OwnerApprovalView"]>>(`/api/v1/runs/${runId}/approvals`, {
+        expectedCost: snapshot.expectedCost,
+        authorizedCeiling: snapshot.authorizedCeiling,
+        minimumRemaining: policy?.minimumRemaining ?? "1",
+        requestedTier: requested,
+        pricingVersion,
+      });
+    },
+    onSuccess: (receipt) => setIssuedId(receipt.data?.snapshot.credentialId ?? receipt.data?.resourceId ?? null),
   });
 
   if (query.isPending) return <section className="detail-section run-budget-panel" aria-label="运行预算"><QueryLoading /></section>;
@@ -83,6 +115,13 @@ export function RunBudgetPanel({ runId }: { runId: string }) {
       <div><dt>暂停原因</dt><dd>{snapshot.pauseReason ?? "—"}</dd></div>
     </dl>
     <div className="run-budget-recovery" aria-label="恢复条件" role="region"><p className="page-kicker">RECOVERY / ONE CALL OUT</p><strong>恢复条件</strong><ul>{statusCopy(snapshot).map((condition) => <li key={condition}>{condition}</li>)}</ul>{snapshot.decisionId && <Link className="text-action" to={`/decisions#${snapshot.decisionId}`}>前往决策中心 · {snapshot.decisionId}</Link>}</div>
+    {canIssueApproval && Number(snapshot.authorizedCeiling) > 20 && (
+      <div className="run-budget-approval">
+        <button type="button" className="primary-action" disabled={mint.isPending || !policyQuery.data?.data?.priceCatalog?.version} onClick={() => void mint.mutateAsync()}>{mint.isPending ? "等待签发回执…" : "签发超过 20 CNY 凭证"}</button>
+        {issuedId && <p className="command-notice" role="status">已签发凭证 {issuedId}；MAC 留在审批库，不回显。</p>}
+        {mint.isError && <div className="command-error" role="alert">凭证未签发；没有自动重试。</div>}
+      </div>
+    )}
     <div className="run-budget-audit-columns">
       <section aria-labelledby="run-budget-events-title"><div className="detail-heading"><h3 id="run-budget-events-title">结构化事件</h3><span>仅摘要</span></div>{snapshot.events.length ? <ol className="run-budget-events">{snapshot.events.map((event) => <li key={event.eventId}><time dateTime={event.occurredAt}>{absoluteTime(event.occurredAt)}</time><strong>{event.eventType}</strong><span>{event.summary ?? "—"}</span></li>)}</ol> : <p className="muted">暂无结构化事件。</p>}</section>
       <section aria-labelledby="run-budget-artifacts-title"><div className="detail-heading"><h3 id="run-budget-artifacts-title">审计引用</h3><span>metadata only</span></div>{artifacts.length ? <ul className="run-budget-artifacts">{artifacts.map((artifact) => <li key={artifact.artifactId}><span>{artifact.kind}</span><a href={artifact.uri}>{artifact.artifactId}</a></li>)}</ul> : <p className="muted">暂无允许展示的元数据引用。</p>}</section>

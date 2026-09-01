@@ -130,3 +130,73 @@ def test_recovery_writes_require_owner_and_usage_unknown_db() -> None:
     )
     assert observer.recovery_writes_enabled is False
 
+
+HMAC32 = "ab" * 32
+
+
+def test_approval_writes_require_owner_db_and_hmac_key() -> None:
+    bare = Settings.from_env({"BOGDA_CONSOLE_PROFILE": "allowlisted-test"})
+    assert bare.approval_writes_enabled is False
+    wired = Settings.from_env(
+        {
+            "BOGDA_CONSOLE_PROFILE": "allowlisted-test",
+            "BOGDA_APPROVAL_DB": "C:/tmp/approval.sqlite",
+            "BOGDA_APPROVAL_HMAC_KEY": HMAC32,
+        }
+    )
+    assert wired.approval_writes_enabled is True
+    assert wired.approval_hmac_key == bytes.fromhex(HMAC32)
+    observer = Settings.from_env(
+        {
+            "BOGDA_CONSOLE_PROFILE": "allowlisted-test",
+            "BOGDA_CONSOLE_ROLE": "observer",
+            "BOGDA_APPROVAL_DB": "C:/tmp/approval.sqlite",
+            "BOGDA_APPROVAL_HMAC_KEY": HMAC32,
+        }
+    )
+    assert observer.approval_writes_enabled is False
+
+
+def test_approval_db_and_hmac_must_be_paired() -> None:
+    with pytest.raises(ValueError, match="BOGDA_APPROVAL"):
+        Settings.from_env({"BOGDA_APPROVAL_DB": "C:/tmp/approval.sqlite"})
+    with pytest.raises(ValueError, match="BOGDA_APPROVAL"):
+        Settings.from_env({"BOGDA_APPROVAL_HMAC_KEY": HMAC32})
+
+
+def test_approval_hmac_key_must_be_32_byte_hex() -> None:
+    with pytest.raises(ValueError, match="hex"):
+        Settings.from_env(
+            {
+                "BOGDA_APPROVAL_DB": "C:/tmp/approval.sqlite",
+                "BOGDA_APPROVAL_HMAC_KEY": "not-hex",
+            }
+        )
+    with pytest.raises(ValueError, match="32"):
+        Settings.from_env(
+            {
+                "BOGDA_APPROVAL_DB": "C:/tmp/approval.sqlite",
+                "BOGDA_APPROVAL_HMAC_KEY": "ab" * 16,
+            }
+        )
+
+
+def test_artifact_cleanup_requires_owner_and_artifact_root() -> None:
+    bare = Settings.from_env({"BOGDA_CONSOLE_PROFILE": "allowlisted-test"})
+    assert bare.artifact_cleanup_enabled is False
+    wired = Settings.from_env(
+        {
+            "BOGDA_CONSOLE_PROFILE": "allowlisted-test",
+            "BOGDA_ARTIFACT_ROOT": "C:/tmp/artifacts",
+        }
+    )
+    assert wired.artifact_cleanup_enabled is True
+    observer = Settings.from_env(
+        {
+            "BOGDA_CONSOLE_PROFILE": "allowlisted-test",
+            "BOGDA_CONSOLE_ROLE": "observer",
+            "BOGDA_ARTIFACT_ROOT": "C:/tmp/artifacts",
+        }
+    )
+    assert observer.artifact_cleanup_enabled is False
+

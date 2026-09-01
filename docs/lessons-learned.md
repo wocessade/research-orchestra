@@ -123,4 +123,5 @@
 56. **四组 exact allowlist 不是单一控制**：只锁 deployment id 时，把生产 deployment 塞进白名单仍会写到 `pi-service`。规则：submit/cancel/review/checkpoint 必须联合校验 `work_pool_name`。
 57. **recovery 写入开关必须跟真实 backend 绑定**：allowlisted-test 的 owner 若只因角色打开 `resolve_decision`，Unwired adapter 会把原来的 403 变成 503，并让前端露出假按钮。规则：`recovery_writes_enabled` 仅在配置了 `BOGDA_USAGE_UNKNOWN_DB` 时为真。
 58. **`slots=True` 的 frozen dataclass 没有 `__dict__`**：HMAC 凭证复制要用 `dataclasses.replace`，不要 `**obj.__dict__`。
+59. **审批库必须成对出现，MAC 不准出 API**：`BOGDA_APPROVAL_DB` 与 `HMAC_KEY` 只配一个就 fail-closed；签发回执不含 mac/nonce，worker 用同一文件 `get_open`/`consume_open`。
 

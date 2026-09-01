@@ -38,6 +38,10 @@ from bogda_console.contracts.models import (
     UsageBalanceSnapshot,
     RunPreparationPreview,
     RunLogSlice,
+    IssueApprovalRequest,
+    ArtifactCleanupRequest,
+    OwnerApprovalView,
+    ArtifactCleanupView,
 )
 
 
@@ -292,6 +296,36 @@ async def decide_checkpoint(
         await commands(request).decide_checkpoint(
             run_id, body.expected_command_version, body.verdict, body.rationale
         )
+    )
+
+
+@router.post(
+    "/runs/{run_id}/approvals",
+    response_model=ApiEnvelope[CommandReceipt[OwnerApprovalView]],
+)
+async def issue_approval(run_id: str, body: IssueApprovalRequest, request: Request):
+    return command_envelope(
+        await commands(request).issue_approval(
+            run_id,
+            expected_cost=body.expected_cost,
+            authorized_ceiling=body.authorized_ceiling,
+            minimum_remaining=body.minimum_remaining,
+            requested_tier=body.requested_tier,
+            pricing_version=body.pricing_version,
+            ttl_seconds=body.ttl_seconds,
+        )
+    )
+
+
+@router.post(
+    "/runs/{run_id}/artifacts/cleanup",
+    response_model=ApiEnvelope[CommandReceipt[ArtifactCleanupView]],
+)
+async def cleanup_artifacts(
+    run_id: str, body: ArtifactCleanupRequest, request: Request
+):
+    return command_envelope(
+        await commands(request).cleanup_artifacts(run_id, confirm=body.confirm)
     )
 
 

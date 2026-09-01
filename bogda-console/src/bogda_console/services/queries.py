@@ -107,6 +107,8 @@ class QueryService:
                 ),
                 canSetModelPolicy=self.settings.model_control_enabled,
                 canPreparePaidRun=self.settings.model_control_enabled,
+                canIssueOwnerApproval=self.settings.approval_writes_enabled,
+                canCleanupArtifacts=self.settings.artifact_cleanup_enabled,
                 allowedDeploymentIds=sorted(self.settings.allowed_deployment_ids),
                 allowedScheduleIds=sorted(self.settings.allowed_schedule_ids),
                 allowedQueueIds=sorted(self.settings.allowed_queue_ids),

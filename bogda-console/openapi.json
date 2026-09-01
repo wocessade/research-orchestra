@@ -98,6 +98,40 @@
         "title": "ApiEnvelope[CapabilitySnapshot]",
         "type": "object"
       },
+      "ApiEnvelope_CommandReceipt_ArtifactCleanupView__": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CommandReceipt_ArtifactCleanupView_"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SourceMeta"
+            },
+            "title": "Sources",
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiEnvelope[CommandReceipt[ArtifactCleanupView]]",
+        "type": "object"
+      },
       "ApiEnvelope_CommandReceipt_AutonomyPolicySnapshot__": {
         "additionalProperties": false,
         "properties": {
@@ -232,6 +266,40 @@
           "data"
         ],
         "title": "ApiEnvelope[CommandReceipt[ModelPolicySnapshot]]",
+        "type": "object"
+      },
+      "ApiEnvelope_CommandReceipt_OwnerApprovalView__": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CommandReceipt_OwnerApprovalView_"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SourceMeta"
+            },
+            "title": "Sources",
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiEnvelope[CommandReceipt[OwnerApprovalView]]",
         "type": "object"
       },
       "ApiEnvelope_CommandReceipt_QueueSnapshot__": {
@@ -923,6 +991,48 @@
         "title": "ApiErrorDetails",
         "type": "object"
       },
+      "ArtifactCleanupRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "confirm": {
+            "minLength": 1,
+            "title": "Confirm",
+            "type": "string"
+          }
+        },
+        "required": [
+          "confirm"
+        ],
+        "title": "ArtifactCleanupRequest",
+        "type": "object"
+      },
+      "ArtifactCleanupView": {
+        "additionalProperties": false,
+        "properties": {
+          "actorId": {
+            "title": "Actorid",
+            "type": "string"
+          },
+          "deletedKinds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Deletedkinds",
+            "type": "array"
+          },
+          "runId": {
+            "title": "Runid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "runId",
+          "actorId",
+          "deletedKinds"
+        ],
+        "title": "ArtifactCleanupView",
+        "type": "object"
+      },
       "ArtifactRecord": {
         "additionalProperties": false,
         "properties": {
@@ -1055,8 +1165,16 @@
             "title": "Cancancelrun",
             "type": "boolean"
           },
+          "canCleanupArtifacts": {
+            "title": "Cancleanupartifacts",
+            "type": "boolean"
+          },
           "canDecideCheckpoint": {
             "title": "Candecidecheckpoint",
+            "type": "boolean"
+          },
+          "canIssueOwnerApproval": {
+            "title": "Canissueownerapproval",
             "type": "boolean"
           },
           "canPauseSchedule": {
@@ -1128,7 +1246,9 @@
           "canSetAutonomyMode",
           "canResolveModelDecision",
           "canSetModelPolicy",
-          "canPreparePaidRun"
+          "canPreparePaidRun",
+          "canIssueOwnerApproval",
+          "canCleanupArtifacts"
         ],
         "title": "CapabilitySnapshot",
         "type": "object"
@@ -1166,6 +1286,35 @@
           "verdict"
         ],
         "title": "CheckpointDecisionRequest",
+        "type": "object"
+      },
+      "CommandReceipt_ArtifactCleanupView_": {
+        "additionalProperties": false,
+        "properties": {
+          "acceptedAt": {
+            "format": "date-time",
+            "title": "Acceptedat",
+            "type": "string"
+          },
+          "command": {
+            "title": "Command",
+            "type": "string"
+          },
+          "resourceId": {
+            "title": "Resourceid",
+            "type": "string"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/ArtifactCleanupView"
+          }
+        },
+        "required": [
+          "command",
+          "resourceId",
+          "acceptedAt",
+          "snapshot"
+        ],
+        "title": "CommandReceipt[ArtifactCleanupView]",
         "type": "object"
       },
       "CommandReceipt_AutonomyPolicySnapshot_": {
@@ -1282,6 +1431,35 @@
           "snapshot"
         ],
         "title": "CommandReceipt[ModelPolicySnapshot]",
+        "type": "object"
+      },
+      "CommandReceipt_OwnerApprovalView_": {
+        "additionalProperties": false,
+        "properties": {
+          "acceptedAt": {
+            "format": "date-time",
+            "title": "Acceptedat",
+            "type": "string"
+          },
+          "command": {
+            "title": "Command",
+            "type": "string"
+          },
+          "resourceId": {
+            "title": "Resourceid",
+            "type": "string"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/OwnerApprovalView"
+          }
+        },
+        "required": [
+          "command",
+          "resourceId",
+          "acceptedAt",
+          "snapshot"
+        ],
+        "title": "CommandReceipt[OwnerApprovalView]",
         "type": "object"
       },
       "CommandReceipt_QueueSnapshot_": {
@@ -1931,6 +2109,79 @@
         "title": "InfrastructureView",
         "type": "object"
       },
+      "IssueApprovalRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "authorizedCeiling": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Authorizedceiling"
+          },
+          "expectedCost": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Expectedcost"
+          },
+          "minimumRemaining": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "default": "1",
+            "title": "Minimumremaining"
+          },
+          "pricingVersion": {
+            "minLength": 1,
+            "title": "Pricingversion",
+            "type": "string"
+          },
+          "requestedTier": {
+            "enum": [
+              "flash",
+              "pro"
+            ],
+            "title": "Requestedtier",
+            "type": "string"
+          },
+          "ttlSeconds": {
+            "default": 3600,
+            "maximum": 86400.0,
+            "minimum": 60.0,
+            "title": "Ttlseconds",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expectedCost",
+          "authorizedCeiling",
+          "requestedTier",
+          "pricingVersion"
+        ],
+        "title": "IssueApprovalRequest",
+        "type": "object"
+      },
       "ModelArtifactReference": {
         "additionalProperties": false,
         "properties": {
@@ -2465,6 +2716,58 @@
           }
         },
         "title": "OverviewSnapshot",
+        "type": "object"
+      },
+      "OwnerApprovalView": {
+        "additionalProperties": false,
+        "properties": {
+          "actorId": {
+            "title": "Actorid",
+            "type": "string"
+          },
+          "authorizedCeilingCny": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Authorizedceilingcny",
+            "type": "string"
+          },
+          "credentialId": {
+            "title": "Credentialid",
+            "type": "string"
+          },
+          "envelopeDigest": {
+            "title": "Envelopedigest",
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "title": "Expiresat",
+            "type": "string"
+          },
+          "issuedAt": {
+            "format": "date-time",
+            "title": "Issuedat",
+            "type": "string"
+          },
+          "pricingVersion": {
+            "title": "Pricingversion",
+            "type": "string"
+          },
+          "runId": {
+            "title": "Runid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "credentialId",
+          "runId",
+          "envelopeDigest",
+          "pricingVersion",
+          "authorizedCeilingCny",
+          "actorId",
+          "issuedAt",
+          "expiresAt"
+        ],
+        "title": "OwnerApprovalView",
         "type": "object"
       },
       "Page_DeploymentSummary_": {
@@ -4808,6 +5111,104 @@
           }
         },
         "summary": "Run Detail"
+      }
+    },
+    "/api/v1/runs/{run_id}/approvals": {
+      "post": {
+        "operationId": "issue_approval_api_v1_runs__run_id__approvals_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueApprovalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_CommandReceipt_OwnerApprovalView__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Issue Approval"
+      }
+    },
+    "/api/v1/runs/{run_id}/artifacts/cleanup": {
+      "post": {
+        "operationId": "cleanup_artifacts_api_v1_runs__run_id__artifacts_cleanup_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArtifactCleanupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_CommandReceipt_ArtifactCleanupView__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cleanup Artifacts"
       }
     },
     "/api/v1/runs/{run_id}/cancel": {

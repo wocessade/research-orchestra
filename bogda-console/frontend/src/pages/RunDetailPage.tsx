@@ -166,7 +166,10 @@ export function RunDetailPage() {
   const [cancelSnapshot, setCancelSnapshot] = useState<RunSummary | null>(null);
   const [reviewSnapshot, setReviewSnapshot] = useState<RunResultView | null>(null);
   const [detailSnapshot, setDetailSnapshot] = useState<RunDetail | null>(null);
+  const [cleanupOpen, setCleanupOpen] = useState(false);
+  const [cleanupNotice, setCleanupNotice] = useState<string | null>(null);
   const cancelMutation = useMutation({ mutationFn: (run: RunSummary) => api.command<CommandReceipt<RunSummary>>(`/api/v1/runs/${run.runId}/cancel`, { expectedCommandVersion: run.commandVersion }) });
+  const cleanupMutation = useMutation({ mutationFn: () => api.command<CommandReceipt<{ runId: string; actorId: string; deletedKinds: string[] }>>(`/api/v1/runs/${runId}/artifacts/cleanup`, { confirm: "delete-content" }) });
   const resultView = reviewSnapshot ?? resultQuery.data?.data;
 
   useEffect(() => {
@@ -189,6 +192,7 @@ export function RunDetailPage() {
   const canCancel = canCancelCapability && runInScope;
   const canReview = canReviewCapability && runInScope;
   const canDecide = canDecideCapability && runInScope;
+  const canCleanup = capReady && capabilities?.canCleanupArtifacts === true;
   const cancelReason = disabledReason(canCancelCapability, runInScope, capabilities?.profile, "取消运行");
   const reviewReason = disabledReason(canReviewCapability, runInScope, capabilities?.profile, "提交科研评审");
   const checkpointReason = disabledReason(canDecideCapability, runInScope, capabilities?.profile, "决定人工检查点");
@@ -210,16 +214,18 @@ export function RunDetailPage() {
       <div><p>科研判断状态</p>{science?.availability === "available" ? <ScientificMark status={science.scientificStatus} /> : <span className={`availability availability--${science?.availability ?? "none"}`}>{science?.availability === "invalid" ? "RunResult 无效" : science?.availability === "missing" ? "RunResult 缺失" : "科研状态不可用"}</span>}<span>{science?.artifactId ?? "无权威 Artifact"}</span></div>
     </section>
     <section className="detail-section context-section" aria-labelledby="context-title"><div className="detail-heading"><h2 id="context-title">项目上下文</h2><p>只读上下文。有效自主模式在创建时冻结，不在此修改。</p></div>{detail.projectContext ? <dl className="fact-grid"><div><dt>项目</dt><dd>{detail.projectContext.projectId}</dd></div><div><dt>冻结模式</dt><dd>{detail.projectContext.effectiveAutonomyMode}</dd></div><div><dt>模式来源</dt><dd>{detail.projectContext.modeSource}</dd></div><div><dt>可写</dt><dd>否</dd></div></dl> : <p className="muted">项目上下文不可用。</p>}</section>
-    <RunBudgetPanel runId={runId} />
+    <RunBudgetPanel runId={runId} canIssueApproval={capReady && capabilities?.canIssueOwnerApproval === true} />
     {detail.checkpoint && !detail.checkpoint.verdict && <CheckpointControl runId={runId} checkpoint={detail.checkpoint} enabled={canDecide} profile={capabilities?.profile} reason={checkpointReason} onDecided={setDetailSnapshot} />}
     {resultQuery.isPending && <QueryLoading />}
     {resultQuery.isError && <QueryFailure title="RunResult 暂不可用" />}
     {resultView && <ResultPanel view={resultView} executionType={run.state.type} />}
     <RunLogPanel runId={runId} />
+    {canCleanup && <div className="detail-section"><button type="button" className="danger-outline-action" disabled={cleanupMutation.isPending} onClick={() => setCleanupOpen(true)}>清理产物内容</button>{cleanupNotice && <p className="command-notice" role="status">{cleanupNotice}</p>}{cleanupMutation.isError && <div className="command-error" role="alert">清理未获得回执；没有自动重试。</div>}</div>}
     {resultView?.availability === "available" && resultView.result && <ReviewControl runId={runId} view={resultView} enabled={canReview} profile={capabilities?.profile} reason={reviewReason} onReviewed={setReviewSnapshot} />}
     <section className="detail-section" aria-labelledby="versions-title"><div className="detail-heading"><h2 id="versions-title">RunResult 版本</h2><p>由新到旧；第一条是当前科研权威版本。</p></div>{versionsQuery.data?.data?.items.length ? <ol className="version-list">{versionsQuery.data.data.items.map((version, index) => <li key={version.artifactId}><span>{index === 0 ? "当前" : `历史 ${index}`}</span><strong>{version.artifactId}</strong><time dateTime={version.createdAt}>{formatAbsolute(version.createdAt)}</time><em>{version.availability}</em></li>)}</ol> : versionsQuery.isPending ? <QueryLoading /> : <p className="muted">没有可显示的版本。</p>}</section>
     <section className="detail-section" aria-labelledby="request-title"><div className="detail-heading"><h2 id="request-title">运行请求</h2><p>Prefect 参数与标签，只读展示。</p></div><pre className="request-code">{JSON.stringify({ parameters: detail.parameters, tags: detail.tags }, null, 2)}</pre></section>
     {cancelMutation.isError && <div className="command-error persistent-command-error" role="alert">取消请求未获得权威回执；运行状态保持原样，没有自动重试。</div>}
     <ConfirmDialog open={cancelOpen} title={`取消运行 ${run.name}`} confirmLabel="确认取消" onClose={() => setCancelOpen(false)} onConfirm={cancelRun} busy={cancelMutation.isPending} destructive>Prefect 是唯一执行状态源。确认后仍需等待 Prefect 返回 Cancelling 或 Cancelled。</ConfirmDialog>
+    <ConfirmDialog open={cleanupOpen} title={`清理运行 ${run.name} 的产物`} confirmLabel="确认删除内容" onClose={() => setCleanupOpen(false)} onConfirm={async () => { const response = await cleanupMutation.mutateAsync().catch(() => null); if (!response?.data) return; const kinds = response.data.snapshot.deletedKinds ?? []; setCleanupNotice(kinds.length ? `已删除 ${kinds.join("、")}` : "没有可删内容"); setCleanupOpen(false); }} busy={cleanupMutation.isPending} destructive>删除 stdout/stderr 字节，写入 tombstone，events 保留。确认词由服务端校验为 delete-content。</ConfirmDialog>
   </article>;
 }

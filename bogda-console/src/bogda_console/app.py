@@ -34,6 +34,22 @@ from bogda_console.services.commands import CommandService
 from bogda_console.services.queries import QueryService
 
 
+def _lifecycle(settings: Settings):
+    if not settings.artifact_root:
+        return None
+    from bogda.artifacts.lifecycle import ArtifactLifecycle
+
+    return ArtifactLifecycle(Path(settings.artifact_root))
+
+
+def _approval_store(settings: Settings):
+    if not settings.approval_db or not settings.approval_hmac_key:
+        return None
+    from bogda.budget.approval import SqliteApprovalStore
+
+    return SqliteApprovalStore(Path(settings.approval_db), hmac_key=settings.approval_hmac_key)
+
+
 def _log_reader(settings: Settings):
     if not settings.artifact_root:
         return None
@@ -139,7 +155,15 @@ class Container:
                 usage_balance=usage_balance,
                 log_reader=_log_reader(settings),
             )
-            commands = CommandService(settings=settings, prefect=prefect, results=prefect, policy=policy, model_control=model_control)
+            commands = CommandService(
+                settings=settings,
+                prefect=prefect,
+                results=prefect,
+                policy=policy,
+                model_control=model_control,
+                approvals=_approval_store(settings),
+                lifecycle=_lifecycle(settings),
+            )
             return cls(settings, prefect, prefect, power, queries, commands, policy, model_control, usage_balance)
         fixture = load_fixture(scenario or settings.fixture_scenario)
         prefect = MockPrefectAdapter(fixture)
@@ -167,6 +191,8 @@ class Container:
             now=lambda: clock,
             policy=policy,
             model_control=model_control,
+            approvals=_approval_store(settings),
+            lifecycle=_lifecycle(settings),
         )
         return cls(settings, prefect, results, power, queries, commands, policy, model_control, usage_balance)
 

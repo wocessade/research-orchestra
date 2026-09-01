@@ -404,3 +404,137 @@ async def test_decision_command_forwards_backend_required_owner_inputs(fixture_l
 
     assert item.actions[0].new_call_id_required is True
     assert item.decision_id not in {value.decision_id for value in resolved.snapshot.items}
+
+
+HMAC32 = "ab" * 32
+
+
+def _approval_settings(tmp_path, **extra: str) -> Settings:
+    return Settings.from_env(
+        {
+            "BOGDA_CONSOLE_PROFILE": "allowlisted-test",
+            "BOGDA_CONSOLE_ALLOWED_DEPLOYMENT_IDS": "deployment-service,deployment-dorm",
+            "BOGDA_CONSOLE_ALLOWED_SCHEDULE_IDS": "schedule-service,schedule-dorm",
+            "BOGDA_CONSOLE_ALLOWED_QUEUE_IDS": "queue-service,queue-cpu,queue-gpu",
+            "BOGDA_CONSOLE_ALLOWED_WORK_POOL_NAMES": "pi-service,dorm-x86",
+            "BOGDA_APPROVAL_DB": str(tmp_path / "approval.sqlite"),
+            "BOGDA_APPROVAL_HMAC_KEY": HMAC32,
+            **extra,
+        }
+    )
+
+
+@pytest.mark.asyncio
+async def test_owner_can_issue_approval_without_returning_mac(fixture_loader, tmp_path) -> None:
+    from bogda.budget.approval import SqliteApprovalStore
+
+    fixture = fixture_loader("normal-active")
+    prefect = MockPrefectAdapter(fixture)
+    results = MockRunResultAdapter(fixture)
+    store = SqliteApprovalStore(
+        tmp_path / "approval.sqlite", hmac_key=bytes.fromhex(HMAC32)
+    )
+    service = CommandService(
+        settings=_approval_settings(tmp_path),
+        prefect=prefect,
+        results=results,
+        approvals=store,
+    )
+    receipt = await service.issue_approval(
+        "run-active",
+        expected_cost=Decimal("21"),
+        authorized_ceiling=Decimal("25"),
+        minimum_remaining=Decimal("1"),
+        requested_tier="flash",
+        pricing_version="deepseek-cn-2026-08-28",
+    )
+    assert receipt.command == "issueOwnerApproval"
+    assert receipt.snapshot.run_id == "run-active"
+    assert receipt.snapshot.authorized_ceiling_cny == Decimal("25")
+    assert not hasattr(receipt.snapshot, "mac") or getattr(receipt.snapshot, "mac", None) is None
+    dumped = receipt.snapshot.model_dump()
+    assert "mac" not in dumped
+    assert "nonce" not in dumped
+    opened = store.get_open("run-active")
+    assert opened is not None
+    assert opened.mac
+
+
+@pytest.mark.asyncio
+async def test_observer_and_operator_cannot_issue_approval(fixture_loader, tmp_path) -> None:
+    from bogda.budget.approval import SqliteApprovalStore
+
+    fixture = fixture_loader("normal-active")
+    store = SqliteApprovalStore(
+        tmp_path / "approval.sqlite", hmac_key=bytes.fromhex(HMAC32)
+    )
+    kwargs = dict(
+        expected_cost=Decimal("21"),
+        authorized_ceiling=Decimal("25"),
+        minimum_remaining=Decimal("1"),
+        requested_tier="flash",
+        pricing_version="deepseek-cn-2026-08-28",
+    )
+    for role in ("observer", "operator"):
+        service = CommandService(
+            settings=_approval_settings(tmp_path, BOGDA_CONSOLE_ROLE=role),
+            prefect=MockPrefectAdapter(fixture),
+            results=MockRunResultAdapter(fixture),
+            approvals=store,
+        )
+        with pytest.raises(ServiceError) as error:
+            await service.issue_approval("run-active", **kwargs)
+        assert error.value.code == "RESOURCE_NOT_ALLOWLISTED"
+        assert store.get_open("run-active") is None
+
+
+@pytest.mark.asyncio
+async def test_owner_cleanup_requires_confirm_token_and_keeps_events(
+    fixture_loader, tmp_path
+) -> None:
+    from bogda.artifacts.lifecycle import ArtifactLifecycle
+
+    attempt = tmp_path / "run-active" / "attempt-1"
+    attempt.mkdir(parents=True)
+    (attempt / "stdout.log").write_text("out", encoding="utf-8")
+    (attempt / "stderr.log").write_text("err", encoding="utf-8")
+    (tmp_path / "run-active" / "events.jsonl").write_text("{}\n", encoding="utf-8")
+    fixture = fixture_loader("normal-active")
+    service = CommandService(
+        settings=_approval_settings(tmp_path, BOGDA_ARTIFACT_ROOT=str(tmp_path)),
+        prefect=MockPrefectAdapter(fixture),
+        results=MockRunResultAdapter(fixture),
+        lifecycle=ArtifactLifecycle(tmp_path),
+    )
+    with pytest.raises(ServiceError) as error:
+        await service.cleanup_artifacts("run-active", confirm="please")
+    assert error.value.code == "COMMAND_NOT_APPLICABLE"
+    assert (attempt / "stdout.log").is_file()
+
+    receipt = await service.cleanup_artifacts("run-active", confirm="delete-content")
+    assert receipt.command == "cleanupArtifacts"
+    assert set(receipt.snapshot.deleted_kinds) == {"stdout", "stderr"}
+    assert not (attempt / "stdout.log").exists()
+    assert (tmp_path / "run-active" / "events.jsonl").read_text(encoding="utf-8") == "{}\n"
+
+
+@pytest.mark.asyncio
+async def test_observer_cannot_cleanup_artifacts(fixture_loader, tmp_path) -> None:
+    from bogda.artifacts.lifecycle import ArtifactLifecycle
+
+    (tmp_path / "run-active" / "attempt-1").mkdir(parents=True)
+    (tmp_path / "run-active" / "attempt-1" / "stdout.log").write_text("x", encoding="utf-8")
+    service = CommandService(
+        settings=_approval_settings(
+            tmp_path,
+            BOGDA_CONSOLE_ROLE="observer",
+            BOGDA_ARTIFACT_ROOT=str(tmp_path),
+        ),
+        prefect=MockPrefectAdapter(fixture_loader("normal-active")),
+        results=MockRunResultAdapter(fixture_loader("normal-active")),
+        lifecycle=ArtifactLifecycle(tmp_path),
+    )
+    with pytest.raises(ServiceError) as error:
+        await service.cleanup_artifacts("run-active", confirm="delete-content")
+    assert error.value.code == "RESOURCE_NOT_ALLOWLISTED"
+    assert (tmp_path / "run-active" / "attempt-1" / "stdout.log").is_file()

@@ -172,6 +172,46 @@ class SqliteApprovalStore:
             self._conn.commit()
         return credential
 
+    def _row_to_credential(self, row: tuple[object, ...]) -> OwnerApprovalCredential:
+        return OwnerApprovalCredential(
+            credential_id=str(row[0]),
+            run_id=str(row[1]),
+            envelope_digest=str(row[2]),
+            pricing_version=str(row[3]),
+            authorized_ceiling_cny=Decimal(str(row[4])),
+            actor_id=str(row[5]),
+            issued_at=datetime.fromisoformat(str(row[6])),
+            expires_at=datetime.fromisoformat(str(row[7])),
+            nonce=str(row[8]),
+            mac=str(row[9]),
+        )
+
+    def get_open(self, run_id: str) -> OwnerApprovalCredential | None:
+        if not isinstance(run_id, str) or not run_id.strip():
+            raise ApprovalError("run_id is invalid")
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT credential_id, run_id, envelope_digest, pricing_version, "
+                "authorized_ceiling_cny, actor_id, issued_at, expires_at, nonce, mac "
+                "FROM owner_approvals WHERE run_id = ? AND consumed_at IS NULL "
+                "ORDER BY issued_at DESC LIMIT 1",
+                (run_id.strip(),),
+            ).fetchone()
+        if row is None:
+            return None
+        return self._row_to_credential(row)
+
+    def consume_open(
+        self,
+        *,
+        run_id: str,
+        envelope: RunBudgetEnvelope,
+    ) -> OwnerApprovalCredential:
+        credential = self.get_open(run_id)
+        if credential is None:
+            raise ApprovalError("credential is unknown")
+        return self.consume(credential, envelope=envelope, run_id=run_id)
+
     def consume(
         self,
         credential: OwnerApprovalCredential,

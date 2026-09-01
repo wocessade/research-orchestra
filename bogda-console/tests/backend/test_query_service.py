@@ -48,10 +48,26 @@ async def test_capabilities_report_sorted_allowlist_scope_and_checkpoint_decisio
 
     assert snapshot.can_decide_checkpoint is True
     assert snapshot.can_review_scientific_result is True
+    assert snapshot.can_issue_owner_approval is False
+    assert snapshot.can_cleanup_artifacts is False
     assert snapshot.allowed_deployment_ids == ["deployment-a", "deployment-z"]
     assert snapshot.allowed_schedule_ids == ["schedule-a", "schedule-z"]
     assert snapshot.allowed_queue_ids == ["queue-a", "queue-z"]
     assert snapshot.allowed_work_pool_names == ["pool-a", "pool-z"]
+
+
+@pytest.mark.asyncio
+async def test_approval_and_cleanup_capabilities_follow_owner_env(fixture_loader) -> None:
+    service = service_for(
+        fixture_loader("normal-active"),
+        BOGDA_CONSOLE_PROFILE="allowlisted-test",
+        BOGDA_APPROVAL_DB="C:/tmp/approval.sqlite",
+        BOGDA_APPROVAL_HMAC_KEY="ab" * 32,
+        BOGDA_ARTIFACT_ROOT="C:/tmp/artifacts",
+    )
+    snapshot = (await service.capabilities()).data
+    assert snapshot.can_issue_owner_approval is True
+    assert snapshot.can_cleanup_artifacts is True
 
 
 @pytest.mark.asyncio
@@ -80,6 +96,8 @@ async def test_readonly_capabilities_report_configured_scope_without_enabling_co
     assert snapshot.can_resolve_model_decision is False
     assert snapshot.can_set_model_policy is False
     assert snapshot.can_prepare_paid_run is False
+    assert snapshot.can_issue_owner_approval is False
+    assert snapshot.can_cleanup_artifacts is False
     assert snapshot.allowed_deployment_ids == ["deployment-a"]
     assert snapshot.allowed_schedule_ids == ["schedule-a"]
     assert snapshot.allowed_queue_ids == ["queue-a"]

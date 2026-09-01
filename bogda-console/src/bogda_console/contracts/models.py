@@ -347,6 +347,8 @@ class CapabilitySnapshot(WireModel):
     can_resolve_model_decision: bool
     can_set_model_policy: bool
     can_prepare_paid_run: bool
+    can_issue_owner_approval: bool
+    can_cleanup_artifacts: bool
     allowed_deployment_ids: list[str] = Field(default_factory=list)
     allowed_schedule_ids: list[str] = Field(default_factory=list)
     allowed_queue_ids: list[str] = Field(default_factory=list)
@@ -380,6 +382,36 @@ class CheckpointDecisionRequest(WireModel):
     expected_command_version: str = Field(min_length=1)
     verdict: Literal["approved", "rejected"]
     rationale: str | None = None
+
+
+class IssueApprovalRequest(WireModel):
+    expected_cost: Decimal = Field(ge=0)
+    authorized_ceiling: Decimal = Field(ge=0)
+    minimum_remaining: Decimal = Field(default=Decimal("1"), ge=0)
+    requested_tier: Literal["flash", "pro"]
+    pricing_version: str = Field(min_length=1)
+    ttl_seconds: int = Field(default=3600, ge=60, le=86400)
+
+
+class ArtifactCleanupRequest(WireModel):
+    confirm: str = Field(min_length=1)
+
+
+class OwnerApprovalView(WireModel):
+    credential_id: str
+    run_id: str
+    envelope_digest: str
+    pricing_version: str
+    authorized_ceiling_cny: Decimal
+    actor_id: str
+    issued_at: datetime
+    expires_at: datetime
+
+
+class ArtifactCleanupView(WireModel):
+    run_id: str
+    actor_id: str
+    deleted_kinds: list[str]
 
 
 class AutonomyPolicySnapshot(WireModel):

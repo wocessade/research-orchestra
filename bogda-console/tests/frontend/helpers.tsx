@@ -84,7 +84,7 @@ export function envelope(data: unknown, sources: JsonValue = { prefect: sourceFr
 
 export function standardRoutes(): Record<string, RouteHandler> {
   return {
-    "/api/v1/capabilities": envelope({ profile: "mock-all", projectId: "bogda-main", actorId: "local-owner", role: "owner", effectiveAutonomyMode: "supervised", canSubmitRegisteredDeployment: true, canCancelRun: true, canPauseSchedule: true, canPauseWorkQueue: true, canDecideCheckpoint: true, canReviewScientificResult: true, canSetAutonomyMode: false, canResolveModelDecision: true, canSetModelPolicy: false, canPreparePaidRun: false, allowedDeploymentIds: ["deployment-dorm"], allowedScheduleIds: ["schedule-dorm"], allowedQueueIds: ["queue-cpu", "queue-gpu", "queue-service"], allowedWorkPoolNames: ["dorm-x86", "pi-service"] }, {}),
+    "/api/v1/capabilities": envelope({ profile: "mock-all", projectId: "bogda-main", actorId: "local-owner", role: "owner", effectiveAutonomyMode: "supervised", canSubmitRegisteredDeployment: true, canCancelRun: true, canPauseSchedule: true, canPauseWorkQueue: true, canDecideCheckpoint: true, canReviewScientificResult: true, canSetAutonomyMode: false, canResolveModelDecision: true, canSetModelPolicy: false, canPreparePaidRun: false, canIssueOwnerApproval: true, canCleanupArtifacts: true, allowedDeploymentIds: ["deployment-dorm"], allowedScheduleIds: ["schedule-dorm"], allowedQueueIds: ["queue-cpu", "queue-gpu", "queue-service"], allowedWorkPoolNames: ["dorm-x86", "pi-service"] }, {}),
     "/api/v1/autonomy-policy": envelope({ globalDefault: "supervised", projectOverrides: {}, revision: 0 }, {}),
     "/api/v1/overview": envelope({
       execution: {

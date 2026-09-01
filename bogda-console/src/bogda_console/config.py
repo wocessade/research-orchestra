@@ -36,6 +36,18 @@ def _exact_set(value: str | None) -> frozenset[str]:
     return values
 
 
+def _parse_hmac_key(value: str | None) -> bytes | None:
+    if value is None or value == "":
+        return None
+    try:
+        key = bytes.fromhex(value)
+    except ValueError as exc:
+        raise ValueError("BOGDA_APPROVAL_HMAC_KEY must be hex") from exc
+    if len(key) < 32:
+        raise ValueError("BOGDA_APPROVAL_HMAC_KEY must be at least 32 bytes")
+    return key
+
+
 @dataclass(frozen=True, slots=True)
 class Settings:
     profile: str
@@ -59,6 +71,8 @@ class Settings:
     role: ConsoleRole
     artifact_root: str | None
     usage_unknown_db: str | None
+    approval_db: str | None
+    approval_hmac_key: bytes | None
 
     @classmethod
     def from_env(cls, env: Mapping[str, str]) -> "Settings":
@@ -85,6 +99,10 @@ class Settings:
         actor_id = env.get("BOGDA_CONSOLE_ACTOR", "local-owner").strip()
         if not actor_id:
             raise ValueError("BOGDA_CONSOLE_ACTOR must be a non-empty string")
+        approval_db = env.get("BOGDA_APPROVAL_DB") or None
+        approval_hmac_key = _parse_hmac_key(env.get("BOGDA_APPROVAL_HMAC_KEY"))
+        if bool(approval_db) != bool(approval_hmac_key):
+            raise ValueError("BOGDA_APPROVAL_DB and BOGDA_APPROVAL_HMAC_KEY must be set together")
         return cls(
             profile=profile,
             public_host=env.get("BOGDA_CONSOLE_PUBLIC_HOST", "127.0.0.1"),
@@ -111,6 +129,8 @@ class Settings:
             role=role,
             artifact_root=env.get("BOGDA_ARTIFACT_ROOT") or None,
             usage_unknown_db=env.get("BOGDA_USAGE_UNKNOWN_DB") or None,
+            approval_db=approval_db,
+            approval_hmac_key=approval_hmac_key,
         )
 
     @property
@@ -137,5 +157,22 @@ class Settings:
             self.role is ConsoleRole.OWNER
             and self.profile in {"mock-all", "allowlisted-test"}
             and bool(self.usage_unknown_db)
+        )
+
+    @property
+    def approval_writes_enabled(self) -> bool:
+        return (
+            self.role is ConsoleRole.OWNER
+            and self.profile in {"mock-all", "allowlisted-test"}
+            and bool(self.approval_db)
+            and bool(self.approval_hmac_key)
+        )
+
+    @property
+    def artifact_cleanup_enabled(self) -> bool:
+        return (
+            self.role is ConsoleRole.OWNER
+            and self.profile in {"mock-all", "allowlisted-test"}
+            and bool(self.artifact_root)
         )
 

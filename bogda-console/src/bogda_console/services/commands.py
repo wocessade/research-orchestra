@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any, Awaitable, Callable
 
@@ -16,6 +16,8 @@ from bogda_console.contracts.models import (
     AutonomyPolicySnapshot,
     CommandReceipt,
     DeploymentSummary,
+    OwnerApprovalView,
+    ArtifactCleanupView,
     QueueSnapshot,
     RunDetail,
     RunResultView,
@@ -50,12 +52,16 @@ class CommandService:
         now: Callable[[], datetime] | None = None,
         policy: AutonomyPolicyPort | None = None,
         model_control: ModelControlCommandPort | None = None,
+        approvals: Any | None = None,
+        lifecycle: Any | None = None,
     ) -> None:
         self.settings = settings
         self.prefect = prefect
         self.results = results
         self.policy = policy
         self._model_control = model_control
+        self._approvals = approvals
+        self._lifecycle = lifecycle
         self._now = now or (lambda: datetime.now(UTC))
         self._locks: dict[str, asyncio.Lock] = {}
 
@@ -134,6 +140,90 @@ class CommandService:
             self._require_model_control_writes()
             snapshot = await self._mutate("modelControl", lambda: self._model_control.set_project_policy(project_id, patch, expected_revision))
             return self._receipt("setProjectModelPolicy", project_id, snapshot)
+
+    async def issue_approval(
+        self,
+        run_id: str,
+        *,
+        expected_cost: Decimal,
+        authorized_ceiling: Decimal,
+        minimum_remaining: Decimal,
+        requested_tier: str,
+        pricing_version: str,
+        ttl_seconds: int = 3600,
+    ) -> CommandReceipt[OwnerApprovalView]:
+        async with self._lock(f"approval:{run_id}"):
+            self._require_approval_writes()
+            current = (await self._pre_read("prefect", lambda: self.prefect.get_run(run_id))).run
+            self._authorize_run(current)
+            from bogda.contracts import BudgetSource, ModelTier, RunBudgetEnvelope
+
+            try:
+                envelope = RunBudgetEnvelope(
+                    expected_cost=expected_cost,
+                    authorized_ceiling=authorized_ceiling,
+                    minimum_remaining=minimum_remaining,
+                    requested_tier=ModelTier(requested_tier),
+                    fallback_tier=None,
+                    budget_source=BudgetSource.RUN,
+                    pricing_version=pricing_version,
+                )
+                credential = self._approvals.issue(
+                    run_id=run_id,
+                    envelope=envelope,
+                    actor_id=self.settings.actor_id,
+                    ttl=timedelta(seconds=ttl_seconds),
+                )
+            except Exception as error:
+                self._raise(
+                    ApiErrorCode.VALIDATION_ERROR,
+                    400,
+                    str(error),
+                    source="approval",
+                )
+            return self._receipt(
+                "issueOwnerApproval",
+                run_id,
+                OwnerApprovalView(
+                    credentialId=credential.credential_id,
+                    runId=credential.run_id,
+                    envelopeDigest=credential.envelope_digest,
+                    pricingVersion=credential.pricing_version,
+                    authorizedCeilingCny=credential.authorized_ceiling_cny,
+                    actorId=credential.actor_id,
+                    issuedAt=credential.issued_at,
+                    expiresAt=credential.expires_at,
+                ),
+            )
+
+    async def cleanup_artifacts(
+        self, run_id: str, *, confirm: str
+    ) -> CommandReceipt[ArtifactCleanupView]:
+        async with self._lock(f"artifacts:{run_id}"):
+            self._require_cleanup_writes()
+            from bogda.artifacts.lifecycle import ArtifactLifecycleError
+
+            try:
+                receipt = self._lifecycle.cleanup(
+                    run_id, actor_id=self.settings.actor_id, confirm=confirm
+                )
+            except ArtifactLifecycleError as error:
+                code = (
+                    ApiErrorCode.COMMAND_NOT_APPLICABLE
+                    if "confirm" in str(error)
+                    else ApiErrorCode.VALIDATION_ERROR
+                )
+                status = 409 if code is ApiErrorCode.COMMAND_NOT_APPLICABLE else 400
+                self._raise(code, status, str(error), source="artifacts")
+            return self._receipt(
+                "cleanupArtifacts",
+                run_id,
+                ArtifactCleanupView(
+                    runId=receipt.run_id,
+                    actorId=receipt.actor_id,
+                    deletedKinds=list(receipt.deleted_kinds),
+                ),
+            )
 
     async def cancel(
         self, run_id: str, expected_command_version: str
@@ -473,6 +563,28 @@ class CommandService:
             self._raise(ApiErrorCode.RESOURCE_NOT_ALLOWLISTED, 403, "model controls disabled")
         if self._model_control is None:
             self._raise(ApiErrorCode.MODEL_CONTROL_UNAVAILABLE, 503, "model-control backend is not wired", source="modelControl")
+
+    def _require_approval_writes(self) -> None:
+        if not self.settings.approval_writes_enabled:
+            self._raise(ApiErrorCode.RESOURCE_NOT_ALLOWLISTED, 403, "owner approval writes disabled")
+        if self._approvals is None:
+            self._raise(
+                ApiErrorCode.NOT_FOUND,
+                404,
+                "approval store is not wired",
+                source="approval",
+            )
+
+    def _require_cleanup_writes(self) -> None:
+        if not self.settings.artifact_cleanup_enabled:
+            self._raise(ApiErrorCode.RESOURCE_NOT_ALLOWLISTED, 403, "artifact cleanup disabled")
+        if self._lifecycle is None:
+            self._raise(
+                ApiErrorCode.NOT_FOUND,
+                404,
+                "artifact root is not wired",
+                source="artifacts",
+            )
 
     @staticmethod
     def _unavailable_code(source: str) -> ApiErrorCode:

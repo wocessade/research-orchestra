@@ -310,6 +310,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/runs/{run_id}/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Issue Approval */
+        post: operations["issue_approval_api_v1_runs__run_id__approvals_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/runs/{run_id}/artifacts/cleanup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cleanup Artifacts */
+        post: operations["cleanup_artifacts_api_v1_runs__run_id__artifacts_cleanup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/runs/{run_id}/cancel": {
         parameters: {
             query?: never;
@@ -532,6 +566,16 @@ export interface components {
                 [key: string]: components["schemas"]["SourceMeta"];
             };
         };
+        /** ApiEnvelope[CommandReceipt[ArtifactCleanupView]] */
+        ApiEnvelope_CommandReceipt_ArtifactCleanupView__: {
+            data: components["schemas"]["CommandReceipt_ArtifactCleanupView_"] | null;
+            /** Errors */
+            errors?: components["schemas"]["ApiError"][];
+            /** Sources */
+            sources?: {
+                [key: string]: components["schemas"]["SourceMeta"];
+            };
+        };
         /** ApiEnvelope[CommandReceipt[AutonomyPolicySnapshot]] */
         ApiEnvelope_CommandReceipt_AutonomyPolicySnapshot__: {
             data: components["schemas"]["CommandReceipt_AutonomyPolicySnapshot_"] | null;
@@ -565,6 +609,16 @@ export interface components {
         /** ApiEnvelope[CommandReceipt[ModelPolicySnapshot]] */
         ApiEnvelope_CommandReceipt_ModelPolicySnapshot__: {
             data: components["schemas"]["CommandReceipt_ModelPolicySnapshot_"] | null;
+            /** Errors */
+            errors?: components["schemas"]["ApiError"][];
+            /** Sources */
+            sources?: {
+                [key: string]: components["schemas"]["SourceMeta"];
+            };
+        };
+        /** ApiEnvelope[CommandReceipt[OwnerApprovalView]] */
+        ApiEnvelope_CommandReceipt_OwnerApprovalView__: {
+            data: components["schemas"]["CommandReceipt_OwnerApprovalView_"] | null;
             /** Errors */
             errors?: components["schemas"]["ApiError"][];
             /** Sources */
@@ -773,6 +827,20 @@ export interface components {
             /** Observed */
             observed?: unknown | null;
         };
+        /** ArtifactCleanupRequest */
+        ArtifactCleanupRequest: {
+            /** Confirm */
+            confirm: string;
+        };
+        /** ArtifactCleanupView */
+        ArtifactCleanupView: {
+            /** Actorid */
+            actorId: string;
+            /** Deletedkinds */
+            deletedKinds: string[];
+            /** Runid */
+            runId: string;
+        };
         /** ArtifactRecord */
         ArtifactRecord: {
             /** Exists */
@@ -823,8 +891,12 @@ export interface components {
             allowedWorkPoolNames?: string[];
             /** Cancancelrun */
             canCancelRun: boolean;
+            /** Cancleanupartifacts */
+            canCleanupArtifacts: boolean;
             /** Candecidecheckpoint */
             canDecideCheckpoint: boolean;
+            /** Canissueownerapproval */
+            canIssueOwnerApproval: boolean;
             /** Canpauseschedule */
             canPauseSchedule: boolean;
             /** Canpauseworkqueue */
@@ -860,6 +932,19 @@ export interface components {
              * @enum {string}
              */
             verdict: "approved" | "rejected";
+        };
+        /** CommandReceipt[ArtifactCleanupView] */
+        CommandReceipt_ArtifactCleanupView_: {
+            /**
+             * Acceptedat
+             * Format: date-time
+             */
+            acceptedAt: string;
+            /** Command */
+            command: string;
+            /** Resourceid */
+            resourceId: string;
+            snapshot: components["schemas"]["ArtifactCleanupView"];
         };
         /** CommandReceipt[AutonomyPolicySnapshot] */
         CommandReceipt_AutonomyPolicySnapshot_: {
@@ -912,6 +997,19 @@ export interface components {
             /** Resourceid */
             resourceId: string;
             snapshot: components["schemas"]["ModelPolicySnapshot"];
+        };
+        /** CommandReceipt[OwnerApprovalView] */
+        CommandReceipt_OwnerApprovalView_: {
+            /**
+             * Acceptedat
+             * Format: date-time
+             */
+            acceptedAt: string;
+            /** Command */
+            command: string;
+            /** Resourceid */
+            resourceId: string;
+            snapshot: components["schemas"]["OwnerApprovalView"];
         };
         /** CommandReceipt[QueueSnapshot] */
         CommandReceipt_QueueSnapshot_: {
@@ -1171,6 +1269,30 @@ export interface components {
             /** Pools */
             pools?: components["schemas"]["PoolSnapshot"][] | null;
         };
+        /** IssueApprovalRequest */
+        IssueApprovalRequest: {
+            /** Authorizedceiling */
+            authorizedCeiling: number | string;
+            /** Expectedcost */
+            expectedCost: number | string;
+            /**
+             * Minimumremaining
+             * @default 1
+             */
+            minimumRemaining: number | string;
+            /** Pricingversion */
+            pricingVersion: string;
+            /**
+             * Requestedtier
+             * @enum {string}
+             */
+            requestedTier: "flash" | "pro";
+            /**
+             * Ttlseconds
+             * @default 3600
+             */
+            ttlSeconds: number;
+        };
         /** ModelArtifactReference */
         ModelArtifactReference: {
             /** Artifactid */
@@ -1352,6 +1474,31 @@ export interface components {
             science?: {
                 [key: string]: unknown;
             } | null;
+        };
+        /** OwnerApprovalView */
+        OwnerApprovalView: {
+            /** Actorid */
+            actorId: string;
+            /** Authorizedceilingcny */
+            authorizedCeilingCny: string;
+            /** Credentialid */
+            credentialId: string;
+            /** Envelopedigest */
+            envelopeDigest: string;
+            /**
+             * Expiresat
+             * Format: date-time
+             */
+            expiresAt: string;
+            /**
+             * Issuedat
+             * Format: date-time
+             */
+            issuedAt: string;
+            /** Pricingversion */
+            pricingVersion: string;
+            /** Runid */
+            runId: string;
         };
         /** Page[DeploymentSummary] */
         Page_DeploymentSummary_: {
@@ -2375,6 +2522,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiEnvelope_RunDetail_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    issue_approval_api_v1_runs__run_id__approvals_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueApprovalRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiEnvelope_CommandReceipt_OwnerApprovalView__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cleanup_artifacts_api_v1_runs__run_id__artifacts_cleanup_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ArtifactCleanupRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiEnvelope_CommandReceipt_ArtifactCleanupView__"];
                 };
             };
             /** @description Validation Error */

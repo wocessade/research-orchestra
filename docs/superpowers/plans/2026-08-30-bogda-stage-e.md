@@ -1,5 +1,7 @@
 # Bogda Stage E Implementation Plan
 
+> **历史计划。** Gate 6 已于 2026-08-31 通过；Gate 7 S1/S2 影子已于 2026-09-01 合入 `origin/main`。下文「不要宣布 Gate 6/7 通过 / 观察窗内禁研究 Flow」只约束当时执行，不再当现网状态。下一跳见根 `CLAUDE.md` 挂账，不是重跑本计划 Task 1–4。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Wire Stage E runtime pieces that Gate 6 does not block: durable budget ledger, fail-closed real usage client already in-tree, then local dsh/Prefect smokes — without declaring Gate 6/7 pass, cutting 3100, or running research Flow on the live Gate 6 RK3528 trial.

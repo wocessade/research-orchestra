@@ -111,3 +111,9 @@
 50. **这块 Armbian 没有 nmcli，有 netplan+wpa**：USB MT7601U 用 netplan `wifis` + 电口静态 `/30` never-default。`/tmp` sticky 下 root 不能覆盖 liuxfs 的半截 curl 产物——大文件下到 `/var/tmp`。
 51. **切到 RK3528 后文档默认机必须一起改**：Prefect 池名仍叫 `pi-service`，但 SSH/SMB/控制台缺省 host 是 `10.77.0.1` / `rk3528`，不是 4B `192.168.0.250`。venv 的 python 不能指向已搬走的 `/root/.local/share/uv/python`。
 52. **从 4B 拷来的 Prefect venv 要修 shebang**：Armbian 上 `uv python` 装到 `/opt/uv-python/...`，否则 unit 报 203/EXEC。
+
+## N. Gate 7 影子（2026-09-01）
+
+53. **挂账页必须跟验收报告一起改**：Gate 6/S1/S2 合进 `main` 后 `CLAUDE.md`/`README.md` 仍写「Gate 6 未通过」会害下一会话按旧红线停工。规则：关闭 Gate 时同步改锚，历史工作台加「已关闭」横幅，不另开第二套现状。
+54. **S2 脚本假设会在真 Prefect 上碎**：队列名不全局唯一、Artifact 列表首项不是最新、新建 pool 会多一个 `default` 队列。规则：硬停后从已写入状态续跑，不要重放成功命令；不要把临时驱动的假设做成产品重试框架。
+55. **整分支审查超时 ≠ 代码没过**：额度耗尽时不要用第三轮审查代替已有的 S1/S2 CLEAN。规则：缺的是审查结论就写明，不要补一层「同机身份」仪式。

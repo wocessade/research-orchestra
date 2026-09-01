@@ -1,8 +1,10 @@
 # Bogda Gate 6 工作台与接班进度
 
+> **已关闭。** 现网状态以 [`2026-08-31-bogda-rk3528-gate6-final-acceptance.md`](2026-08-31-bogda-rk3528-gate6-final-acceptance.md) 与 [`2026-09-01-bogda-gate7-entry-decision.md`](2026-09-01-bogda-gate7-entry-decision.md) 为准。下文是 2026-08 观察窗接班记录，不要当「Gate 6 仍未通过」用。
+
 日期：2026-08-24
 
-目的：在模型额度和执行者切换后，以本文件作为当前唯一工作入口。不要从聊天记录重新拼装状态。
+目的：当时作为工作入口。2026-09-02 起不要从本文件拼装现状。
 
 ## 收班补记：2026-08-28 切到 RK3528（Gate 6 仍未通过）
 

@@ -325,7 +325,7 @@ Wake Bridge 按架构 spec 单独计划，不在本文提前实施。
 | Orchestra 卡 + 盒子 dsh/shell + 3100 运维面 | 科研主路径 Bogda；Orchestra 日报/日历 |
 | 3101 mock / 禁写 | A 完成线：真提交/暂停/审批 |
 | runner 未接 | B：接上后再启用 runner dsh 大脑 |
-| Gate 6 未过 | 不宣布通过；e2fsck / 带盘冷启动仍是盒子债 |
+| Gate 6 当时未过 | **已过时。** Gate 6 于 2026-08-31 通过；e2fsck 1.47.0 已修 |
 
 ## 8. 验收（设计层）
 

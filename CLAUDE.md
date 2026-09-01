@@ -45,13 +45,15 @@
   - 个人日程：控制台首页可增删改，或改 `orchestra/console/console-schedule.toml` 的 `[[personal]]`；系统层（雷达/备份）只读。用法见 `orchestra/console/README.md`
   - **日程将近提醒**：读 `console-schedule.toml` 或 `status.json` 的 `upcoming_personal`（未来 14 天未完成个人事项）。会话开头或收束时：48 小时内必须口头提醒，7 天内顺带一句，8–14 天轻提一次。不要每 10 分钟往 `messages.md` 刷提醒。
 
-## 当前挂账（更新日期 2026-08-28）
+## 当前挂账（更新日期 2026-09-02）
 
-- **阶段定位（用户定调）**：【术】已足够，转入【道】——新任务优先论文/研究实体，纯基建只记挂账
+- **阶段定位（用户定调）**：【术】已足够，转入【道】——新任务优先论文/研究实体；执行重心 Bogda。纯 Orchestra 基建只记挂账
 - **Skill digest：owner 暂不锁**（2026-08-22 起）。`academic-shared` 为 required 且 `expected_digest` 未写；engine 契约已改过。`check_skills --strict` / 真实 `run_card.py ingest` 会 HARD。需要入账时再开口锁定，agent 不得自行 `--lock-current`
-- **exam-watch 已上线**（RK3528 timer 轮询雨课堂 → console 告警融合，2026-08-26 首条告警在 4B）。缺口：盒子上 `orchestra-exam-watch.service.d/env.conf` 需手工从 broker 的复制（deploy 脚本只 WARN）
+- **exam-watch 已上线**（RK3528 timer 轮询雨课堂 → console 告警融合）。缺口：盒子上 `orchestra-exam-watch.service.d/env.conf` 需手工从 broker 的复制（deploy 脚本只 WARN）
 - Pi/RK 部署窗口：deploy_broker.sh 已含 exam-watch；taskfile 收紧、artifact 校验、taskkill 树杀等与仓库对齐仍挂
-- Bogda Gate 6：**未通过**（4B）。RK3528 trial `20260828T064220Z` 观察窗 **24h** → 2026-08-29T06:42Z。**Gate 7 / 3101 真 Prefect 写入未进**
+- Bogda Gate 6：**通过**（2026-08-31，trial `20260830T154019Z`）。见 [`docs/reports/2026-08-31-bogda-rk3528-gate6-final-acceptance.md`](docs/reports/2026-08-31-bogda-rk3528-gate6-final-acceptance.md)
+- Gate 7：**S1 只读影子 + S2 专用白名单写入已通过**（合入 `e79f79b`）。不是 3100 切换，不是生产科研任务。证据 [`2026-09-01-bogda-gate7-entry-decision.md`](docs/reports/2026-09-01-bogda-gate7-entry-decision.md)、[`S1`](docs/reports/2026-09-01-bogda-console-s1-real-shadow.md)、[`S2`](docs/reports/2026-09-01-bogda-console-s2-allowlisted-shadow.md)。盒子上仍留 S2 验收资源 `bogda-s2-acceptance-20260901-...`（未删）
+- **下一跳（未开工）**：正式研究运行前接线（DEF-03 checkpoint/worker、DEF-04/07 生产 transport、DEF-16 >20 CNY 凭证、DEF-17 日志内容、DEF-19 身份）。**不要**接宿舍机 / Wake Bridge，**不要**改 3100 入口
 - 4B 已空：Orchestra + Samba NAS + Bogda 均在 RK3528（`10.77.0.1` / `\\10.77.0.1\nas` / Prefect `:4200`）。4B 可断电。
 - 入学前（2026-09-08）：宿舍–实验室 Tailscale 实测；4B 弱密码已改（2026-08-20），核桃派 pi 密码待上线后同步
 - 雷达→Zotero 直连推迟到开学后再设计（`docs/superpowers/plans/2026-08-20-radar-digest-reading-note.md`）

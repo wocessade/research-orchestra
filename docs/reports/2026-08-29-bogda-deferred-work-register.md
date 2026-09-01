@@ -22,6 +22,7 @@
 | NOW-03 | Stage E：运行接线与迁移前验收 | Task 1–4：ledger、paid-call+SQLite、官方余额 **live GET**、本机 Flash/Pro dsh stdout `pong`。缺 `usage.json` 精确对账。真 suspend 未做。Gate 6 **已通过**；Gate 7 的 3101 real Prefect S1 只读与 S2 exact-allowlist 专用写入均已通过，仍不代表生产切换 | [Stage E 开工](2026-08-30-bogda-stage-e-start.md)、[Gate 7 entry](2026-09-01-bogda-gate7-entry-decision.md)、[S1](2026-09-01-bogda-console-s1-real-shadow.md)、[S2](2026-09-01-bogda-console-s2-allowlisted-shadow.md) |
 | NOW-04 | Gate 6 收尾 | **已完成。** trial `20260830T154019Z` 覆盖 24h08m56s，275 个样本零缺口、零 API/DB/OOM 失败；受控 reboot、正常 fsck/mount、独立 restore 与最终日志复核全部通过 | [最终验收](2026-08-31-bogda-rk3528-gate6-final-acceptance.md)、[e2fsck/重试日志](2026-08-30-bogda-rk3528-e2fsck-remediation.md) |
 | NOW-05 | Runner 开工包本地准入 | `admit_runner_packet` + 6 个契约测试已过。未接线到 Prefect worker / 3101 | [spec](../superpowers/specs/2026-08-30-bogda-runner-dsh-design.md) §5.7、[计划](../superpowers/plans/2026-08-30-bogda-runner-packet.md) |
+| NOW-06 | 正式研究运行前接线 | Gate 7 影子已过。未做：专用 worker 上的 checkpoint（DEF-03）、core→console transport（DEF-04）、>20 CNY 凭证（DEF-16）、日志内容 API（DEF-17）、身份（DEF-19）。S2 验收资源仍留在现网 Prefect | 下一阶段计划；**不**接宿舍机、**不**切 3100 |
 
 ## 必要延期项
 
@@ -33,7 +34,7 @@
 | DEF-04 | usage unknown 的真实接线闭环：把 core 持久恢复状态映射到 real profile 的 owner API/窗口 | **本轮已完成 core SQLite 四状态、人工费用对账、唯一新 call id、mock API/UI 与结构化事件；尚未完成 core→console 生产 transport** | 第一条需要通过 real profile 人工恢复的 provider 调用前 | 决策中心已有“先对账、确认重试、终止”窗口；真实接线不得改变字段、revision 或禁止同 call 重试语义 | Stage E；真实 usage-unknown case 可跨重启进入窗口，动作回写 core，事件完整且同 call 不重复付费；本轮证据见 [acceptance](2026-08-31-bogda-price-aware-owner-control-acceptance.md) |
 | DEF-05 | 将进程内 SingleFlight ledger、call claim、recovery case 与终态事件投递替换为跨进程原子预留/持久 outbox；预留同时持久化并校验 intent、模型层级与价格上下文 | 当前 SQLite reservation 仍跨多个提交边界，异常可能只留在进程内；仓促补丁反而会制造双事实源 | worker 并发大于 1、跨进程恢复或正式多节点执行前 | 全局策略页只展示并发/锁状态；不能提供绕过锁的普通开关 | Stage E/切换前；在每个持久化边界注入崩溃后，相同 call 不重复付费，恢复上下文不可由调用方篡改，终态事件最终且仅投递一次 |
 | DEF-06 | 将已验证的峰谷计划器接入真实 scheduler/dispatcher，并提供“继续等/按高峰新预算立即跑/取消” | **本轮已完成与预计工作量、运行时长、deadline、北京时间峰谷窗口关联的纯计划器与边界测试；生产调度执行和 owner 三选一命令尚未接线** | real profile 开始自动安排付费运行前 | 创建/确认窗口需显示计划启动、当前价格窗口、预计节省、deadline 风险和 owner 三选一 | Stage E；实际 dispatcher 使用冻结计划，跨峰谷/deadline 重算可复现且不会绕过预算批准；本轮证据见 [acceptance](2026-08-31-bogda-price-aware-owner-control-acceptance.md) |
-| DEF-07 | 完整 owner 前端：决策中心、创建运行、启动确认、运行详情、项目策略、全局策略 | **Stage D mock 已交付**；真实 profile 仍禁写 | Phase C 已完成；后续只补真实接线 | 明确展示三种 autonomy 合作方式、intent、Auto/Flash/Pro、预算、价格、恢复条件、日志/产物 | Stage D mock 关闭于 [acceptance](2026-08-29-bogda-owner-console-acceptance.md)；真实写入仍要 Gate 6 + S1/S2 |
+| DEF-07 | 完整 owner 前端：决策中心、创建运行、启动确认、运行详情、项目策略、全局策略 | **Stage D mock 已交付**；Gate 7 S1/S2 已过。生产科研写入与 model-control 仍未接（见 DEF-03/04） | 正式研究运行前 | 明确展示三种 autonomy 合作方式、intent、Auto/Flash/Pro、预算、价格、恢复条件、日志/产物 | Stage D mock 关闭于 [acceptance](2026-08-29-bogda-owner-console-acceptance.md)；S1/S2 见 2026-09-01 报告；生产科研仍禁 |
 | DEF-08 | 前端显式开关与不可关闭安全基线 | **Stage D mock 已交付** | 与 DEF-07 同步完成 | 可选偏好与不可关闭基线已在 `/model-policy` 分开 | 来源/修订号/恢复继承与冲突重确认已有前端+浏览器测试 |
 | DEF-09 | 价格目录生命周期：到期前更新、来源审计、失效 fail-closed、前端告警 | 当前目录 `review_by=2026-09-28`，不会自动更新 | 到 review_by 前或 DeepSeek 价格变更时 | 全局策略页显示版本、来源、生效/复核日期；失效时给更新入口 | Stage E 运维；新旧版本回归、未知版本拒绝、无猜价 |
 | DEF-10 | 实际消耗反馈到 workload 估算、历史 p90、安全系数和后续调用预算 | 当前只完成单次精确对账，尚未形成历史反馈闭环 | 有足够真实调用样本后 | 运行详情显示预测/实际偏差；策略页显示调整依据，不自动扩大当前预算 | Stage E 后续；偏差告警与下一次预测变化可复现 |

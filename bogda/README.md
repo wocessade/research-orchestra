@@ -2,18 +2,20 @@
 
 Bogda is the Prefect-based successor to Research Orchestra. This directory is independent from orchestra/. The local vertical slice still lives here; **production Prefect (control plane + `pi-service` worker) runs on RK3528**, not the retired Pi 4B.
 
-## Production host (2026-08-28)
+## Production host (2026-09-02)
 
 | 项 | 值 |
 |---|---|
 | 机器 | RK3528（hostname `rk3528`，Armbian / aarch64） |
-| SSH | `liuxfs@10.77.0.1`（直连 `/30`）；Tailscale `100.78.158.80` |
+| SSH | 优先 Tailscale `100.78.158.80` / `rk3528`；直连 `10.77.0.1` 可能 host key 失败 |
 | Prefect UI / API | `http://10.77.0.1:4200`；tailnet `http://100.78.158.80:4200` |
 | 数据 | `/mnt/nas/.bogda`（西数 250G，UUID `d105381a-d80e-47b0-8bb4-2a8c4b56600f`，LABEL `nas-data`） |
 | 程序 | `/opt/bogda` + `/opt/bogda/.venv`；units 仍用 `deploy/pi/` 清单 |
-| 工作池名 | **`pi-service`**（不改名；host 已换） |
+| 工作池名 | **`pi-service`**（冻结名：控制面轻任务池，与树莓派无关） |
+| Gate 6 | **通过**（2026-08-31，trial `20260830T154019Z`） |
+| Gate 7 | **S1/S2 影子通过**（2026-09-01）。不是 3100 切换；生产科研仍禁 `pi-service` |
 
-Do not treat Pi 4B (`192.168.0.250` / Tailscale `liuxfs`) as a scheduler. Gate trial reports under `docs/reports/2026-08-27-bogda-pi-gate6-*` are historical.
+Do not treat Pi 4B (`192.168.0.250` / Tailscale `liuxfs`) as a scheduler. Early Gate 6 trial reports under `docs/reports/2026-08-27-bogda-pi-gate6-*` are historical. Final: [`docs/reports/2026-08-31-bogda-rk3528-gate6-final-acceptance.md`](../docs/reports/2026-08-31-bogda-rk3528-gate6-final-acceptance.md).
 
 ## Requirements
 

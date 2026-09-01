@@ -54,7 +54,7 @@ RK3528 数据在 **`/home/liuxfs/broker-data`**（`/mnt/broker` 指向该目录�
 
 - Skill digest：**owner 暂不锁**
 - RK3528 部署窗口：`deploy_broker.sh` 已含 exam-watch 传载/启用，实例上 env.conf 需手工复制（脚本 WARN）
-- bogda Gate 6：**未通过**（4B）；RK3528 观察窗 **24h**（owner 2026-08-28 缩短）。仓库 unit 为 `RequiresMountsFor`。Gate 7 未进
+- bogda Gate 6：**通过**（2026-08-31）。Gate 7：**S1/S2 影子通过**；不是 3100 切换、不是生产科研。下一跳见根 `CLAUDE.md` 挂账
 - 4B 已空：Orchestra / Samba / Bogda 均在 RK3528（`10.77.0.1`，NAS=`\\10.77.0.1\nas`，Prefect `:4200`）。西数 SSD 挂在盒子 USB3。4B 可断电。
 - 入学前（2026-09-08）：宿舍–实验室 Tailscale 实测；核桃派 pi 密码
 - 雷达→Zotero：9.8 后再设计
@@ -73,4 +73,4 @@ Mission 流水、验收数字、旧测试计数**不再维护于本文件**。
 - 学校网络：`orchestra/docs/school-network-switch.md`
 - xju-desktop 属独立仓库 `wocessade/xju-portal-desktop`（本仓库仅引用设计 spec / 计划）
 
-2026-08-18 起：总 spec → 4B Broker → 雷达四阶段 → 实验 ingest → 墨水屏 → Codex 副脑 → SOL 合并 → 3100 控制台 → 2026-08-22 锐评后门禁收紧、Hermes 放弃 → bogda 本地切片/受监督协调器 → exam-watch 上线 → 08-27 Gate 6 未通过 → 08-28 现网切 RK3528。
+2026-08-18 起：总 spec → 4B Broker → 雷达四阶段 → 实验 ingest → 墨水屏 → Codex 副脑 → SOL 合并 → 3100 控制台 → 2026-08-22 锐评后门禁收紧、Hermes 放弃 → bogda 本地切片/受监督协调器 → exam-watch 上线 → 08-28 现网切 RK3528 → 08-31 Gate 6 通过 → 09-01 Gate 7 S1/S2 影子通过。

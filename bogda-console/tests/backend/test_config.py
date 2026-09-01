@@ -27,6 +27,18 @@ def test_public_host_allows_loopback_and_rk3528_tailnet() -> None:
     ).public_host == "100.78.158.80"
 
 
+def test_public_host_allowlist_can_be_extended_by_env() -> None:
+    env = {"BOGDA_CONSOLE_SAFE_PUBLIC_HOSTS": "127.0.0.1,100.64.1.8"}
+    assert assert_public_host("100.64.1.8", env) == "100.64.1.8"
+    with pytest.raises(ValueError, match="100.64.1.8"):
+        assert_public_host("100.78.158.80", env)
+
+
+def test_public_host_allowlist_always_keeps_loopback() -> None:
+    env = {"BOGDA_CONSOLE_SAFE_PUBLIC_HOSTS": "100.64.1.8"}
+    assert assert_public_host("127.0.0.1", env) == "127.0.0.1"
+
+
 def test_public_host_rejects_wildcard_bind_without_opt_in() -> None:
     with pytest.raises(ValueError, match="BOGDA_CONSOLE_PUBLIC_HOST"):
         Settings.from_env({"BOGDA_CONSOLE_PUBLIC_HOST": "0.0.0.0"})

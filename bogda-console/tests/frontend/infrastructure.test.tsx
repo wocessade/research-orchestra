@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { envelope, renderAppAt, sourceFresh, standardRoutes } from "./helpers";
@@ -22,6 +22,17 @@ describe("InfrastructurePage", () => {
     expect(screen.getByText("sleep")).toBeVisible();
     expect(screen.getAllByText("模拟数据").length).toBeGreaterThan(0);
     expect(screen.queryByText(/OFFLINE.*sleep/)).not.toBeInTheDocument();
+  });
+
+  it("treats the power host as the green-panel hub", async () => {
+    const routes = standardRoutes();
+    routes["/api/v1/infrastructure"] = envelope({ pools: [{ name: "dorm-x86", status: "NOT_READY", isPaused: false, concurrencyLimit: 1, activeSlots: 0, queues: [], workers: [] }], dormPower: { host: "dorm-x86", mode: "sleep", agentReachable: true, sleepInhibited: false, lastTransitionAt: "2026-08-24T22:45:00Z" } }, { prefect: sourceFresh, power: { ...sourceFresh, source: "power", sourceMode: "mock" } });
+    renderAppAt("/infrastructure", routes);
+    const panel = await screen.findByRole("region", { name: "宿舍机电源状态" });
+    expect(within(panel).getByText("dorm-x86")).toBeVisible();
+    expect(within(panel).getByText("sleep")).toBeVisible();
+    expect(within(panel).getByText("模拟数据")).toBeVisible();
+    expect(screen.queryByText("Power agent / mock adapter")).not.toBeInTheDocument();
   });
 
   it("reports a broken dorm capacity contract directly", async () => {

@@ -54,6 +54,17 @@ async def test_capabilities_report_sorted_allowlist_scope_and_checkpoint_decisio
     assert snapshot.allowed_schedule_ids == ["schedule-a", "schedule-z"]
     assert snapshot.allowed_queue_ids == ["queue-a", "queue-z"]
     assert snapshot.allowed_work_pool_names == ["pool-a", "pool-z"]
+    assert snapshot.public_port == 3101
+
+
+@pytest.mark.asyncio
+async def test_capabilities_report_configured_public_port(fixture_loader) -> None:
+    service = service_for(
+        fixture_loader("normal-active"),
+        BOGDA_CONSOLE_PUBLIC_PORT="3103",
+    )
+    snapshot = (await service.capabilities()).data
+    assert snapshot.public_port == 3103
 
 
 @pytest.mark.asyncio

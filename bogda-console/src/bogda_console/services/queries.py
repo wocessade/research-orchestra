@@ -4,6 +4,7 @@ import json
 from datetime import UTC, datetime
 from typing import Any, Awaitable, Callable, TypeVar
 
+from bogda.contracts.runner_packet import PI_SERVICE_POOL, RESEARCH_POOL
 from bogda_console.config import Settings
 from bogda_console.contracts.models import (
     ApiEnvelope,
@@ -113,6 +114,7 @@ class QueryService:
                 allowedScheduleIds=sorted(self.settings.allowed_schedule_ids),
                 allowedQueueIds=sorted(self.settings.allowed_queue_ids),
                 allowedWorkPoolNames=sorted(self.settings.allowed_work_pool_names),
+                publicPort=self.settings.public_port,
             ),
             sources={},
             errors=[],
@@ -493,8 +495,8 @@ class QueryService:
             if science_available
             else None,
             infrastructure={
-                "piService": pool_map.get("pi-service"),
-                "dormX86": pool_map.get("dorm-x86"),
+                "piService": pool_map.get(PI_SERVICE_POOL),
+                "dormX86": pool_map.get(RESEARCH_POOL),
             }
             if infrastructure_available
             else None,

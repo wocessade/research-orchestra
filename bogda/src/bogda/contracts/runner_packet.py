@@ -16,6 +16,7 @@ INBOX_ROOT = "/mnt/nas/.bogda/inbox"
 RESEARCH_TASK_TYPES = frozenset(
     {"paper_reproduce", "paper_reproduce_slice", "research"}
 )
+CONTROL_PLANE_TASK_TYPES = frozenset({"brief"})
 _WINDOWS_PATH = re.compile(r"^[A-Za-z]:[\\/]|^\\\\")
 _GIT_COMMIT = re.compile(r"^[0-9a-f]{7,40}$")
 _INBOX_TOKEN = re.compile(r"^[A-Za-z0-9._-]{1,180}$")
@@ -109,6 +110,11 @@ def admit_runner_packet(request: JobRequest, packet: RunnerPacket) -> AdmitDecis
         return AdmitDecision(
             status=AdmitStatus.POOL_FORBIDDEN,
             reasons=("research jobs must not use pi-service",),
+        )
+    if request.task_type in CONTROL_PLANE_TASK_TYPES and packet.work_pool != PI_SERVICE_POOL:
+        return AdmitDecision(
+            status=AdmitStatus.POOL_FORBIDDEN,
+            reasons=("brief jobs must use pi-service",),
         )
     reasons: list[str] = []
     if _is_research(request) and not packet.attachments:

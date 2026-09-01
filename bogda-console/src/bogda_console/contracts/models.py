@@ -353,6 +353,7 @@ class CapabilitySnapshot(WireModel):
     allowed_schedule_ids: list[str] = Field(default_factory=list)
     allowed_queue_ids: list[str] = Field(default_factory=list)
     allowed_work_pool_names: list[str] = Field(default_factory=list)
+    public_port: int = Field(default=3101, ge=1, le=65535)
 
 
 class RunFilters(WireModel):

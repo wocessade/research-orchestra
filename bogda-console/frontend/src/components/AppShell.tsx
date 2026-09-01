@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { NavLink } from "react-router-dom";
 
+import { api } from "../api/client";
+import type { CapabilitySnapshot } from "../api/types";
 import { BrandMark } from "./BrandMark";
 
 
@@ -29,6 +32,12 @@ function Navigation({ mobile = false }: { mobile?: boolean }) {
 
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const capabilities = useQuery({
+    queryKey: ["capabilities"],
+    queryFn: () => api.get<CapabilitySnapshot>("/api/v1/capabilities"),
+  });
+  const publicPort = capabilities.data?.data?.publicPort ?? 3101;
+
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main-content">跳到主要内容</a>
@@ -37,7 +46,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Navigation />
         <div className="rail-foot">
           <span className="source-dot" aria-hidden="true" />
-          <span><strong>3101 影子运行</strong><small>影子控制台 · 不写现网 Prefect</small></span>
+          <span><strong>{publicPort} 影子运行</strong><small>影子控制台 · 不写现网 Prefect</small></span>
         </div>
       </aside>
       <main id="main-content" tabIndex={-1}>{children}</main>

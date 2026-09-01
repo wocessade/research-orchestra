@@ -22,6 +22,16 @@ $Python = [System.IO.Path]::GetFullPath((Join-Path $Root ".venv\Scripts\python.e
 $FrontendDist = [System.IO.Path]::GetFullPath((Join-Path $Root "frontend\dist"))
 $BindHost = "127.0.0.1"
 $Port = 3101
+if ($env:BOGDA_CONSOLE_PUBLIC_PORT) {
+    try {
+        $requested = [int]$env:BOGDA_CONSOLE_PUBLIC_PORT
+        if ($requested -ne 3100 -and $requested -ge 1 -and $requested -le 65535) {
+            $Port = $requested
+        }
+    } catch {
+        $Port = 3101
+    }
+}
 $ReadyTimeoutSeconds = 15
 
 if ($env:BOGDA_CONSOLE_STATE_DIR) {

@@ -6,6 +6,7 @@ import type { OverviewSnapshot, PoolSnapshot, RunSummary } from "../api/types";
 import { AutonomyPolicyPanel } from "../components/AutonomyPolicyPanel";
 import { EnvelopeErrors, QueryFailure, QueryLoading, SourceStrip } from "../components/EnvelopeState";
 import { RunLedger } from "../components/RunLedger";
+import { RESEARCH_POOL } from "../contracts/pools";
 
 type OverviewData = OverviewSnapshot & {
   execution?: { countsByPrefectType?: Record<string, number>; recentRuns?: RunSummary[] } | null;
@@ -60,7 +61,7 @@ export function OverviewPage() {
           <div className="section-heading"><p>04 / FIELD</p><h2 id="field-title">宿舍机容量与电源</h2></div>
           <div className="field-band__grid">
             {dorm ? (
-              <div><small>共享执行容量</small><strong>{`${dorm.activeSlots} / ${dorm.concurrencyLimit ?? "—"}`}</strong><span>dorm-x86 · CPU/GPU 共用</span></div>
+              <div><small>共享执行容量</small><strong>{`${dorm.activeSlots} / ${dorm.concurrencyLimit ?? "—"}`}</strong><span>{RESEARCH_POOL} · CPU/GPU 共用</span></div>
             ) : (
               <div><small>共享执行容量</small><strong>{infrastructureAvailable ? "未接入" : "来源不可用"}</strong><span>{infrastructureAvailable ? "宿舍机未接入 Prefect pool" : "Prefect pool 暂不可读取"}</span></div>
             )}

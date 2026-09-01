@@ -38,7 +38,7 @@ BOGDA_CONSOLE_ALLOWED_WORK_POOL_NAMES=<runner-pool-name>
 BOGDA_ARTIFACT_ROOT=/mnt/nas/.bogda/runner/artifacts
 BOGDA_USAGE_UNKNOWN_DB=/mnt/nas/.bogda/runner/usage-unknown.sqlite
 BOGDA_APPROVAL_DB=/mnt/nas/.bogda/runner/approvals.sqlite
-# 小附件：/mnt/nas/.bogda/inbox/<run_id>/<file>  （单文件 ≤ 8MiB；禁止 D:\）
+# 小附件：/mnt/nas/.bogda/inbox/<run_id>/<file>  （默认 ≤ 8MiB/文件，硬顶 32MiB；禁止 D:\）
 # BOGDA_APPROVAL_HMAC_KEY 只写进盒子/runner 环境，不入库
 ```
 

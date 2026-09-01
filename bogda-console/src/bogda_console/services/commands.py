@@ -7,6 +7,7 @@ from typing import Any, Awaitable, Callable
 
 import httpx
 
+from bogda.contracts.runner_packet import RESEARCH_POOL
 from bogda_console.adapters.mock_run_results import ReviewConflict
 from bogda_console.config import Settings
 from bogda_console.contracts.models import (
@@ -77,15 +78,15 @@ class CommandService:
                 "prefect", lambda: self.prefect.get_deployment(deployment_id)
             )
             self._authorize_pool(deployment.work_pool_name, deployment_id)
-            if deployment.work_pool_name == "dorm-x86":
+            if deployment.work_pool_name == RESEARCH_POOL:
                 pool = await self._pre_read(
-                    "prefect", lambda: self.prefect.get_work_pool_concurrency("dorm-x86")
+                    "prefect", lambda: self.prefect.get_work_pool_concurrency(RESEARCH_POOL)
                 )
                 if pool.concurrency_limit != 1:
                     self._raise(
                         ApiErrorCode.INFRASTRUCTURE_MISCONFIGURED,
                         409,
-                        "dorm-x86 concurrency limit must equal one",
+                        f"{RESEARCH_POOL} concurrency limit must equal one",
                     )
             if run_preparation_id is not None:
                 self._require_model_control_writes()

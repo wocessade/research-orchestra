@@ -287,6 +287,21 @@ def test_plan_pins_loopback_3101_and_does_not_bind_3100(tmp_path: Path) -> None:
     assert "3100" not in command
 
 
+def test_plan_honors_non_reserved_public_port(tmp_path: Path) -> None:
+    completed = run_launcher(
+        "plan",
+        script=LAUNCHER,
+        cwd=tmp_path,
+        state_dir=tmp_path / "state",
+        extra_env={"BOGDA_CONSOLE_PUBLIC_PORT": "3103"},
+    )
+    assert completed.returncode == 0, _output(completed)
+    plan = parse_json(completed)
+    assert plan["port"] == 3103
+    assert plan["env"]["BOGDA_CONSOLE_PUBLIC_PORT"] == "3103"
+    assert plan["host"] == "127.0.0.1"
+
+
 def test_plan_forwards_real_profile_settings_without_exposing_credentials(tmp_path: Path) -> None:
     secrets = ["auth-sentinel", "prefect-key-sentinel", "deepseek-key-sentinel"]
     completed = run_launcher(

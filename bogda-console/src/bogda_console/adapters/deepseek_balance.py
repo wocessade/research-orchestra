@@ -7,6 +7,7 @@ from typing import Any
 
 import httpx
 
+from bogda.budget.deepseek_balance import DEFAULT_DEEPSEEK_API_BASE
 from bogda_console.contracts.models import UsageBalanceSnapshot
 from bogda_console.contracts.ports import UsageBalanceUnavailable
 
@@ -20,7 +21,7 @@ class DeepSeekBalanceAdapter:
         self,
         api_key: str | None,
         *,
-        api_base: str = "https://api.deepseek.com",
+        api_base: str = DEFAULT_DEEPSEEK_API_BASE,
         timeout_seconds: float = 10.0,
         transport: httpx.AsyncBaseTransport | None = None,
         now: Callable[[], datetime] | None = None,

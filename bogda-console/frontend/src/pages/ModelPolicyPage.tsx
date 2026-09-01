@@ -15,6 +15,11 @@ type PolicyScope = "project" | "global";
 type ScalarPolicyKey = "minimumRemaining" | "workloadSafetyMargin";
 type SwitchPolicyKey = "allowAutoUpgrade" | "allowFlashDowngrade" | "preferOffPeak" | "autoResume" | "criticalNotifications";
 
+function formatProviderName(provider: string) {
+  if (provider.toLowerCase() === "deepseek") return "DeepSeek";
+  return provider;
+}
+
 const SCALAR_FIELDS: Array<{ key: ScalarPolicyKey; label: string; description: string; suffix: string }> = [
   {
     key: "minimumRemaining",
@@ -285,20 +290,27 @@ export function ModelPolicyPage() {
       <SourceStrip sources={activePolicy.data?.sources ?? {}} />
       <EnvelopeErrors errors={activePolicy.data?.errors ?? []} />
       <section className="section-block account-balance" aria-labelledby="balance-title">
-        <div className="section-heading">
-          <p>PROVIDER / BALANCE</p>
-          <h2 id="balance-title">账户余额</h2>
-        </div>
-        {balance.isPending && <p className="muted">正在读取余额…</p>}
+        {balance.isPending && (
+          <>
+            <h2 id="balance-title">账户余额</h2>
+            <p className="muted">正在读取余额…</p>
+          </>
+        )}
         {balance.isError && (
-          <p className="command-notice" role="status">{balance.error.message || "余额来源暂不可用"}</p>
+          <>
+            <h2 id="balance-title">账户余额</h2>
+            <p className="command-notice" role="status">{balance.error.message || "余额来源暂不可用"}</p>
+          </>
         )}
         {balance.data?.data && (
-          <dl className="policy-meta balance-facts">
-            <div><dt>可用余额</dt><dd>¥{balance.data.data.totalBalance}</dd></div>
-            <div><dt>服务商</dt><dd>{balance.data.data.provider}</dd></div>
-            <div><dt>观测时间</dt><dd>{new Date(balance.data.data.observedAt).toLocaleString("zh-CN")}</dd></div>
-          </dl>
+          <>
+            <p className="account-balance__provider">{formatProviderName(balance.data.data.provider)}</p>
+            <h2 id="balance-title">账户余额</h2>
+            <p className="account-balance__amount">¥{balance.data.data.totalBalance}</p>
+            <p className="account-balance__meta">
+              官方账户 · 只读观测 · {new Date(balance.data.data.observedAt).toLocaleString("zh-CN")}
+            </p>
+          </>
         )}
         {balance.data && <SourceStrip sources={balance.data.sources} />}
         {balance.data && <EnvelopeErrors errors={balance.data.errors} />}

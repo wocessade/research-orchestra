@@ -9,7 +9,7 @@ sudo -n /opt/bogda-console/maintain.sh logs
 sudo -n /opt/bogda-console/maintain.sh restart
 ```
 
-`health` 探 `GET /`、一个 `/assets/*.js`、以及只读 `GET /api/v1/capabilities`。`restart` 等到 loopback 200 再探这三项（最多约 30s）。`logs` 附带 `ss` 里的 3101 与 `tailscale serve status`。
+`health` 探 `GET /`、一个 `/assets/*.js`、以及只读 `GET /api/v1/capabilities`。端口读 `console.env` 的 `BOGDA_CONSOLE_PUBLIC_PORT`（缺省 3101，拒绝 3100），只抽这一行，不打印文件。`restart` 等到 loopback 200 再探这三项（最多约 30s）。`logs` 附带 `ss` 里该端口与 `tailscale serve status`。
 
 禁止：
 

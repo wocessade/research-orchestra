@@ -1227,6 +1227,13 @@
             "title": "Projectid",
             "type": "string"
           },
+          "publicPort": {
+            "default": 3101,
+            "maximum": 65535.0,
+            "minimum": 1.0,
+            "title": "Publicport",
+            "type": "integer"
+          },
           "role": {
             "title": "Role",
             "type": "string"

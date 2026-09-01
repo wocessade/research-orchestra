@@ -25,8 +25,10 @@ def test_health_probes_root_assets_and_capabilities() -> None:
     text = _maintain_sh()
     assert "/api/v1/capabilities" in text
     assert "frontend/dist/assets" in text
-    assert 'base="http://127.0.0.1:3101"' in text
+    assert "BOGDA_CONSOLE_PUBLIC_PORT" in text
     assert '"$base/"' in text
+    assert "3100" in text
+    assert 'base="http://127.0.0.1:3101"' not in text
 
 
 def test_restart_waits_until_loopback_answers() -> None:
@@ -59,7 +61,9 @@ def test_deploy_scripts_require_fixtures() -> None:
     ).read_text(encoding="utf-8")
     assert "fixtures/normal-active.json" in deploy
     assert "fixtures/normal-active.json" in remote
-    assert "rk3528.tail6d8b09.ts.net:3101" in deploy
+    assert "rk3528.tail6d8b09.ts.net" in deploy
+    assert "BOGDA_CONSOLE_MAGICDNS_HOST" in deploy
+    assert "BOGDA_CONSOLE_PUBLIC_PORT" in remote
     assert "DEEPSEEK_API_KEY" in remote
     assert "orchestra-broker.service.d/env.conf" in remote
     assert "echo \"$line\"" not in remote

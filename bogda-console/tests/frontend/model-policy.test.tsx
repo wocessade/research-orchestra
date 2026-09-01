@@ -181,6 +181,7 @@ describe("ModelPolicyPage", () => {
     expect(within(region).getByText("修订号")).toBeVisible();
     expect(within(region).getByText("4")).toBeVisible();
     expect(within(region).getByText("账户余额")).toBeVisible();
+    expect(within(region).getByText("DeepSeek")).toBeVisible();
     expect(within(region).getByText("¥37.1250")).toBeVisible();
   });
 

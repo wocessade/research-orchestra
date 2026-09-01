@@ -136,4 +136,5 @@
 63. **`tailscale serve --http=3101` 认 MagicDNS 不认裸 IP**：`http://rk3528.tail6d8b09.ts.net:3101/` 200，`http://100.78.158.80:3101/` 404。规则：文档和健康检查用主机名。
 64. **已占用 `main` 的仓不要 `move_agent_to_root` 进别的 worktree**：Cursor 会先 checkpoint 再 `git checkout main`，而 `main` 已在 `D:\pythonProject`。规则：多 worktree 任务用绝对路径改文件，不要切根到会抢 `main` 的目录。
 65. **离机审批用 3101 按钮，不要聊天连 dsh**：自由文本会绕过机械白名单；文件也到不了 runner。规则：材料用 git/inbox/计算端路径；盒子 dsh 只 `maintain.sh` 或 Prefect 白名单 `brief`。
-66. **inbox 必须是 NAS 两段路径**：`/mnt/nas/.bogda/inbox/<run_id>/<file>`，单文件 8MiB；相对路径和 `D:\` 都拒。规则：先 `prepare_runner_share.sh` 建目录，再让 runner 读同一棵树。
+66. **inbox 必须是 NAS 两段路径**：`/mnt/nas/.bogda/inbox/<run_id>/<file>`，默认 8MiB/文件、硬顶 32MiB（`BOGDA_INBOX_MAX_FILE_BYTES`）；相对路径和 `D:\` 都拒。规则：先 `prepare_runner_share.sh` 建目录，再让 runner 读同一棵树。
+67. **盒子 Tailscale IP 不要写死在安全允许名单**：`SAFE_PUBLIC_HOSTS` 默认含当前 `100.78.158.80`，换 IP 用 `BOGDA_CONSOLE_SAFE_PUBLIC_HOSTS`；loopback 始终可绑。规则：`maintain.sh` / `tailscale serve` 读 `BOGDA_CONSOLE_PUBLIC_PORT`，brief 只许 `pi-service`。

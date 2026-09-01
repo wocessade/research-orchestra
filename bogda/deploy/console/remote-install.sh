@@ -78,7 +78,19 @@ systemctl daemon-reload
 systemctl enable --now bogda-console.service
 systemctl restart bogda-console.service
 if command -v tailscale >/dev/null 2>&1; then
-    tailscale serve --bg --http=3101 3101 || echo "WARN: tailscale serve failed; 3101 remains loopback"
+    port=3101
+    if [ -f /etc/bogda/console.env ]; then
+        parsed=$(awk -F= '/^BOGDA_CONSOLE_PUBLIC_PORT=/{gsub(/\r/,""); gsub(/"/,""); print $2; exit}' /etc/bogda/console.env)
+        case "$parsed" in
+            ''|*[!0-9]*) ;;
+            3100)
+                echo "BOGDA_CONSOLE_PUBLIC_PORT 3100 is reserved" >&2
+                exit 78
+                ;;
+            *) port=$parsed ;;
+        esac
+    fi
+    tailscale serve --bg --http="$port" "$port" || echo "WARN: tailscale serve failed; $port remains loopback"
 fi
 rm -rf "$STAGE"
 systemctl is-active bogda-console.service

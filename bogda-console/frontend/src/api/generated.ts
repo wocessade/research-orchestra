@@ -918,6 +918,11 @@ export interface components {
             profile: string;
             /** Projectid */
             projectId: string;
+            /**
+             * Publicport
+             * @default 3101
+             */
+            publicPort: number;
             /** Role */
             role: string;
         };

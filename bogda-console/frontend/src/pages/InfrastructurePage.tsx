@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "../api/client";
 import type { CapabilitySnapshot, CommandReceipt, DeploymentSummary, InfrastructureView, Page, PoolSnapshot, QueueSnapshot, RunSummary } from "../api/types";
+import { RESEARCH_POOL } from "../contracts/pools";
 import { ConfirmDialog } from "../components/Dialogs";
 import { EnvelopeErrors, QueryFailure, QueryLoading, SourceStrip, envelopeHasErrors } from "../components/EnvelopeState";
 import { RunPreparation } from "../components/RunPreparation";
@@ -26,7 +27,7 @@ function disabledReason(enabled: boolean, inResourceScope: boolean, profile?: st
 }
 
 function PoolLedger({ pool, capabilities, onAction }: { pool: PoolSnapshot; capabilities?: CapabilitySnapshot; onAction: (action: PendingAction) => void }) {
-  const isDorm = pool.name === "dorm-x86";
+  const isDorm = pool.name === RESEARCH_POOL;
   return <article className="pool-ledger">
     <header><div><p className="page-kicker">Work pool</p><h2>{pool.name}</h2></div><span className={`plain-status plain-status--${pool.status.toLowerCase()}`}>{pool.status}</span></header>
     <div className="capacity-line"><strong>{isDorm ? `共享并发 ${pool.activeSlots} / ${pool.concurrencyLimit ?? "—"}` : `并发 ${pool.activeSlots} / ${pool.concurrencyLimit ?? "—"}`}</strong><span>{isDorm ? "CPU 与 GPU 任务共用这一上限" : "Prefect 工作池容量"}</span></div>
@@ -80,7 +81,7 @@ export function InfrastructurePage() {
     return api.command<CommandReceipt<DeploymentSummary>>(`/api/v1/deployments/${pending.deployment.deploymentId}/schedules/${pending.schedule.scheduleId}/${verb}`, { expectedCommandVersion: pending.schedule.commandVersion });
   }});
 
-  const dorm = useMemo(() => infrastructure.data?.data?.pools?.find((pool) => pool.name === "dorm-x86"), [infrastructure.data]);
+  const dorm = useMemo(() => infrastructure.data?.data?.pools?.find((pool) => pool.name === RESEARCH_POOL), [infrastructure.data]);
 
   async function confirmAction() {
     if (!action) return;
@@ -107,7 +108,28 @@ export function InfrastructurePage() {
     {dorm && dorm.concurrencyLimit !== 1 && <div className="contract-alert" role="alert"><strong>宿舍机共享并发配置不符合约束</strong><span>期望 1，Prefect 当前报告 {dorm.concurrencyLimit ?? "未设置"}。</span></div>}
     {notice && <div className="command-notice" role="status">{notice}</div>}
 
-    <section className="power-observation" aria-labelledby="power-title"><div><p className="page-kicker">Power agent / mock adapter</p><h2 id="power-title">宿舍机电源状态</h2></div>{data.dormPower ? <div className="power-facts"><strong>{data.dormPower.mode}</strong><span>Agent {data.dormPower.agentReachable === true ? "可达" : data.dormPower.agentReachable === false ? "不可达" : "未知"}</span><span>Sleep inhibition {data.dormPower.sleepInhibited === true ? "开启" : data.dormPower.sleepInhibited === false ? "关闭" : "未知"}</span><time dateTime={data.dormPower.lastTransitionAt ?? undefined}>{formatAbsolute(data.dormPower.lastTransitionAt)}</time>{powerMeta?.sourceMode === "mock" && <em>模拟数据</em>}</div> : <p className="muted">Power Agent 数据不可用。</p>}</section>
+    <section className="power-observation" aria-labelledby="power-title">
+      {data.dormPower ? (
+        <>
+          <p className="power-observation__host">{data.dormPower.host}</p>
+          <h2 id="power-title">宿舍机电源状态</h2>
+          <p className="power-observation__mode">{data.dormPower.mode}</p>
+          <p className="power-observation__meta">
+            Agent {data.dormPower.agentReachable === true ? "可达" : data.dormPower.agentReachable === false ? "不可达" : "未知"}
+            {" · "}
+            Sleep inhibition {data.dormPower.sleepInhibited === true ? "开启" : data.dormPower.sleepInhibited === false ? "关闭" : "未知"}
+            {" · "}
+            <time dateTime={data.dormPower.lastTransitionAt ?? undefined}>{formatAbsolute(data.dormPower.lastTransitionAt)}</time>
+            {powerMeta?.sourceMode === "mock" && <>{" · "}<em>模拟数据</em></>}
+          </p>
+        </>
+      ) : (
+        <>
+          <h2 id="power-title">宿舍机电源状态</h2>
+          <p className="muted">Power Agent 数据不可用。</p>
+        </>
+      )}
+    </section>
 
     <div className="pool-grid">{data.pools?.map((pool) => <PoolLedger key={pool.name} pool={pool} capabilities={cap ?? undefined} onAction={setAction} />) ?? <p className="muted">Prefect 工作池数据不可用。</p>}</div>
 

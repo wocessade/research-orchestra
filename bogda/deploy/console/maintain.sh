@@ -1,5 +1,5 @@
 #!/bin/sh
-# Box-side 3101 maintenance. dsh may only call this script.
+# Box-side console maintenance. dsh may only call this script.
 # Allowed verbs: status | logs | restart | health
 # Does not print /etc/bogda/console.env or bogda.env.
 # Does not rebuild frontend, fetch source, or change profile.
@@ -7,8 +7,23 @@
 set -eu
 
 unit="bogda-console.service"
-base="http://127.0.0.1:3101"
+env_file="/etc/bogda/console.env"
 asset_dir="/opt/bogda-console/frontend/dist/assets"
+port="3101"
+if [ -f "$env_file" ]; then
+    parsed=$(awk -F= '/^BOGDA_CONSOLE_PUBLIC_PORT=/{gsub(/\r/,""); gsub(/"/,""); print $2; exit}' "$env_file")
+    case "$parsed" in
+        ''|*[!0-9]*) ;;
+        3100)
+            echo "BOGDA_CONSOLE_PUBLIC_PORT 3100 is reserved" >&2
+            exit 78
+            ;;
+        *)
+            port="$parsed"
+            ;;
+    esac
+fi
+base="http://127.0.0.1:$port"
 
 usage() {
     echo "usage: $0 status|logs|restart|health" >&2
@@ -62,7 +77,7 @@ case "$1" in
     logs)
         journalctl -u "$unit" -n 80 --no-pager
         echo "--- listen ---"
-        ss -lntp 2>/dev/null | grep 3101 || true
+        ss -lntp 2>/dev/null | grep "$port" || true
         echo "--- serve ---"
         tailscale serve status 2>/dev/null || true
         ;;

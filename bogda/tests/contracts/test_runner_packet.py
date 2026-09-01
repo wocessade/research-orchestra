@@ -94,6 +94,14 @@ def test_light_job_may_use_pi_service() -> None:
     assert decision.status is AdmitStatus.ADMITTED
 
 
+def test_brief_job_must_use_pi_service() -> None:
+    job = _job(task_type="brief", resource=ResourceClass.PI)
+    packet = _packet(work_pool="dorm-x86", gpu_class=None)
+    decision = admit_runner_packet(job, packet)
+    assert decision.status is AdmitStatus.POOL_FORBIDDEN
+    assert any("pi-service" in reason for reason in decision.reasons)
+
+
 def test_inbox_attachment_must_live_under_nas_inbox() -> None:
     with pytest.raises(ValidationError, match="inbox"):
         AttachmentRef(kind=AttachmentKind.INBOX, path="runs/jr-packet-1/fail.log")

@@ -4,11 +4,31 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Mapping
 
+from bogda.budget.deepseek_balance import DEFAULT_DEEPSEEK_API_BASE
+
 
 SAFE_PROFILES = frozenset({"mock-all", "real-readonly", "allowlisted-test"})
 
-# Loopback plus the current RK3528 tailnet address. 0.0.0.0 needs an explicit opt-in.
-SAFE_PUBLIC_HOSTS = frozenset({"127.0.0.1", "100.78.158.80"})
+# Loopback plus the current RK3528 tailnet address. Override with
+# BOGDA_CONSOLE_SAFE_PUBLIC_HOSTS. 0.0.0.0 needs an explicit opt-in.
+DEFAULT_SAFE_PUBLIC_HOSTS = ("127.0.0.1", "100.78.158.80")
+SAFE_PUBLIC_HOSTS = frozenset(DEFAULT_SAFE_PUBLIC_HOSTS)
+
+
+def safe_public_hosts(env: Mapping[str, str]) -> frozenset[str]:
+    raw = env.get("BOGDA_CONSOLE_SAFE_PUBLIC_HOSTS")
+    if raw is None or raw.strip() == "":
+        hosts = set(DEFAULT_SAFE_PUBLIC_HOSTS)
+    else:
+        hosts = {part.strip() for part in raw.split(",") if part.strip()}
+    hosts.add("127.0.0.1")
+    if "*" in hosts:
+        raise ValueError("wildcards are not allowed in BOGDA_CONSOLE_SAFE_PUBLIC_HOSTS")
+    if any(host in {"0.0.0.0", "::"} for host in hosts):
+        raise ValueError(
+            "wildcard bind addresses cannot be listed in BOGDA_CONSOLE_SAFE_PUBLIC_HOSTS"
+        )
+    return frozenset(hosts)
 
 
 class ConsoleRole(StrEnum):
@@ -33,13 +53,15 @@ def assert_safe_port(port: int, purpose: str) -> int:
 
 
 def assert_public_host(host: str, env: Mapping[str, str]) -> str:
-    if host in SAFE_PUBLIC_HOSTS:
+    allowed = safe_public_hosts(env)
+    if host in allowed:
         return host
     if host in {"0.0.0.0", "::"} and env.get("BOGDA_CONSOLE_ALLOW_UNSAFE_BIND") == "1":
         return host
+    allowed_text = ", ".join(sorted(allowed))
     raise ValueError(
-        "BOGDA_CONSOLE_PUBLIC_HOST must be 127.0.0.1 or the RK3528 tailnet "
-        "address 100.78.158.80 (set BOGDA_CONSOLE_ALLOW_UNSAFE_BIND=1 only for a reviewed bind)"
+        f"BOGDA_CONSOLE_PUBLIC_HOST must be one of {allowed_text} "
+        "(set BOGDA_CONSOLE_ALLOW_UNSAFE_BIND=1 only for a reviewed bind)"
     )
 
 
@@ -132,7 +154,7 @@ class Settings:
             prefect_api_auth_string=env.get("PREFECT_API_AUTH_STRING"),
             prefect_api_key=env.get("PREFECT_API_KEY"),
             deepseek_api_key=env.get("DEEPSEEK_API_KEY"),
-            deepseek_api_base=env.get("DEEPSEEK_API_BASE", "https://api.deepseek.com"),
+            deepseek_api_base=env.get("DEEPSEEK_API_BASE", DEFAULT_DEEPSEEK_API_BASE),
             replica_count=replica_count,
             allowed_deployment_ids=_exact_set(
                 env.get("BOGDA_CONSOLE_ALLOWED_DEPLOYMENT_IDS")

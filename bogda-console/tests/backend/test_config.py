@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from bogda_console.config import Settings, assert_safe_port
+from bogda_console.config import Settings, assert_public_host, assert_safe_port
 
 
 def test_default_mock_profile_uses_3101_and_loopback_3102() -> None:
@@ -18,6 +18,28 @@ def test_default_mock_profile_uses_3101_and_loopback_3102() -> None:
 def test_every_new_console_entry_point_rejects_3100(purpose: str) -> None:
     with pytest.raises(ValueError, match="3100 is reserved"):
         assert_safe_port(3100, purpose)
+
+
+def test_public_host_allows_loopback_and_rk3528_tailnet() -> None:
+    assert assert_public_host("127.0.0.1", {}) == "127.0.0.1"
+    assert Settings.from_env(
+        {"BOGDA_CONSOLE_PUBLIC_HOST": "100.78.158.80"}
+    ).public_host == "100.78.158.80"
+
+
+def test_public_host_rejects_wildcard_bind_without_opt_in() -> None:
+    with pytest.raises(ValueError, match="BOGDA_CONSOLE_PUBLIC_HOST"):
+        Settings.from_env({"BOGDA_CONSOLE_PUBLIC_HOST": "0.0.0.0"})
+
+
+def test_public_host_wildcard_requires_explicit_opt_in() -> None:
+    settings = Settings.from_env(
+        {
+            "BOGDA_CONSOLE_PUBLIC_HOST": "0.0.0.0",
+            "BOGDA_CONSOLE_ALLOW_UNSAFE_BIND": "1",
+        }
+    )
+    assert settings.public_host == "0.0.0.0"
 
 
 def test_unsupported_profile_fails_closed() -> None:

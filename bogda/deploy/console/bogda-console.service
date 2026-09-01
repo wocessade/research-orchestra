@@ -1,0 +1,21 @@
+[Unit]
+Description=Bogda Console 3101 (Tailscale control plane)
+# Do not BindsTo USB NAS. The UI should stay up if /mnt/nas drops; Prefect will already be down.
+After=network-online.target bogda-prefect-server.service
+Wants=network-online.target
+# Soft dependency only: console can boot and show errors if Prefect is restarting.
+StartLimitIntervalSec=5min
+StartLimitBurst=5
+
+[Service]
+User=bogda
+Group=bogda
+WorkingDirectory=/opt/bogda-console
+EnvironmentFile=/etc/bogda/console.env
+Environment=PYTHONPATH=/opt/bogda/src
+Restart=on-failure
+RestartSec=10s
+ExecStart=/opt/bogda-console/.venv/bin/python -m bogda_console
+
+[Install]
+WantedBy=multi-user.target

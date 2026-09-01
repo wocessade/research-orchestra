@@ -7,6 +7,9 @@ from typing import Mapping
 
 SAFE_PROFILES = frozenset({"mock-all", "real-readonly", "allowlisted-test"})
 
+# Loopback plus the current RK3528 tailnet address. 0.0.0.0 needs an explicit opt-in.
+SAFE_PUBLIC_HOSTS = frozenset({"127.0.0.1", "100.78.158.80"})
+
 
 class ConsoleRole(StrEnum):
     OWNER = "owner"
@@ -27,6 +30,17 @@ def assert_safe_port(port: int, purpose: str) -> int:
     if not 1 <= port <= 65535:
         raise ValueError(f"invalid {purpose} port: {port}")
     return port
+
+
+def assert_public_host(host: str, env: Mapping[str, str]) -> str:
+    if host in SAFE_PUBLIC_HOSTS:
+        return host
+    if host in {"0.0.0.0", "::"} and env.get("BOGDA_CONSOLE_ALLOW_UNSAFE_BIND") == "1":
+        return host
+    raise ValueError(
+        "BOGDA_CONSOLE_PUBLIC_HOST must be 127.0.0.1 or the RK3528 tailnet "
+        "address 100.78.158.80 (set BOGDA_CONSOLE_ALLOW_UNSAFE_BIND=1 only for a reviewed bind)"
+    )
 
 
 def _exact_set(value: str | None) -> frozenset[str]:
@@ -103,9 +117,12 @@ class Settings:
         approval_hmac_key = _parse_hmac_key(env.get("BOGDA_APPROVAL_HMAC_KEY"))
         if bool(approval_db) != bool(approval_hmac_key):
             raise ValueError("BOGDA_APPROVAL_DB and BOGDA_APPROVAL_HMAC_KEY must be set together")
+        public_host = assert_public_host(
+            env.get("BOGDA_CONSOLE_PUBLIC_HOST", "127.0.0.1"), env
+        )
         return cls(
             profile=profile,
-            public_host=env.get("BOGDA_CONSOLE_PUBLIC_HOST", "127.0.0.1"),
+            public_host=public_host,
             public_port=public_port,
             bff_host="127.0.0.1",
             bff_port=bff_port,

@@ -2,7 +2,9 @@
 
 作者：owner 侧（本机 CC 代写）。**只要评论合理性，不要改代码、不要扩 `orchestra_check`、不要提原子 `releases/<sha>`。** 回复请另开报告或在本文件末追加「评注」节；digest 仍未 `--lock-current`，勿代锁。
 
-基线：Orchestra = 任务调度器（job runner + 夜间雷达），不是自主科研体。4B 继续当唯一队列。论文复现：CC 抽实验 → `T-*.md` → 有 GPU 的机器跑 → `metrics.json` ingest。**4B 不能无监督跑任意论文代码。**
+基线：Orchestra = 任务调度器（job runner + 夜间雷达），不是自主科研体。RK3528 继续当唯一队列（原文写 4B，切机后等同）。论文复现：CC 抽实验 → `T-*.md` → 有 GPU 的机器跑 → `metrics.json` ingest。**控制面盒子不能无监督跑任意论文代码。**
+
+**owner 2026-08-30：** 硬件涨价，宿舍 runner **停购**。该层暂由**第二台笔记本**顶替（不是 7×24 拟购塔、未授权 Wake Bridge / 新 worker 池）。下文「拟购」与三档预算仅作原 RFC 行情，不再当采购清单。
 
 ---
 
@@ -12,7 +14,7 @@
 |---|---|---|
 | 笔记本 | i7-11800H / 64G / **3060 12GB**，跟人走 | 写卡、精读、小试 CUDA；**不能 7×24** |
 | 4B Broker | 2GB，现网 `/home/liuxfs/broker-data` | 唯一队列：claim / 超时 / 重试 / 雷达；`executor` 现仅 `dsh\|shell` |
-| 宿舍 runner（拟购） | 常驻 x86 + Ubuntu + Tailscale，**可后插 NVIDIA** | 过夜单卡复现、Docker 固定环境 |
+| 宿舍 runner | **停购**；暂第二台笔记本 | 过夜/离主脑实验；未接 Prefect |
 | 组里服务器 | 人申请，**不自动 SSH 抢卡** | 多卡、>24GB、数天、保密数据 |
 
 压缩预算（2026-08 国内公开行情，非成交单；50 系与内存在涨）：

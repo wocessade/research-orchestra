@@ -112,8 +112,15 @@
 51. **切到 RK3528 后文档默认机必须一起改**：Prefect 池名仍叫 `pi-service`，但 SSH/SMB/控制台缺省 host 是 `10.77.0.1` / `rk3528`，不是 4B `192.168.0.250`。venv 的 python 不能指向已搬走的 `/root/.local/share/uv/python`。
 52. **从 4B 拷来的 Prefect venv 要修 shebang**：Armbian 上 `uv python` 装到 `/opt/uv-python/...`，否则 unit 报 203/EXEC。
 
+## M2. remount 自愈（2026-08-30）
+
+53. **挂载条件失败不会触发 `Restart=on-failure`**：`ConditionPathIsMountPoint` 不满足时 unit 是 skipped/dead，不是 Failed。USB SSD 掉盘再挂上后，只靠 `WantedBy=multi-user.target` 不会把 Prefect 拉回来。规则：server/worker 必须 `BindsTo=mnt-nas.mount` 且 `WantedBy=mnt-nas.mount`；**health timer 不要绑**。
+54. **服务恢复不能改写失败轮**：API 200 / worker online 只证明控制面又活了。失败轮 `20260828T064220Z` 的结论以当时报告为准；最终通过以 2026-08-31 验收为准。
+55. **只换 unit 不要跑整包 `install.sh`**：`--install` 会 `uv sync` 并改 `/etc/bogda/last-backup`。规则：热修两份 service 时手工备份到 `backups/<UTC>/`。
+56. **RK3528 SSH 优先 Tailscale**：直连 `10.77.0.1` 可能 `Host key verification failed`，Tailscale `100.78.158.80` / `rk3528` 可用。规则：BatchMode 先试 tailnet；不要默认 `StrictHostKeyChecking=no`。
+
 ## N. Gate 7 影子（2026-09-01）
 
-53. **挂账页必须跟验收报告一起改**：Gate 6/S1/S2 合进 `main` 后 `CLAUDE.md`/`README.md` 仍写「Gate 6 未通过」会害下一会话按旧红线停工。规则：关闭 Gate 时同步改锚，历史工作台加「已关闭」横幅，不另开第二套现状。
-54. **S2 脚本假设会在真 Prefect 上碎**：队列名不全局唯一、Artifact 列表首项不是最新、新建 pool 会多一个 `default` 队列。规则：硬停后从已写入状态续跑，不要重放成功命令；不要把临时驱动的假设做成产品重试框架。
-55. **整分支审查超时 ≠ 代码没过**：额度耗尽时不要用第三轮审查代替已有的 S1/S2 CLEAN。规则：缺的是审查结论就写明，不要补一层「同机身份」仪式。
+57. **挂账页必须跟验收报告一起改**：Gate 6/S1/S2 合进 `main` 后 `CLAUDE.md`/`README.md` 仍写「Gate 6 未通过」会害下一会话按旧红线停工。规则：关闭 Gate 时同步改锚，历史工作台加「已关闭」横幅，不另开第二套现状。
+58. **S2 脚本假设会在真 Prefect 上碎**：队列名不全局唯一、Artifact 列表首项不是最新、新建 pool 会多一个 `default` 队列。规则：硬停后从已写入状态续跑，不要重放成功命令；不要把临时驱动的假设做成产品重试框架。
+59. **整分支审查超时 ≠ 代码没过**：额度耗尽时不要用第三轮审查代替已有的 S1/S2 CLEAN。规则：缺的是审查结论就写明，不要补一层「同机身份」仪式。

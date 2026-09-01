@@ -1,10 +1,10 @@
 # Bogda Pi 影子部署包设计
 
-> 日期：2026-08-24
+> 日期：2026-08-24；修订：2026-08-30（RK3528 现网；server/worker `BindsTo=mnt-nas.mount`）
 >
-> 状态：已批准，待实施
+> 状态：已批准。路径名 `deploy/pi` 与池名 `pi-service` 冻结。Gate 6 已于 2026-08-31 通过；下文仍是部署包契约，不是第二套现状。
 >
-> 范围：只制作和本地验证部署包，不连接或修改 Pi
+> 范围：原件只覆盖本地部署包。现网操作以 `bogda/docs/pi-shadow-runbook.md` 为准。
 
 ## 1. 目标
 
@@ -105,7 +105,7 @@ bogda/
 
 SQLite 必须由 Pi 本机通过 ext4 打开，不得通过 SMB 访问。`/mnt/broker` 是旧路径，部署包中不得出现。数据根不落 SD 卡。
 
-服务账户拥有 `/mnt/nas/.bogda`，但不拥有现有 NAS 的其他目录。systemd unit 使用 `RequiresMountsFor=/mnt/nas/.bogda`，避免 SSD 未挂载时回退写入系统盘同名目录。
+服务账户拥有 `/mnt/nas/.bogda`，但不拥有现有 NAS 的其他目录。systemd 对 server/worker 使用 `RequiresMountsFor=/mnt/nas/.bogda`，并 `BindsTo=` / `WantedBy=mnt-nas.mount`：盘不在时停写、盘回来时再起。仅 `RequiresMountsFor` + `ConditionPathIsMountPoint` 在 USB remount 后不会自愈（Gate 6 失败轮 `20260828T064220Z`）。健康 timer **不**绑挂载。路径名 `deploy/pi` 与池名 `pi-service` 冻结，与树莓派无关。
 
 ## 6. 秘密与网络边界
 
@@ -130,7 +130,7 @@ Prefect Server 为未来 Tailscale 访问准备监听地址，但本部署包不
 
 - 以 `bogda` 账户运行；
 - 读取 `/etc/bogda/bogda.env`；
-- 要求 `/mnt/nas/.bogda` 已挂载；
+- 要求 `/mnt/nas/.bogda` 已挂载；`BindsTo=mnt-nas.mount`，`WantedBy` 含 `mnt-nas.mount`（USB remount 后自愈）；
 - 启动 Prefect Server 3.8.3；
 - 失败时由 systemd 退避重启，不在 shell 中实现重试循环；
 - 不依赖或重启任何 `orchestra-*` 服务。
@@ -140,6 +140,7 @@ Prefect Server 为未来 Tailscale 访问准备监听地址，但本部署包不
 `bogda-pi-worker.service`：
 
 - 在 Prefect Server 健康后启动；
+- `BindsTo=mnt-nas.mount`，`WantedBy` 含 `mnt-nas.mount`（与 server 相同；盘回来时再起）；
 - 只连接 `pi-service` work pool；
 - Worker 总并发固定为 1；
 - 影子阶段只接测试 deployment 与健康检查；
@@ -149,7 +150,7 @@ Prefect Server 为未来 Tailscale 访问准备监听地址，但本部署包不
 
 ### 7.3 快照与健康定时器
 
-快照 timer 每日调用 `python -m bogda.ops.snapshot`。健康 timer 默认每 5 分钟调用 `python -m bogda.ops.health sample`，将 JSON Lines 写入健康证据目录。具体日历值集中在 unit 文件，不复制进 README 的状态叙述。
+快照 timer 每日调用 `python -m bogda.ops.snapshot`。健康 timer 默认每 5 分钟调用 `python -m bogda.ops.health sample`，将 JSON Lines 写入健康证据目录。健康 timer **不**绑 `mnt-nas.mount`。具体日历值集中在 unit 文件，不复制进 README 的状态叙述。
 
 ## 8. SQLite 快照与恢复
 

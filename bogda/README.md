@@ -11,11 +11,21 @@ Bogda is the Prefect-based successor to Research Orchestra. This directory is in
 | Prefect UI / API | `http://10.77.0.1:4200`；tailnet `http://100.78.158.80:4200` |
 | 数据 | `/mnt/nas/.bogda`（西数 250G，UUID `d105381a-d80e-47b0-8bb4-2a8c4b56600f`，LABEL `nas-data`） |
 | 程序 | `/opt/bogda` + `/opt/bogda/.venv`；units 仍用 `deploy/pi/` 清单 |
-| 工作池名 | **`pi-service`**（冻结名：控制面轻任务池，与树莓派无关） |
+| 工作池名 | **`pi-service`**（冻结名：控制面轻任务池，与树莓派无关；改名要动 Prefect 池、unit、`EXPECTED_VALUES`、盒子 `daemon-reload`） |
 | Gate 6 | **通过**（2026-08-31，trial `20260830T154019Z`） |
 | Gate 7 | **S1/S2 影子通过**（2026-09-01）。不是 3100 切换；生产科研仍禁 `pi-service` |
 
-Do not treat Pi 4B (`192.168.0.250` / Tailscale `liuxfs`) as a scheduler. Early Gate 6 trial reports under `docs/reports/2026-08-27-bogda-pi-gate6-*` are historical. Final: [`docs/reports/2026-08-31-bogda-rk3528-gate6-final-acceptance.md`](../docs/reports/2026-08-31-bogda-rk3528-gate6-final-acceptance.md).
+Do not treat Pi 4B (`192.168.0.250` / Tailscale `liuxfs`) as a scheduler. Early Gate 6 trial reports under `docs/reports/2026-08-27-bogda-pi-gate6-*` are historical. Failure-round restore notes: [`docs/reports/2026-08-30-bogda-rk3528-prefect-restore.md`](../docs/reports/2026-08-30-bogda-rk3528-prefect-restore.md). Final: [`docs/reports/2026-08-31-bogda-rk3528-gate6-final-acceptance.md`](../docs/reports/2026-08-31-bogda-rk3528-gate6-final-acceptance.md).
+
+## Who owns what (do not mix)
+
+| 今晚坏了什么 | 改哪边 | 不要改 |
+|---|---|---|
+| 雷达 / exam-watch / 任务队列 / 3100 留言 | `orchestra/`，SSH 盒子上 `orchestra-*` timer | Prefect unit、`pi-service` |
+| Prefect UI、worker、`/mnt/nas/.bogda` | RK3528 `:4200`，`bogda-prefect-*` / `bogda-pi-worker` | Orchestra broker 数据根 |
+| 3101 影子控制台 | `bogda-console/`，默认 mock / real-readonly | 未授权不接真 Prefect 写入 |
+
+`deploy/pi/` 路径名是有意冻结，不是「还跑在树莓派上」。
 
 ## Requirements
 
@@ -76,7 +86,8 @@ Implemented: local shell flow, attempt directories, required artifact checks, ve
 - Legacy Orchestra cards enter only through `bogda.compat` and become Bogda `JobRequest` objects; Bogda does not import the Orchestra runtime.
 - `RunEventV1` is the versioned structured-log contract. Model-call events pair on `call_id`; ordinary events may carry prompt hashes/artifact references and never store full prompts, responses, credentials, or authorization headers.
 
-Core schema-v1 entry points are exported from `bogda.contracts`: `JobRequest`, `RunBudgetEnvelope`, `SchedulePolicy`, `RunEventV1`, `TaskIntent`, `ModelTier`, and `ExecutorKind`. Supporting public enums include `PricePreference`, `BudgetSource`, and `RunEventType`.
+- Core schema-v1 entry points are exported from `bogda.contracts`: `JobRequest`, `RunBudgetEnvelope`, `SchedulePolicy`, `RunEventV1`, `TaskIntent`, `ModelTier`, and `ExecutorKind`. Supporting public enums include `PricePreference`, `BudgetSource`, and `RunEventType`.
+- Research worker freeze (`RunnerPacket` + `admit_runner_packet`): git+commit / staged / inbox only; `pi-service` rejects GPU/research `task_type`. Not wired to live Prefect.
 
 ## Phase B budget kernel (accepted locally)
 
@@ -84,14 +95,16 @@ Phase B is a provider-neutral, fail-closed kernel. The module ownership and publ
 
 - `bogda/contracts`: versioned `RunBudgetEnvelope`, `JobRequest`, and `RunEventV1` contracts.
 - `bogda/budget/pricing.py`: versioned `PricingCatalogV1`, Beijing peak-window lookup, and Decimal token pricing.
-- `bogda/budget/usage.py`: `UsagePort`, `UsageSnapshotV1`, freshness checks, and the read-only `UsageMonitorClient` adapter.
+- `bogda/budget/usage.py`: `UsagePort`, `UsageSnapshotV1`, freshness checks, and the walnutpi `UsageMonitorClient` (eink cache only).
+- `bogda/budget/deepseek_balance.py`: official DeepSeek `GET /user/balance` adapter for admission.
 - `bogda/budget/estimation.py`: `TokenWorkload`, `HistoricalUsageProfile`, and `WorkloadEstimator`.
 - `bogda/budget/guard.py`: deterministic `BudgetGuard` decisions; it reads coherent ledger facts but does not mutate the ledger.
 - `bogda/budget/ledger.py`: `BudgetLedger` and process-local `SingleFlightBudgetLedger`; the revision boundary is the replacement point for a durable atomic ledger.
+- `bogda/budget/durable_ledger.py`: file-backed `SqliteBudgetLedger` (Stage E; not yet the Prefect worker default).
 - `bogda/budget/service.py`: `BudgetAdmissionService` orchestration, reservation compensation, and terminal release/reconciliation.
 - `bogda/events/jsonl.py`: caller-selected `JsonlRunEventSink`; every appended line is validated as `RunEventV1`.
 
-The monitor adapter requests exactly `GET {base_url}/api/dashboard`. It sends `X-Monitor-Token: <MONITOR_TOKEN>` only when configured. The DeepSeek API key remains inside the existing usage-monitor service; Bogda never receives or persists that key. The adapter is read-only and normalizes `balance.total`, `balance.currency`, `balance.is_available`, `last_updated.balance`, and `services.deepseek_api` into `UsageSnapshotV1`.
+Admission balance is official `GET https://api.deepseek.com/user/balance` with `Authorization: Bearer $DEEPSEEK_API_KEY` (env only; never logged). Amounts are decimal strings; Bogda selects the CNY row. `observed_at` is the local clock at a successful response. The walnutpi usage-monitor still polls the same URL every 60s for the eink panel (`GET {monitor}/api/dashboard` + `X-Monitor-Token`); that path is not Bogda's admission source.
 
 The accepted catalog is `deepseek-cn-2026-08-28`, reviewed by `2026-09-28`, in `Asia/Shanghai`: weekdays `09:00–12:00` and `14:00–18:00` are peak, with end boundaries off-peak. To update it, re-check the official price source, create a new versioned catalog with effective/review timestamps and source note, keep existing envelopes pinned to their original version, update accepted-version tests and maintainer docs, then rerun the full compatibility and acceptance suites. A catalog past `review_by` fails closed.
 
@@ -160,13 +173,13 @@ Explicit exclusions for this phase: no live dsh or DeepSeek call, no deployment 
 
 ## Pi-bundle operations
 
-The fixed ARM64 deployment inventory is in [deploy/pi/manifest.toml](deploy/pi/manifest.toml) (paths and unit names stay Pi-compatible). Day-to-day ops on RK3528: [docs/pi-shadow-runbook.md](docs/pi-shadow-runbook.md) (banner: current host). Local pytest does not authorize a reinstall.
+The fixed ARM64 deployment inventory is in [deploy/pi/manifest.toml](deploy/pi/manifest.toml) (paths and unit names stay Pi-compatible). Day-to-day ops on RK3528: [docs/pi-shadow-runbook.md](docs/pi-shadow-runbook.md) (banner: current host). After a USB drop, server/worker follow `mnt-nas.mount`; health timers do not. Local pytest does not authorize a reinstall. Hot-patching two unit files must not go through `install.sh --install`.
 
 ## Deferred
 
-- Gate 7 and remaining 24-hour acceptance on RK3528 (4B Gate 6 did not pass; owner shortened the window from 72h on 2026-08-28)
-- Wake Bridge/WoL
-- Laptop `dorm-x86`
+- Gate 6 **已通过**（2026-08-31）；Gate 7 S1/S2 影子 **已通过**。生产科研仍禁 `pi-service`
+- Wake Bridge/WoL（宿舍塔停购；第二台笔记本暂代 runner，仍未接线）
+- Laptop `dorm-x86` pool（控制台契约有名；真机未接）
 - Windows Power Agent/game mode
 - Task migration
 - CPU/GPU worker and higher concurrency

@@ -101,9 +101,9 @@
 
 ## 部署连接（当前家庭网络）
 
-- **RK3528（现网）**：直连 `10.77.0.1/30`；USB Wi-Fi `liudfs`（LAN DHCP 会变）。SSH `liuxfs@10.77.0.1`
-- 用法：`ORCHESTRA_SSH_HOST=10.77.0.1 [ORCHESTRA_REMOTE_ROOT=/home/liuxfs/broker-data] bash scripts/deploy_broker.sh`（现网 timer 保持 `ORCHESTRA_ENABLE_TIMERS=1`，默认）
-- 切机记录：[`docs/rk3528-standby-cutover.md`](docs/rk3528-standby-cutover.md)。树莓派 4B 已停 Orchestra/NAS/Bogda，可断电
+- **RK3528（现网）**：直连 `10.77.0.1/30`；USB Wi-Fi `liudfs`（LAN DHCP 会变）。SSH 优先 Tailscale `rk3528` / `100.78.158.80`（直连 host key 可能失败）；亦可用 `liuxfs@10.77.0.1`
+- 用法：`ORCHESTRA_SSH_HOST=10.77.0.1 [ORCHESTRA_REMOTE_ROOT=/home/liuxfs/broker-data] bash scripts/deploy_broker.sh`（现网 timer 保持 `ORCHESTRA_ENABLE_TIMERS=1`，默认；`1`=现网 enable 全部 timer，`0`=并行机禁止双开雷达）
+- 切机记录：[`docs/rk3528-standby-cutover.md`](docs/rk3528-standby-cutover.md)。树莓派 4B 已停 Orchestra/NAS/Bogda，可断电。Prefect 运维见 [`../bogda/docs/pi-shadow-runbook.md`](../bogda/docs/pi-shadow-runbook.md)（Gate 6 已通过；USB remount 合同仍有效）
 - 部署脚本先只把 `migration_guard.py` 临时上传到远端 `/tmp` 并检查任务文件及 SQLite；预检通过后才覆盖在役代码。发现 queued/running/仍可重试 failed 的旧单体雷达任务时，部署在任何线上文件覆盖前退出
 - **现网 REMOTE_ROOT = `/home/liuxfs/broker-data`**。`/mnt/broker` 在 RK3528 上指向该目录（executor 仍写 `/mnt/broker/dsh-patches/`）
 - **Tailscale**：RK3528=`rk3528`(100.78.158.80)、核桃派=`walnutpi`(100.64.2.60)、Windows=`laptop-w0cessade`。旧 4B 名 `liuxfs`(100.111.75.58) 不再当调度。`ORCHESTRA_SSH_HOST` 为 env 驱动

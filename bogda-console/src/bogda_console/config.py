@@ -1,10 +1,24 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Mapping
 
 
 SAFE_PROFILES = frozenset({"mock-all", "real-readonly", "allowlisted-test"})
+
+
+class ConsoleRole(StrEnum):
+    OWNER = "owner"
+    OBSERVER = "observer"
+    OPERATOR = "operator"
+
+
+_DEFAULT_ROLE = {
+    "mock-all": ConsoleRole.OWNER,
+    "real-readonly": ConsoleRole.OBSERVER,
+    "allowlisted-test": ConsoleRole.OWNER,
+}
 
 
 def assert_safe_port(port: int, purpose: str) -> int:
@@ -41,6 +55,10 @@ class Settings:
     allowed_schedule_ids: frozenset[str]
     allowed_queue_ids: frozenset[str]
     allowed_work_pool_names: frozenset[str]
+    actor_id: str
+    role: ConsoleRole
+    artifact_root: str | None
+    usage_unknown_db: str | None
 
     @classmethod
     def from_env(cls, env: Mapping[str, str]) -> "Settings":
@@ -56,6 +74,17 @@ class Settings:
             raise ValueError("BOGDA_CONSOLE_REPLICA_COUNT must be at least 1")
         if profile == "allowlisted-test" and replica_count != 1:
             raise ValueError("allowlisted-test requires exactly one replica")
+        role_value = env.get("BOGDA_CONSOLE_ROLE")
+        if role_value is None or role_value == "":
+            role = _DEFAULT_ROLE[profile]
+        else:
+            try:
+                role = ConsoleRole(role_value)
+            except ValueError as exc:
+                raise ValueError(f"Unsupported BOGDA_CONSOLE_ROLE: {role_value}") from exc
+        actor_id = env.get("BOGDA_CONSOLE_ACTOR", "local-owner").strip()
+        if not actor_id:
+            raise ValueError("BOGDA_CONSOLE_ACTOR must be a non-empty string")
         return cls(
             profile=profile,
             public_host=env.get("BOGDA_CONSOLE_PUBLIC_HOST", "127.0.0.1"),
@@ -78,10 +107,16 @@ class Settings:
             allowed_work_pool_names=_exact_set(
                 env.get("BOGDA_CONSOLE_ALLOWED_WORK_POOL_NAMES")
             ),
+            actor_id=actor_id,
+            role=role,
+            artifact_root=env.get("BOGDA_ARTIFACT_ROOT") or None,
+            usage_unknown_db=env.get("BOGDA_USAGE_UNKNOWN_DB") or None,
         )
 
     @property
     def commands_enabled(self) -> bool:
+        if self.role is ConsoleRole.OBSERVER:
+            return False
         return self.profile in {"mock-all", "allowlisted-test"}
 
     @property
@@ -90,8 +125,17 @@ class Settings:
 
     @property
     def autonomy_writes_enabled(self) -> bool:
-        return self.profile == "mock-all"
+        return self.profile == "mock-all" and self.role is ConsoleRole.OWNER
 
     @property
     def model_control_enabled(self) -> bool:
-        return self.profile == "mock-all"
+        return self.profile == "mock-all" and self.role is ConsoleRole.OWNER
+
+    @property
+    def recovery_writes_enabled(self) -> bool:
+        return (
+            self.role is ConsoleRole.OWNER
+            and self.profile in {"mock-all", "allowlisted-test"}
+            and bool(self.usage_unknown_db)
+        )
+

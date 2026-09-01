@@ -99,7 +99,7 @@ export function InfrastructurePage() {
   const powerMeta = infrastructure.data.sources.power;
 
   return <section className="page infrastructure-page">
-    <header className="page-header page-header--split"><div><p className="page-kicker">Field / 04</p><h1>基础设施</h1><p className="lede">容量、队列和电源各看来源，不互相推断。</p></div><span className="profile-flag">{cap?.profile ?? "读取能力中"}</span></header>
+    <header className="page-header page-header--split"><div><p className="page-kicker">Field / 04</p><h1>基础设施</h1><p className="lede">容量、队列和电源各看来源，不互相推断。</p></div><span className="profile-flag">{cap?.profile ?? "读取能力中"}{cap?.role ? ` · ${cap.role}` : ""}{cap?.actorId ? ` · ${cap.actorId}` : ""}</span></header>
     <SourceStrip sources={infrastructure.data.sources} />
     <EnvelopeErrors errors={infrastructure.data.errors} />
     <SourceStrip sources={capabilities.data?.sources ?? {}} />

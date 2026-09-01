@@ -40,6 +40,21 @@ def test_exact_allowlists_are_parsed_without_wildcards() -> None:
     assert settings.allowed_work_pool_names == frozenset({"dorm-x86"})
 
 
+@pytest.mark.parametrize(
+    "key",
+    [
+        "BOGDA_CONSOLE_ALLOWED_DEPLOYMENT_IDS",
+        "BOGDA_CONSOLE_ALLOWED_SCHEDULE_IDS",
+        "BOGDA_CONSOLE_ALLOWED_QUEUE_IDS",
+        "BOGDA_CONSOLE_ALLOWED_WORK_POOL_NAMES",
+    ],
+)
+@pytest.mark.parametrize("value", ["*", "pi-service,*"])
+def test_allowlist_wildcards_fail_closed(key: str, value: str) -> None:
+    with pytest.raises(ValueError, match="wildcards"):
+        Settings.from_env({key: value})
+
+
 def test_real_readonly_disables_all_commands() -> None:
     settings = Settings.from_env({"BOGDA_CONSOLE_PROFILE": "real-readonly"})
     assert settings.commands_enabled is False
@@ -56,4 +71,62 @@ def test_allowlisted_test_requires_exactly_one_replica() -> None:
         Settings.from_env(
             {"BOGDA_CONSOLE_PROFILE": "allowlisted-test", "BOGDA_CONSOLE_REPLICA_COUNT": "2"}
         )
+
+
+def test_default_roles_follow_profile() -> None:
+    assert Settings.from_env({}).role == "owner"
+    assert Settings.from_env({"BOGDA_CONSOLE_PROFILE": "real-readonly"}).role == "observer"
+    assert Settings.from_env({"BOGDA_CONSOLE_PROFILE": "allowlisted-test"}).role == "owner"
+    assert Settings.from_env({}).actor_id == "local-owner"
+
+
+def test_unsupported_role_fails_closed() -> None:
+    with pytest.raises(ValueError, match="Unsupported BOGDA_CONSOLE_ROLE"):
+        Settings.from_env({"BOGDA_CONSOLE_ROLE": "admin"})
+
+
+def test_observer_cannot_enable_commands_even_on_allowlisted_test() -> None:
+    settings = Settings.from_env(
+        {
+            "BOGDA_CONSOLE_PROFILE": "allowlisted-test",
+            "BOGDA_CONSOLE_ROLE": "observer",
+            "BOGDA_CONSOLE_ALLOWED_DEPLOYMENT_IDS": "deployment-dorm",
+        }
+    )
+    assert settings.commands_enabled is False
+    assert settings.review_enabled is False
+    assert settings.model_control_enabled is False
+    assert settings.autonomy_writes_enabled is False
+
+
+def test_operator_may_run_prefect_commands_but_not_model_control() -> None:
+    settings = Settings.from_env(
+        {
+            "BOGDA_CONSOLE_PROFILE": "allowlisted-test",
+            "BOGDA_CONSOLE_ROLE": "operator",
+        }
+    )
+    assert settings.commands_enabled is True
+    assert settings.model_control_enabled is False
+    assert settings.autonomy_writes_enabled is False
+
+
+def test_recovery_writes_require_owner_and_usage_unknown_db() -> None:
+    bare = Settings.from_env({"BOGDA_CONSOLE_PROFILE": "allowlisted-test"})
+    assert bare.recovery_writes_enabled is False
+    wired = Settings.from_env(
+        {
+            "BOGDA_CONSOLE_PROFILE": "allowlisted-test",
+            "BOGDA_USAGE_UNKNOWN_DB": "C:/tmp/recovery.sqlite",
+        }
+    )
+    assert wired.recovery_writes_enabled is True
+    observer = Settings.from_env(
+        {
+            "BOGDA_CONSOLE_PROFILE": "allowlisted-test",
+            "BOGDA_CONSOLE_ROLE": "observer",
+            "BOGDA_USAGE_UNKNOWN_DB": "C:/tmp/recovery.sqlite",
+        }
+    )
+    assert observer.recovery_writes_enabled is False
 

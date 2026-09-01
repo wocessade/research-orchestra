@@ -344,6 +344,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/runs/{run_id}/logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Run Logs */
+        get: operations["run_logs_api_v1_runs__run_id__logs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/runs/{run_id}/model-budget": {
         parameters: {
             query?: never;
@@ -685,6 +702,16 @@ export interface components {
                 [key: string]: components["schemas"]["SourceMeta"];
             };
         };
+        /** ApiEnvelope[RunLogSlice] */
+        ApiEnvelope_RunLogSlice_: {
+            data: components["schemas"]["RunLogSlice"] | null;
+            /** Errors */
+            errors?: components["schemas"]["ApiError"][];
+            /** Sources */
+            sources?: {
+                [key: string]: components["schemas"]["SourceMeta"];
+            };
+        };
         /** ApiEnvelope[RunPreparationPreview] */
         ApiEnvelope_RunPreparationPreview_: {
             data: components["schemas"]["RunPreparationPreview"] | null;
@@ -784,6 +811,8 @@ export interface components {
         BudgetState: "ready" | "stale" | "insufficient" | "scheduled-off-peak" | "awaiting-approval" | "usage-unknown" | "terminated";
         /** CapabilitySnapshot */
         CapabilitySnapshot: {
+            /** Actorid */
+            actorId: string;
             /** Alloweddeploymentids */
             allowedDeploymentIds?: string[];
             /** Allowedqueueids */
@@ -817,6 +846,8 @@ export interface components {
             profile: string;
             /** Projectid */
             projectId: string;
+            /** Role */
+            role: string;
         };
         /** CheckpointDecisionRequest */
         CheckpointDecisionRequest: {
@@ -1486,6 +1517,21 @@ export interface components {
             run: components["schemas"]["RunSummary"];
             /** Tags */
             tags?: string[];
+        };
+        /** RunLogSlice */
+        RunLogSlice: {
+            /** Content */
+            content: string;
+            /** Exists */
+            exists: boolean;
+            /** Runid */
+            runId: string;
+            /** Sizebytes */
+            sizeBytes?: number | null;
+            /** Source */
+            source: string;
+            /** Truncated */
+            truncated: boolean;
         };
         /** RunPreparationPreview */
         RunPreparationPreview: {
@@ -2399,6 +2445,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiEnvelope_CommandReceipt_RunDetail__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_logs_api_v1_runs__run_id__logs_get: {
+        parameters: {
+            query?: {
+                source?: string;
+                maxBytes?: number;
+            };
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiEnvelope_RunLogSlice_"];
                 };
             };
             /** @description Validation Error */

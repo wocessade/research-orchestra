@@ -168,7 +168,7 @@ describe("guarded commands", () => {
 
   it("disables write controls in real-readonly", async () => {
     const routes = standardRoutes();
-    routes["/api/v1/capabilities"] = envelope({ profile: "real-readonly", projectId: "bogda-main", effectiveAutonomyMode: "supervised", canSubmitRegisteredDeployment: false, canCancelRun: false, canPauseSchedule: false, canPauseWorkQueue: false, canDecideCheckpoint: false, canReviewScientificResult: false, canSetAutonomyMode: false, allowedDeploymentIds: [], allowedScheduleIds: [], allowedQueueIds: [], allowedWorkPoolNames: [] }, {});
+    routes["/api/v1/capabilities"] = envelope({ profile: "real-readonly", projectId: "bogda-main", actorId: "local-owner", role: "observer", effectiveAutonomyMode: "supervised", canSubmitRegisteredDeployment: false, canCancelRun: false, canPauseSchedule: false, canPauseWorkQueue: false, canDecideCheckpoint: false, canReviewScientificResult: false, canSetAutonomyMode: false, allowedDeploymentIds: [], allowedScheduleIds: [], allowedQueueIds: [], allowedWorkPoolNames: [] }, {});
     renderAppAt("/infrastructure", routes);
     expect(await screen.findByRole("button", { name: "提交 alpine-assay" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "暂停队列 cpu" })).toBeDisabled();

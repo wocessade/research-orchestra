@@ -34,6 +34,64 @@ from bogda_console.services.commands import CommandService
 from bogda_console.services.queries import QueryService
 
 
+def _log_reader(settings: Settings):
+    if not settings.artifact_root:
+        return None
+    from bogda.artifacts.safe_log import SafeLogReader
+
+    return SafeLogReader(Path(settings.artifact_root))
+
+
+def _core_model_control(settings: Settings):
+    if not settings.usage_unknown_db:
+        return UnwiredModelControlAdapter()
+    try:
+        from datetime import datetime, timezone
+        from decimal import Decimal
+
+        from bogda.budget.durable_ledger import SqliteBudgetLedger
+        from bogda.budget.guard import BudgetGuard
+        from bogda.budget.service import BudgetAdmissionService
+        from bogda.budget.usage import UsageSnapshotV1, UsageSourceStatus
+        from bogda.events.jsonl import JsonlRunEventSink
+        from bogda.model_runtime.recovery import (
+            SqliteUsageUnknownStore,
+            UsageUnknownRecoveryService,
+        )
+
+        from bogda_console.adapters.core_model_control import CoreUsageUnknownAdapter
+    except ImportError:
+        return UnwiredModelControlAdapter()
+
+    db = Path(settings.usage_unknown_db)
+    ledger = SqliteBudgetLedger(db.with_name(db.stem + "-ledger.sqlite"))
+
+    class _FreshUsage:
+        def get_snapshot(self) -> UsageSnapshotV1:
+            return UsageSnapshotV1(
+                provider="deepseek",
+                available=True,
+                total_balance=Decimal("0"),
+                currency="CNY",
+                observed_at=datetime.now(timezone.utc),
+                source_status=UsageSourceStatus.UP,
+            )
+
+    sink = JsonlRunEventSink(db.with_name(db.stem + "-events.jsonl"))
+    budget = BudgetAdmissionService(
+        usage=_FreshUsage(),
+        guard=BudgetGuard(ledger),
+        ledger=ledger,
+        event_sink=sink,
+    )
+    recovery = UsageUnknownRecoveryService(
+        store=SqliteUsageUnknownStore(db),
+        budget=budget,
+        event_sink=sink,
+    )
+    return CoreUsageUnknownAdapter(recovery)
+
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -66,12 +124,21 @@ class Container:
             )
             power = MockPowerAdapter(load_fixture(settings.fixture_scenario))
             policy = UnwiredAutonomyPolicyAdapter()
-            model_control = UnwiredModelControlAdapter()
+            model_control = _core_model_control(settings)
             usage_balance = DeepSeekBalanceAdapter(
                 settings.deepseek_api_key,
                 api_base=settings.deepseek_api_base,
             )
-            queries = QueryService(settings=settings, prefect=prefect, results=prefect, power=power, policy=policy, model_control=model_control, usage_balance=usage_balance)
+            queries = QueryService(
+                settings=settings,
+                prefect=prefect,
+                results=prefect,
+                power=power,
+                policy=policy,
+                model_control=model_control,
+                usage_balance=usage_balance,
+                log_reader=_log_reader(settings),
+            )
             commands = CommandService(settings=settings, prefect=prefect, results=prefect, policy=policy, model_control=model_control)
             return cls(settings, prefect, prefect, power, queries, commands, policy, model_control, usage_balance)
         fixture = load_fixture(scenario or settings.fixture_scenario)
@@ -91,6 +158,7 @@ class Container:
             policy=policy,
             model_control=model_control,
             usage_balance=usage_balance,
+            log_reader=_log_reader(settings),
         )
         commands = CommandService(
             settings=settings,

@@ -37,6 +37,7 @@ from bogda_console.contracts.models import (
     ModelPolicySnapshot,
     UsageBalanceSnapshot,
     RunPreparationPreview,
+    RunLogSlice,
 )
 
 
@@ -114,6 +115,16 @@ async def run_detail(run_id: str, request: Request):
 @router.get("/runs/{run_id}/result", response_model=ApiEnvelope[RunResultView])
 async def result(run_id: str, request: Request):
     return await queries(request).result(run_id)
+
+
+@router.get("/runs/{run_id}/logs", response_model=ApiEnvelope[RunLogSlice])
+async def run_logs(
+    run_id: str,
+    request: Request,
+    source: str = Query(default="stdout"),
+    max_bytes: int = Query(default=65536, ge=1, le=262144, alias="maxBytes"),
+):
+    return await queries(request).run_logs(run_id, source, max_bytes=max_bytes)
 
 
 @router.get(

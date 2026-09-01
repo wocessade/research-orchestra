@@ -141,6 +141,20 @@ function CheckpointControl({
   </section>;
 }
 
+function RunLogPanel({ runId }: { runId: string }) {
+  const [source, setSource] = useState<"stdout" | "stderr" | "events">("stdout");
+  const logs = useQuery({
+    queryKey: ["run-logs", runId, source],
+    queryFn: () => api.get<{ runId: string; source: string; exists: boolean; content: string; truncated: boolean }>(`/api/v1/runs/${runId}/logs?source=${source}`),
+  });
+  const slice = logs.data?.data;
+  return <section className="detail-section" aria-labelledby="logs-title">
+    <div className="detail-heading"><h2 id="logs-title">运行日志</h2><p>只读取受控 attempt 目录，密钥已脱敏，超长会截断。</p></div>
+    <div className="log-source-tabs">{(["stdout", "stderr", "events"] as const).map((item) => <button key={item} type="button" className="quiet-action" aria-pressed={source === item} onClick={() => setSource(item)}>{item}</button>)}</div>
+    {logs.isPending ? <QueryLoading /> : logs.isError || envelopeHasErrors(logs.data) ? <p className="muted">日志内容暂不可读（未配置产物根或文件不存在）。</p> : <pre className="request-code">{slice?.exists ? slice.content || "(empty)" : "文件不存在"}{slice?.truncated ? "\n…[truncated]" : ""}</pre>}
+  </section>;
+}
+
 export function RunDetailPage() {
   const { runId = "" } = useParams();
   const location = useLocation();
@@ -201,6 +215,7 @@ export function RunDetailPage() {
     {resultQuery.isPending && <QueryLoading />}
     {resultQuery.isError && <QueryFailure title="RunResult 暂不可用" />}
     {resultView && <ResultPanel view={resultView} executionType={run.state.type} />}
+    <RunLogPanel runId={runId} />
     {resultView?.availability === "available" && resultView.result && <ReviewControl runId={runId} view={resultView} enabled={canReview} profile={capabilities?.profile} reason={reviewReason} onReviewed={setReviewSnapshot} />}
     <section className="detail-section" aria-labelledby="versions-title"><div className="detail-heading"><h2 id="versions-title">RunResult 版本</h2><p>由新到旧；第一条是当前科研权威版本。</p></div>{versionsQuery.data?.data?.items.length ? <ol className="version-list">{versionsQuery.data.data.items.map((version, index) => <li key={version.artifactId}><span>{index === 0 ? "当前" : `历史 ${index}`}</span><strong>{version.artifactId}</strong><time dateTime={version.createdAt}>{formatAbsolute(version.createdAt)}</time><em>{version.availability}</em></li>)}</ol> : versionsQuery.isPending ? <QueryLoading /> : <p className="muted">没有可显示的版本。</p>}</section>
     <section className="detail-section" aria-labelledby="request-title"><div className="detail-heading"><h2 id="request-title">运行请求</h2><p>Prefect 参数与标签，只读展示。</p></div><pre className="request-code">{JSON.stringify({ parameters: detail.parameters, tags: detail.tags }, null, 2)}</pre></section>

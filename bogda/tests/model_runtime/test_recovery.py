@@ -267,3 +267,18 @@ def test_terminate_requires_reconciliation_and_survives_reopen_without_release(
 
 def test_case_is_immutable() -> None:
     assert UsageUnknownCase.__dataclass_params__.frozen is True
+
+
+def test_list_open_cases_excludes_terminal_states(tmp_path: Path) -> None:
+    recovery, store, ledger, _, case = runtime_for(tmp_path)
+    assert [item.case_id for item in store.list_open_cases()] == [case.case_id]
+
+    reconciled = recovery.reconcile(
+        case.case_id, Decimal("0.50"), expected_revision=case.revision
+    )
+    assert [item.case_id for item in store.list_open_cases()] == [case.case_id]
+
+    recovery.terminate(case.case_id, expected_revision=reconciled.revision)
+    assert store.list_open_cases() == []
+    ledger.close()
+    store.close()

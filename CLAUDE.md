@@ -53,7 +53,7 @@
 - Pi/RK 部署窗口：deploy_broker.sh 已含 exam-watch；taskfile 收紧、artifact 校验、taskkill 树杀等与仓库对齐仍挂
 - Bogda Gate 6：**通过**（2026-08-31，trial `20260830T154019Z`）。见 [`docs/reports/2026-08-31-bogda-rk3528-gate6-final-acceptance.md`](docs/reports/2026-08-31-bogda-rk3528-gate6-final-acceptance.md)
 - Gate 7：**S1 只读影子 + S2 专用白名单写入已通过**（合入 `e79f79b`）。不是 3100 切换，不是生产科研任务。证据 [`2026-09-01-bogda-gate7-entry-decision.md`](docs/reports/2026-09-01-bogda-gate7-entry-decision.md)、[`S1`](docs/reports/2026-09-01-bogda-console-s1-real-shadow.md)、[`S2`](docs/reports/2026-09-01-bogda-console-s2-allowlisted-shadow.md)。盒子上仍留 S2 验收资源 `bogda-s2-acceptance-20260901-...`（未删）
-- **下一跳（未开工）**：正式研究运行前接线（DEF-03 checkpoint/worker、DEF-04/07 生产 transport、DEF-16 >20 CNY 凭证、DEF-17 日志内容、DEF-19 身份）。**不要**接宿舍机 / Wake Bridge，**不要**改 3100 入口
+- **下一跳**：正式研究运行前接线已在分支 `codex/bogda-now06-pre-research` 做完本地层（审查热修 + 身份/日志/产物/凭证/usage-unknown 适配器/峰谷 dispatcher）。见 [`2026-09-02-bogda-now06-pre-research.md`](docs/reports/2026-09-02-bogda-now06-pre-research.md)。**仍缺** DEF-03 专用 worker checkpoint、凭证签发 UI、现网 SQLite/产物根。**不要**接宿舍机 / Wake Bridge，**不要**改 3100 入口
 - 4B 已空：Orchestra + Samba NAS + Bogda 均在 RK3528（`10.77.0.1` / `\\10.77.0.1\nas` / Prefect `:4200`）。4B 可断电。
 - 入学前（2026-09-08）：宿舍–实验室 Tailscale 实测；4B 弱密码已改（2026-08-20），核桃派 pi 密码待上线后同步
 - 雷达→Zotero 直连推迟到开学后再设计（`docs/superpowers/plans/2026-08-20-radar-digest-reading-note.md`）

@@ -70,6 +70,7 @@ class CommandService:
             deployment = await self._pre_read(
                 "prefect", lambda: self.prefect.get_deployment(deployment_id)
             )
+            self._authorize_pool(deployment.work_pool_name, deployment_id)
             if deployment.work_pool_name == "dorm-x86":
                 pool = await self._pre_read(
                     "prefect", lambda: self.prefect.get_work_pool_concurrency("dorm-x86")
@@ -108,7 +109,7 @@ class CommandService:
         new_call_id: str | None = None,
     ) -> CommandReceipt[DecisionCenterSnapshot]:
         async with self._lock(f"decision:{decision_id}"):
-            self._require_model_control_writes()
+            self._require_decision_writes()
             snapshot = await self._mutate(
                 "modelControl",
                 lambda: self._model_control.resolve_decision(
@@ -292,6 +293,7 @@ class CommandService:
             deployment = await self._pre_read(
                 "prefect", lambda: self.prefect.get_deployment(deployment_id)
             )
+            self._authorize_pool(deployment.work_pool_name, schedule_id)
             schedule = next(
                 (item for item in deployment.schedules if item.schedule_id == schedule_id), None
             )
@@ -432,9 +434,14 @@ class CommandService:
             post = await self._post_read("autonomyPolicy", self.policy.get_policy)
             return self._receipt("setProjectAutonomy", project_id, post)
 
+    def _authorize_pool(self, work_pool_name: str | None, resource_id: str) -> None:
+        if not work_pool_name or work_pool_name not in self.settings.allowed_work_pool_names:
+            self._raise(ApiErrorCode.RESOURCE_NOT_ALLOWLISTED, 403, resource_id)
+
     def _authorize_run(self, run: RunSummary) -> None:
         if not run.deployment_id or run.deployment_id not in self.settings.allowed_deployment_ids:
             self._raise(ApiErrorCode.RESOURCE_NOT_ALLOWLISTED, 403, run.run_id, run)
+        self._authorize_pool(run.work_pool_name, run.run_id)
 
     def _check_version(self, current: str, expected: str, resource: Any) -> None:
         if current != expected:
@@ -455,6 +462,14 @@ class CommandService:
 
     def _require_model_control_writes(self) -> None:
         if not self.settings.model_control_enabled:
+            self._raise(ApiErrorCode.RESOURCE_NOT_ALLOWLISTED, 403, "model controls disabled")
+        if self._model_control is None:
+            self._raise(ApiErrorCode.MODEL_CONTROL_UNAVAILABLE, 503, "model-control backend is not wired", source="modelControl")
+
+    def _require_decision_writes(self) -> None:
+        if not (
+            self.settings.model_control_enabled or self.settings.recovery_writes_enabled
+        ):
             self._raise(ApiErrorCode.RESOURCE_NOT_ALLOWLISTED, 403, "model controls disabled")
         if self._model_control is None:
             self._raise(ApiErrorCode.MODEL_CONTROL_UNAVAILABLE, 503, "model-control backend is not wired", source="modelControl")

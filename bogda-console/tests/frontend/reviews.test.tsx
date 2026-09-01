@@ -50,6 +50,8 @@ describe("scientific review entry", () => {
     routes["/api/v1/capabilities"] = envelope({
       profile: "real-readonly",
       projectId: "bogda-main",
+      actorId: "local-owner",
+      role: "observer",
       effectiveAutonomyMode: "supervised",
       canSubmitRegisteredDeployment: false,
       canCancelRun: false,

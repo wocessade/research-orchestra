@@ -32,6 +32,7 @@ from bogda_console.contracts.models import (
     RunPreparationPreview,
     WorkloadEstimate,
     AllowedRunPreferences,
+    RunLogSlice,
 )
 from bogda_console.contracts.ports import (
     AutonomyPolicyPort,
@@ -61,6 +62,7 @@ class QueryService:
         policy: AutonomyPolicyPort | None = None,
         model_control: ModelControlQueryPort | None = None,
         usage_balance: UsageBalancePort | None = None,
+        log_reader: Any | None = None,
     ) -> None:
         self.settings = settings
         self.prefect = prefect
@@ -69,6 +71,7 @@ class QueryService:
         self.policy = policy
         self.model_control = model_control
         self.usage_balance = usage_balance
+        self.log_reader = log_reader
         self._now = now or (lambda: datetime.now(UTC))
         self._readers: dict[str, LastGoodReader[Any]] = {}
 
@@ -84,6 +87,8 @@ class QueryService:
             data=CapabilitySnapshot(
                 profile=self.settings.profile,
                 projectId="bogda-main",
+                actorId=self.settings.actor_id,
+                role=self.settings.role.value,
                 effectiveAutonomyMode=effective,
                 canSubmitRegisteredDeployment=enabled,
                 canCancelRun=enabled,
@@ -92,13 +97,54 @@ class QueryService:
                 canDecideCheckpoint=self.settings.review_enabled,
                 canReviewScientificResult=self.settings.review_enabled,
                 canSetAutonomyMode=self.settings.autonomy_writes_enabled,
-                canResolveModelDecision=self.settings.model_control_enabled,
+                canResolveModelDecision=(
+                    (
+                        self.settings.model_control_enabled
+                        or self.settings.recovery_writes_enabled
+                    )
+                    and self.model_control is not None
+                    and type(self.model_control).__name__ != "UnwiredModelControlAdapter"
+                ),
                 canSetModelPolicy=self.settings.model_control_enabled,
                 canPreparePaidRun=self.settings.model_control_enabled,
                 allowedDeploymentIds=sorted(self.settings.allowed_deployment_ids),
                 allowedScheduleIds=sorted(self.settings.allowed_schedule_ids),
                 allowedQueueIds=sorted(self.settings.allowed_queue_ids),
                 allowedWorkPoolNames=sorted(self.settings.allowed_work_pool_names),
+            ),
+            sources={},
+            errors=[],
+        )
+
+    async def run_logs(
+        self, run_id: str, source: str, *, max_bytes: int = 65536
+    ) -> ApiEnvelope[RunLogSlice]:
+        if self.log_reader is None:
+            raise ServiceError(
+                ApiErrorCode.NOT_FOUND,
+                "artifact log root is not configured",
+                source="artifacts",
+                retryable=False,
+                status_code=404,
+            )
+        try:
+            slice_ = self.log_reader.read(run_id, source, max_bytes=max_bytes)
+        except ValueError as error:
+            raise ServiceError(
+                ApiErrorCode.VALIDATION_ERROR,
+                str(error),
+                source="artifacts",
+                retryable=False,
+                status_code=400,
+            ) from error
+        return ApiEnvelope(
+            data=RunLogSlice(
+                runId=run_id,
+                source=slice_.source,
+                exists=slice_.exists,
+                content=slice_.content,
+                truncated=slice_.truncated,
+                sizeBytes=slice_.size_bytes,
             ),
             sources={},
             errors=[],

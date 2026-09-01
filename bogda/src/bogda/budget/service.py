@@ -9,6 +9,7 @@ from threading import RLock
 from typing import Callable
 
 from bogda.budget.guard import BudgetDecision, BudgetDecisionKind, BudgetGuard
+from bogda.budget.approval import ApprovalError
 from bogda.budget.ledger import (
     BudgetLedger,
     LedgerRevisionConflictError,
@@ -115,6 +116,7 @@ class BudgetAdmissionService:
         ledger: BudgetLedger,
         event_sink: RunEventSink,
         clock: Callable[[], datetime] | None = None,
+        approvals: object | None = None,
     ) -> None:
         if not callable(getattr(usage, "get_snapshot", None)):
             raise ValueError("usage must implement UsagePort")
@@ -128,11 +130,14 @@ class BudgetAdmissionService:
             raise ValueError("guard and ledger must be the same instance")
         if clock is not None and not callable(clock):
             raise ValueError("clock must be callable")
+        if approvals is not None and not callable(getattr(approvals, "consume", None)):
+            raise ValueError("approvals must implement consume")
         self._usage = usage
         self._guard = guard
         self._ledger = ledger
         self._event_sink = event_sink
         self._clock = clock or (lambda: datetime.now(timezone.utc))
+        self._approvals = approvals
         self._terminal_lock = RLock()
         self._delivered_terminal_events: dict[tuple[object, ...], RunEventV1] = {}
         self._terminal_contexts: dict[
@@ -306,6 +311,8 @@ class BudgetAdmissionService:
         intent: TaskIntent,
         envelope: RunBudgetEnvelope,
         reservation_cny: Decimal | None = None,
+        *,
+        approval: object | None = None,
     ) -> BudgetAdmissionResult:
         if not isinstance(run_id, str) or not run_id:
             raise BudgetAdmissionError("run_id must be a non-empty string")
@@ -336,6 +343,42 @@ class BudgetAdmissionService:
             )
         elif monitor_reason is not None and decision.reason == "usage_snapshot_unavailable":
             decision = replace(decision, reason=monitor_reason)
+
+        if (
+            decision.kind is BudgetDecisionKind.OWNER_APPROVAL_REQUIRED
+            and approval is not None
+        ):
+            if self._approvals is None:
+                pass
+            else:
+                try:
+                    self._approvals.consume(
+                        approval, envelope=envelope, run_id=run_id
+                    )
+                except ApprovalError:
+                    pass
+                else:
+                    decision = replace(
+                        decision,
+                        allowed=True,
+                        kind=BudgetDecisionKind.ALLOW,
+                        reason="owner_approval_consumed",
+                    )
+                    self._append(
+                        self._event_context(
+                            run_id=run_id,
+                            intent=intent,
+                            requested_tier=envelope.requested_tier,
+                            now=now,
+                            decision=decision,
+                            snapshot=snapshot,
+                            event=RunEventType.BUDGET_OVERRIDE_APPROVED,
+                            reserved_cny=None,
+                            active_reservations_cny=decision.active_reservations,
+                            requested_reservation_cny=decision.requested_reservation,
+                            budget_decision=decision.kind.value,
+                        )
+                    )
 
         snapshot_event = self._event_context(
             run_id=run_id,

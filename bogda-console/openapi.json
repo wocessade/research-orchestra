@@ -676,6 +676,40 @@
         "title": "ApiEnvelope[RunDetail]",
         "type": "object"
       },
+      "ApiEnvelope_RunLogSlice_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunLogSlice"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SourceMeta"
+            },
+            "title": "Sources",
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiEnvelope[RunLogSlice]",
+        "type": "object"
+      },
       "ApiEnvelope_RunPreparationPreview_": {
         "additionalProperties": false,
         "properties": {
@@ -985,6 +1019,10 @@
       "CapabilitySnapshot": {
         "additionalProperties": false,
         "properties": {
+          "actorId": {
+            "title": "Actorid",
+            "type": "string"
+          },
           "allowedDeploymentIds": {
             "items": {
               "type": "string"
@@ -1070,11 +1108,17 @@
           "projectId": {
             "title": "Projectid",
             "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
           }
         },
         "required": [
           "profile",
           "projectId",
+          "actorId",
+          "role",
           "canSubmitRegisteredDeployment",
           "canCancelRun",
           "canPauseSchedule",
@@ -2981,6 +3025,52 @@
         "title": "RunDetail",
         "type": "object"
       },
+      "RunLogSlice": {
+        "additionalProperties": false,
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "exists": {
+            "title": "Exists",
+            "type": "boolean"
+          },
+          "runId": {
+            "title": "Runid",
+            "type": "string"
+          },
+          "sizeBytes": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sizebytes"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "runId",
+          "source",
+          "exists",
+          "content",
+          "truncated"
+        ],
+        "title": "RunLogSlice",
+        "type": "object"
+      },
       "RunPreparationPreview": {
         "additionalProperties": false,
         "properties": {
@@ -4816,6 +4906,67 @@
           }
         },
         "summary": "Decide Checkpoint"
+      }
+    },
+    "/api/v1/runs/{run_id}/logs": {
+      "get": {
+        "operationId": "run_logs_api_v1_runs__run_id__logs_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "default": "stdout",
+              "title": "Source",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "maxBytes",
+            "required": false,
+            "schema": {
+              "default": 65536,
+              "maximum": 262144,
+              "minimum": 1,
+              "title": "Maxbytes",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_RunLogSlice_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Logs"
       }
     },
     "/api/v1/runs/{run_id}/model-budget": {

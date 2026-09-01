@@ -55,6 +55,8 @@ function writableCapabilities() {
   return {
     profile: "mock-all",
     projectId: "bogda-main",
+    actorId: "local-owner",
+    role: "owner",
     effectiveAutonomyMode: "supervised",
     canSubmitRegisteredDeployment: true,
     canCancelRun: true,

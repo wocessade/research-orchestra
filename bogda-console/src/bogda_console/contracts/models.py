@@ -322,9 +322,20 @@ class InfrastructureView(WireModel):
     dorm_power: PowerSnapshot | None = None
 
 
+class RunLogSlice(WireModel):
+    run_id: str
+    source: str
+    exists: bool
+    content: str
+    truncated: bool
+    size_bytes: int | None = Field(default=None, ge=0)
+
+
 class CapabilitySnapshot(WireModel):
     profile: str
     project_id: str
+    actor_id: str
+    role: str
     effective_autonomy_mode: AutonomyMode | None = None
     can_submit_registered_deployment: bool
     can_cancel_run: bool

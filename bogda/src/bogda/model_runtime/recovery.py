@@ -316,6 +316,21 @@ class SqliteUsageUnknownStore:
         with self._lock:
             return self._get_unlocked(case_id)
 
+    def list_open_cases(self) -> list[UsageUnknownCase]:
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT case_id, run_id, call_id, reservation_id, intent, "
+                "requested_tier, effective_tier, pricing_version, state, revision, "
+                "actual_cost_cny, new_call_id, prompt_hash, prompt_artifact, "
+                "created_at, updated_at FROM usage_unknown_cases "
+                "WHERE state IN (?, ?) ORDER BY created_at ASC",
+                (
+                    UsageUnknownState.AWAITING_RECONCILIATION.value,
+                    UsageUnknownState.AWAITING_RETRY_DECISION.value,
+                ),
+            ).fetchall()
+            return [_row_to_case(row) for row in rows]
+
     def get(self, case_id: str) -> UsageUnknownCase:
         return self.get_case(case_id)
 
@@ -599,6 +614,9 @@ class UsageUnknownRecoveryService:
 
     def get_case(self, case_id: str) -> UsageUnknownCase:
         return self._store.get_case(case_id)
+
+    def list_open_cases(self) -> list[UsageUnknownCase]:
+        return self._store.list_open_cases()
 
     def blocks_original_call(self, run_id: str, call_id: str) -> bool:
         return self._store.blocks_original_call(run_id, call_id)

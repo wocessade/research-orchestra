@@ -117,3 +117,10 @@
 53. **挂账页必须跟验收报告一起改**：Gate 6/S1/S2 合进 `main` 后 `CLAUDE.md`/`README.md` 仍写「Gate 6 未通过」会害下一会话按旧红线停工。规则：关闭 Gate 时同步改锚，历史工作台加「已关闭」横幅，不另开第二套现状。
 54. **S2 脚本假设会在真 Prefect 上碎**：队列名不全局唯一、Artifact 列表首项不是最新、新建 pool 会多一个 `default` 队列。规则：硬停后从已写入状态续跑，不要重放成功命令；不要把临时驱动的假设做成产品重试框架。
 55. **整分支审查超时 ≠ 代码没过**：额度耗尽时不要用第三轮审查代替已有的 S1/S2 CLEAN。规则：缺的是审查结论就写明，不要补一层「同机身份」仪式。
+
+## O. NOW-06 预研究接线（2026-09-02）
+
+56. **四组 exact allowlist 不是单一控制**：只锁 deployment id 时，把生产 deployment 塞进白名单仍会写到 `pi-service`。规则：submit/cancel/review/checkpoint 必须联合校验 `work_pool_name`。
+57. **recovery 写入开关必须跟真实 backend 绑定**：allowlisted-test 的 owner 若只因角色打开 `resolve_decision`，Unwired adapter 会把原来的 403 变成 503，并让前端露出假按钮。规则：`recovery_writes_enabled` 仅在配置了 `BOGDA_USAGE_UNKNOWN_DB` 时为真。
+58. **`slots=True` 的 frozen dataclass 没有 `__dict__`**：HMAC 凭证复制要用 `dataclasses.replace`，不要 `**obj.__dict__`。
+

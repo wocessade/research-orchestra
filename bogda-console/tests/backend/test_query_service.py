@@ -67,9 +67,19 @@ async def test_readonly_capabilities_report_configured_scope_without_enabling_co
 
     snapshot = (await service.capabilities()).data
 
+    assert snapshot.profile == "real-readonly"
+    assert snapshot.role == "observer"
+    assert snapshot.actor_id == "local-owner"
     assert snapshot.can_decide_checkpoint is False
     assert snapshot.can_review_scientific_result is False
     assert snapshot.can_submit_registered_deployment is False
+    assert snapshot.can_cancel_run is False
+    assert snapshot.can_pause_schedule is False
+    assert snapshot.can_pause_work_queue is False
+    assert snapshot.can_set_autonomy_mode is False
+    assert snapshot.can_resolve_model_decision is False
+    assert snapshot.can_set_model_policy is False
+    assert snapshot.can_prepare_paid_run is False
     assert snapshot.allowed_deployment_ids == ["deployment-a"]
     assert snapshot.allowed_schedule_ids == ["schedule-a"]
     assert snapshot.allowed_queue_ids == ["queue-a"]

@@ -129,6 +129,82 @@ async def test_queue_pause_and_resume_use_exact_pool_membership(fixture_loader) 
 
 
 @pytest.mark.asyncio
+async def test_submit_rejects_allowlisted_deployment_on_pool_outside_allowlist(
+    fixture_loader,
+) -> None:
+    service, prefect, _ = harness(fixture_loader("normal-active"))
+    service.settings = Settings.from_env(
+        {
+            "BOGDA_CONSOLE_PROFILE": "allowlisted-test",
+            "BOGDA_CONSOLE_ALLOWED_DEPLOYMENT_IDS": "deployment-service",
+            "BOGDA_CONSOLE_ALLOWED_WORK_POOL_NAMES": "bogda-s2-pool",
+        }
+    )
+    with pytest.raises(ServiceError) as error:
+        await service.submit("deployment-service", {}, "intent-pool")
+    assert error.value.code == "RESOURCE_NOT_ALLOWLISTED"
+    assert prefect.submit_calls == []
+
+
+@pytest.mark.asyncio
+async def test_queue_pause_rejects_allowlisted_queue_on_pool_outside_allowlist(
+    fixture_loader,
+) -> None:
+    service, prefect, _ = harness(fixture_loader("normal-active"))
+    service.settings = Settings.from_env(
+        {
+            "BOGDA_CONSOLE_PROFILE": "allowlisted-test",
+            "BOGDA_CONSOLE_ALLOWED_QUEUE_IDS": "queue-cpu",
+            "BOGDA_CONSOLE_ALLOWED_WORK_POOL_NAMES": "bogda-s2-pool",
+        }
+    )
+    before = await prefect.get_work_queue("queue-cpu")
+    with pytest.raises(ServiceError) as error:
+        await service.pause_queue("queue-cpu", before.command_version)
+    assert error.value.code == "RESOURCE_NOT_ALLOWLISTED"
+
+
+@pytest.mark.asyncio
+async def test_real_readonly_mutations_stop_before_adapter(fixture_loader) -> None:
+    fixture = fixture_loader("normal-active")
+    settings = Settings.from_env(
+        {
+            "BOGDA_CONSOLE_PROFILE": "real-readonly",
+            "BOGDA_CONSOLE_ALLOWED_DEPLOYMENT_IDS": "deployment-dorm",
+            "BOGDA_CONSOLE_ALLOWED_QUEUE_IDS": "queue-cpu",
+            "BOGDA_CONSOLE_ALLOWED_WORK_POOL_NAMES": "dorm-x86,pi-service",
+        }
+    )
+    prefect = MockPrefectAdapter(fixture)
+    service = CommandService(
+        settings=settings,
+        prefect=prefect,
+        results=MockRunResultAdapter(fixture),
+    )
+    with pytest.raises(ServiceError) as error:
+        await service.submit("deployment-dorm", {}, "intent-ro")
+    assert error.value.code == "RESOURCE_NOT_ALLOWLISTED"
+    assert prefect.submit_calls == []
+
+
+@pytest.mark.asyncio
+async def test_observer_submit_stops_before_adapter_despite_allowlist(fixture_loader) -> None:
+    service, prefect, _ = harness(fixture_loader("normal-active"))
+    service.settings = Settings.from_env(
+        {
+            "BOGDA_CONSOLE_PROFILE": "allowlisted-test",
+            "BOGDA_CONSOLE_ROLE": "observer",
+            "BOGDA_CONSOLE_ALLOWED_DEPLOYMENT_IDS": "deployment-dorm",
+            "BOGDA_CONSOLE_ALLOWED_WORK_POOL_NAMES": "dorm-x86",
+        }
+    )
+    with pytest.raises(ServiceError) as error:
+        await service.submit("deployment-dorm", {}, "intent-observer")
+    assert error.value.code == "RESOURCE_NOT_ALLOWLISTED"
+    assert prefect.submit_calls == []
+
+
+@pytest.mark.asyncio
 async def test_review_appends_after_fresh_prefect_ownership_read(fixture_loader) -> None:
     service, _, results = harness(fixture_loader("result-missing-invalid-conflict"))
     before = await results.get_latest("run-review")

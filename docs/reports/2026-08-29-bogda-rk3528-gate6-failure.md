@@ -6,6 +6,8 @@
 
 核对方式：通过 Tailscale `liuxfs@100.78.158.80` 只读检查；远端未启动/停止服务，未 reboot，未创建或恢复快照，未修改 unit、挂载、数据库、认证或密钥。
 
+后续服务恢复（2026-08-30）见 [`2026-08-30-bogda-rk3528-prefect-restore.md`](2026-08-30-bogda-rk3528-prefect-restore.md)。**本文件仍是失败轮事实，不因后来 start 而改结论。** 后续新 trial 最终通过见 [`2026-08-31-bogda-rk3528-gate6-final-acceptance.md`](2026-08-31-bogda-rk3528-gate6-final-acceptance.md)。
+
 ## 结论
 
 本轮 Gate 6 **失败**。2026-08-28T09:34:57Z，RK3528 上承载 `/mnt/nas` 的 USB SSD 从内核断开，随后出现写 I/O 错误、ext4 journal abort、只读重挂载和卸载。`bogda-pi-worker.service` 与 `bogda-prefect-server.service` 因挂载依赖在 09:34:59Z 停止；SSD 自动重新枚举并于 09:36:45Z 恢复挂载后，这两个服务没有自动恢复。

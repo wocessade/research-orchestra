@@ -5,6 +5,8 @@
 
 **不是 3100 切换。不是 Wake Bridge。不是把研究任务丢进现网 `pi-service`。**
 
+现网 Orchestra 雷达已停，见 [`2026-09-02-orchestra-pre-runner-freeze.md`](2026-09-02-orchestra-pre-runner-freeze.md)。broker / exam-watch / backup 仍在。
+
 ## 已经在线上准备好的
 
 - Gate 7 联合 work-pool 白名单（submit/cancel/review/checkpoint）

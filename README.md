@@ -43,10 +43,11 @@ RK3528 Broker（broker-data）队列 + dsh + 23:30 雷达四阶段 + exam-watch
 | RK3528 | 4+128 Armbian | **现网**：Broker + dsh + exam-watch + Samba NAS + Bogda Prefect。直连 `10.77.0.1`，Tailscale `rk3528` `100.78.158.80` |
 | 树莓派 4B | 2GB | **已空**，可断电。勿再当调度机 |
 | 核桃派 1B | 1GB | 墨水屏 + 实验室冷备，不是执行节点 |
+| 第二台笔记本 | 规格未入库 | **暂代宿舍 runner**（owner 2026-08-30：涨价停购）。过夜/离主脑实验；**尚未**接 Prefect `dorm-x86` / Wake Bridge |
 
 RK3528 数据在 **`/home/liuxfs/broker-data`**（`/mnt/broker` 指向该目录）。NAS：`\\10.77.0.1\nas` / Tailscale `\\100.78.158.80\nas`。Prefect：`http://10.77.0.1:4200`。
 
-拟购宿舍 runner 与组里溢出：见 [`docs/reports/2026-08-22-dorm-runner-rfc.md`](docs/reports/2026-08-22-dorm-runner-rfc.md)，未拍板。
+拟购宿舍 runner 因涨价暂停，暂由第二台笔记本顶替：[`docs/reports/2026-08-22-dorm-runner-rfc.md`](docs/reports/2026-08-22-dorm-runner-rfc.md)。未授权接 `dorm-x86` worker。三档预算只作行情参考。
 
 ---
 
@@ -54,12 +55,14 @@ RK3528 数据在 **`/home/liuxfs/broker-data`**（`/mnt/broker` 指向该目录�
 
 - Skill digest：**owner 暂不锁**
 - RK3528 部署窗口：`deploy_broker.sh` 已含 exam-watch 传载/启用，实例上 env.conf 需手工复制（脚本 WARN）
-- bogda Gate 6：**通过**（2026-08-31）。Gate 7：**S1/S2 影子通过**；不是 3100 切换、不是生产科研。下一跳见根 `CLAUDE.md` 挂账
+- bogda Gate 6：**通过**（2026-08-31）。Gate 7：**S1/S2 影子通过**。NOW-06 软件已合；接 runner 见握手说明。**不要**切 3100、**不要**研究进 `pi-service`
+- Orchestra：**雷达 timer 已停**（2026-09-02）；broker / exam-watch / backup 仍在。记录 [`docs/reports/2026-09-02-orchestra-pre-runner-freeze.md`](docs/reports/2026-09-02-orchestra-pre-runner-freeze.md)
 - 4B 已空：Orchestra / Samba / Bogda 均在 RK3528（`10.77.0.1`，NAS=`\\10.77.0.1\nas`，Prefect `:4200`）。西数 SSD 挂在盒子 USB3。4B 可断电。
 - 入学前（2026-09-08）：宿舍–实验室 Tailscale 实测；核桃派 pi 密码
 - 雷达→Zotero：9.8 后再设计
 - 控制台 v1.5：tailnet 手机访问
-- 待拍板：SD 旧副本删除、512G SSD、宿舍 NAS、QQ bot、宿舍 runner 三档预算、触发式 agent / dsh 能力面
+- 待拍板：SD 旧副本删除、512G SSD、宿舍 NAS、QQ bot、触发式 agent / dsh 能力面
+- 宿舍 runner：**采购暂停**（涨价）；暂用第二台笔记本。三档预算 RFC 仍作行情参考，不按拟购执行
 - 有意不做：全文证据扫描器、原子 `releases/<sha>`、Hermes / OpenClaw
 
 ---

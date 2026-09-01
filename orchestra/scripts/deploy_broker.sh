@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
-# 部署 broker 代码到 4B 并 (re)start systemd 服务
-# 用法: ORCHESTRA_SSH_HOST=192.168.x.x [ORCHESTRA_REMOTE_ROOT=~/broker-data] [ORCHESTRA_ENABLE_TIMERS=0] bash deploy_broker.sh
-# ORCHESTRA_ENABLE_TIMERS=0：只 enable broker，不 enable 雷达/备份/exam-watch（RK3528 备机并行用）
-# SSD 已挂载时 ORCHESTRA_REMOTE_ROOT 默认 /mnt/broker；SD 过渡期传 ~/broker-data
+# 部署 broker 代码到现网 RK3528 并 (re)start systemd 服务
+# 用法: ORCHESTRA_SSH_HOST=10.77.0.1 [ORCHESTRA_REMOTE_ROOT=/home/liuxfs/broker-data] [ORCHESTRA_ENABLE_TIMERS=1] bash deploy_broker.sh
+# 直连 host key 失败时：ORCHESTRA_SSH_HOST=100.78.158.80
+# ORCHESTRA_ENABLE_TIMERS=1：现网（RK3528）enable 全部 timer（雷达/备份/exam-watch）
+# ORCHESTRA_ENABLE_TIMERS=0：并行机禁止双开雷达（只 enable broker）
+# 现网 REMOTE_ROOT 默认应传 /home/liuxfs/broker-data（/mnt/broker 是该目录的挂载点）
 set -euo pipefail
 SSH_HOST="${ORCHESTRA_SSH_HOST:?用法: ORCHESTRA_SSH_HOST=192.168.x.x bash deploy_broker.sh}"
 SSH_USER="${ORCHESTRA_SSH_USER:-liuxfs}"
 REMOTE_ROOT="${ORCHESTRA_REMOTE_ROOT:-/mnt/broker}"
-# 1=现网 4B；0=RK3528 备机并行部署，禁止 enable 雷达/备份/exam-watch timer
+# 1=现网 RK3528 enable 全部 timer；0=并行机禁止双开雷达（只 enable broker）
 ENABLE_TIMERS="${ORCHESTRA_ENABLE_TIMERS:-1}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 GUARD_REMOTE="/tmp/orchestra-migration-guard-$$.py"

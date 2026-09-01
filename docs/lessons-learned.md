@@ -112,16 +112,20 @@
 51. **切到 RK3528 后文档默认机必须一起改**：Prefect 池名仍叫 `pi-service`，但 SSH/SMB/控制台缺省 host 是 `10.77.0.1` / `rk3528`，不是 4B `192.168.0.250`。venv 的 python 不能指向已搬走的 `/root/.local/share/uv/python`。
 52. **从 4B 拷来的 Prefect venv 要修 shebang**：Armbian 上 `uv python` 装到 `/opt/uv-python/...`，否则 unit 报 203/EXEC。
 
+## M2. remount 自愈（2026-08-30）
+
+53. **挂载条件失败不会触发 `Restart=on-failure`**：`ConditionPathIsMountPoint` 不满足时 unit 是 skipped/dead，不是 Failed。USB SSD 掉盘再挂上后，只靠 `WantedBy=multi-user.target` 不会把 Prefect 拉回来。规则：server/worker 必须 `BindsTo=mnt-nas.mount` 且 `WantedBy=mnt-nas.mount`；**health timer 不要绑**。
+54. **只换 unit 不要跑整包 `install.sh`**：`--install` 会 `uv sync` 并改 `/etc/bogda/last-backup`。规则：热修两份 service 时手工备份到 `backups/<UTC>/`。
+55. **RK3528 SSH 优先 Tailscale**：直连 `10.77.0.1` 可能 `Host key verification failed`，Tailscale `100.78.158.80` / `rk3528` 可用。规则：BatchMode 先试 tailnet；不要默认 `StrictHostKeyChecking=no`。
+
 ## N. Gate 7 影子（2026-09-01）
 
-53. **挂账页必须跟验收报告一起改**：Gate 6/S1/S2 合进 `main` 后 `CLAUDE.md`/`README.md` 仍写「Gate 6 未通过」会害下一会话按旧红线停工。规则：关闭 Gate 时同步改锚，历史工作台加「已关闭」横幅，不另开第二套现状。
-54. **S2 脚本假设会在真 Prefect 上碎**：队列名不全局唯一、Artifact 列表首项不是最新、新建 pool 会多一个 `default` 队列。规则：硬停后从已写入状态续跑，不要重放成功命令；不要把临时驱动的假设做成产品重试框架。
-55. **整分支审查超时 ≠ 代码没过**：额度耗尽时不要用第三轮审查代替已有的 S1/S2 CLEAN。规则：缺的是审查结论就写明，不要补一层「同机身份」仪式。
+56. **挂账页必须跟验收报告一起改**：关闭 Gate 后若锚页仍写旧红线，下一会话会按过时口径停工。规则：关闭时同步改 `CLAUDE.md`/`README.md`，历史工作台加「已关闭」横幅，不另开第二套现状；也不要用后来的服务恢复改写失败轮原文。
+57. **S2 脚本假设会在真 Prefect 上碎**：队列名不全局唯一、Artifact 列表首项不是最新、新建 pool 会多一个 `default` 队列。规则：硬停后从已写入状态续跑，不要重放成功命令；不要把临时驱动的假设做成产品重试框架。
 
 ## O. NOW-06 预研究接线（2026-09-02）
 
-56. **四组 exact allowlist 不是单一控制**：只锁 deployment id 时，把生产 deployment 塞进白名单仍会写到 `pi-service`。规则：submit/cancel/review/checkpoint 必须联合校验 `work_pool_name`。
-57. **recovery 写入开关必须跟真实 backend 绑定**：allowlisted-test 的 owner 若只因角色打开 `resolve_decision`，Unwired adapter 会把原来的 403 变成 503，并让前端露出假按钮。规则：`recovery_writes_enabled` 仅在配置了 `BOGDA_USAGE_UNKNOWN_DB` 时为真。
-58. **`slots=True` 的 frozen dataclass 没有 `__dict__`**：HMAC 凭证复制要用 `dataclasses.replace`，不要 `**obj.__dict__`。
-59. **审批库必须成对出现，MAC 不准出 API**：`BOGDA_APPROVAL_DB` 与 `HMAC_KEY` 只配一个就 fail-closed；签发回执不含 mac/nonce，worker 用同一文件 `get_open`/`consume_open`。
-
+58. **四组 exact allowlist 不是单一控制**：只锁 deployment id 时，把生产 deployment 塞进白名单仍会写到 `pi-service`。规则：submit/cancel/review/checkpoint 必须联合校验 `work_pool_name`。
+59. **recovery 写入开关必须跟真实 backend 绑定**：allowlisted-test 的 owner 若只因角色打开 `resolve_decision`，Unwired adapter 会把原来的 403 变成 503，并让前端露出假按钮。规则：`recovery_writes_enabled` 仅在配置了 `BOGDA_USAGE_UNKNOWN_DB` 时为真。
+60. **`slots=True` 的 frozen dataclass 没有 `__dict__`**：HMAC 凭证复制要用 `dataclasses.replace`，不要 `**obj.__dict__`。
+61. **审批库必须成对出现，MAC 不准出 API**：`BOGDA_APPROVAL_DB` 与 `HMAC_KEY` 只配一个就 fail-closed；签发回执不含 mac/nonce，worker 用同一文件 `get_open`/`consume_open`。

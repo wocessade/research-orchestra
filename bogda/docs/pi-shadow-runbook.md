@@ -1,8 +1,8 @@
 # Bogda Pi Shadow Operations Runbook
 
-**Current control-plane host (2026-08-28):** RK3528, not Raspberry Pi 4B. SSH `liuxfs@10.77.0.1` (direct `/30`) or Tailscale hostname `rk3528` (`100.78.158.80`). Prefect `http://10.77.0.1:4200`. Data still `/mnt/nas/.bogda`. Work pool still `pi-service`. In this runbook, “Pi” means that ARM64 box.
+**Current control-plane host (2026-09-02):** RK3528, not Raspberry Pi 4B. Prefer SSH `liuxfs@100.78.158.80` or hostname `rk3528` (Tailscale). Direct `liuxfs@10.77.0.1` may fail host-key checks. Prefect `http://10.77.0.1:4200` / tailnet `:4200`. Data still `/mnt/nas/.bogda`. Work pool still `pi-service` (name frozen; it is not the retired Raspberry Pi). In this runbook, “Pi” means that ARM64 box.
 
-This runbook remains the gate procedure for install / start / rollback. It is not a second authorization to reinstall over a live Prefect DB. Local pytest does not prove Tailscale ACLs, USB remount after reboot, or 24-hour stability. Historical Gate 6 evidence on 4B stays in `docs/reports/2026-08-27-bogda-pi-gate6-*`.
+Gate 6 **passed** 2026-08-31 (trial `20260830T154019Z`). This runbook remains the gate procedure for install / start / rollback. It is not a second authorization to reinstall over a live Prefect DB. Do not run `install.sh --install` just to hot-patch two unit files (it `uv sync`s and rewrites `/etc/bogda/last-backup`). Local pytest does not prove Tailscale ACLs, USB remount after reboot, or 24-hour stability. Historical Gate 6 evidence on 4B stays in `docs/reports/2026-08-27-bogda-pi-gate6-*`. Final: `docs/reports/2026-08-31-bogda-rk3528-gate6-final-acceptance.md`.
 
 Proceed through the gates in order. A hard failure stops the shadow deployment and returns operation to the existing system. Do not print, commit, or paste either Basic Auth value.
 
@@ -46,6 +46,8 @@ tailscale ip -4
 tailscale netcheck
 command -v uv
 uv --version
+head -1 /opt/bogda/.venv/bin/prefect
+# must not contain another host's uv path (lesson 52)
 systemd-analyze verify \
   deploy/pi/systemd/bogda-prefect-server.service \
   deploy/pi/systemd/bogda-pi-worker.service \
@@ -57,7 +59,7 @@ rc=$?
 printf 'verify_exit=%s\n' "$rc"
 ```
 
-Expected facts: uname -m is aarch64; Python is 3.11 or newer; /mnt/nas is an approved local SSD partition with FSTYPE ext4; its UUID/PARTUUID and source match the approved SSD and /etc/fstab; and the available-byte value has capacity for the approved 24-hour evidence plus seven snapshots. Record the Tailscale identity, tailnet IPv4 address, and netcheck output; it must show the approved tailnet rather than an unreviewed public exposure. A missing mount, wrong source/identity, non-ext4 filesystem, or inadequate capacity is a hard failure.
+Expected facts: uname -m is aarch64; Python is 3.11 or newer; /mnt/nas is an approved local SSD partition with FSTYPE ext4; its UUID/PARTUUID and source match the approved SSD and /etc/fstab; and the available-byte value has capacity for the approved 24-hour evidence plus seven snapshots. Record the Tailscale identity, tailnet IPv4 address, and netcheck output; it must show the approved tailnet rather than an unreviewed public exposure. A missing mount, wrong source/identity, non-ext4 filesystem, or inadequate capacity is a hard failure. If `/opt/bogda/.venv` already exists, `head -1` of `prefect` must not point at another machine's uv install.
 
 uv is a Gate 3 install prerequisite. Record `command -v uv` and `uv --version`. If uv is missing, stop and obtain separate authorization to install it; install.sh must not fetch uv from the network on its own. This Pi already has owner-authorized uv 0.12.5 at /usr/local/bin, so this change does not install uv again.
 
@@ -232,6 +234,30 @@ snapshot_manifest="${snapshot_path%.db}.json"
 ```
 
 The verification report must show integrity_check equal to ok. An unrestorable snapshot, corrupt database, missing SSD, or any OOM is a hard failure.
+
+## USB remount (live contract after Gate 6)
+
+`RequiresMountsFor` + `ConditionPathIsMountPoint` stop writes to a missing disk. They do **not** restart server/worker when the disk comes back. That is why trial `20260828T064220Z` left Prefect `inactive` while health timers kept sampling.
+
+Live contract (server and worker only):
+
+- `BindsTo=mnt-nas.mount` and `After=mnt-nas.mount`
+- `WantedBy=multi-user.target` **and** `WantedBy=mnt-nas.mount`
+- Confirm `ls /etc/systemd/system/mnt-nas.mount.wants/`
+- Do **not** bind `bogda-shadow-health.timer` to the mount; failed samples during an outage stay in `samples.jsonl`
+
+If `/mnt/nas` is already `ext4` `rw` and units are still dead:
+
+```sh
+systemctl is-active bogda-prefect-server.service bogda-pi-worker.service
+sudo systemctl start bogda-prefect-server.service
+# wait until curl http://127.0.0.1:4200/api/health returns 200
+sudo systemctl start bogda-pi-worker.service
+```
+
+Orchestra broker data lives on eMMC (`/home/liuxfs/broker-data`). Stopping Orchestra is optional and only needed if you must unmount `/mnt/nas` (Samba + Prefect DB). A remount-heal unit deploy does not require stopping Orchestra.
+
+Offline fsck / SMART still need an unmount window. Never repair live `prefect.db`.
 
 ## Gate 7 — Decision: accept, return, or rollback
 

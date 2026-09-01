@@ -53,11 +53,14 @@
 - Pi/RK 部署窗口：deploy_broker.sh 已含 exam-watch；taskfile 收紧、artifact 校验、taskkill 树杀等与仓库对齐仍挂
 - Bogda Gate 6：**通过**（2026-08-31，trial `20260830T154019Z`）。见 [`docs/reports/2026-08-31-bogda-rk3528-gate6-final-acceptance.md`](docs/reports/2026-08-31-bogda-rk3528-gate6-final-acceptance.md)
 - Gate 7：**S1 只读影子 + S2 专用白名单写入已通过**（合入 `e79f79b`）。不是 3100 切换，不是生产科研任务。证据 [`2026-09-01-bogda-gate7-entry-decision.md`](docs/reports/2026-09-01-bogda-gate7-entry-decision.md)、[`S1`](docs/reports/2026-09-01-bogda-console-s1-real-shadow.md)、[`S2`](docs/reports/2026-09-01-bogda-console-s2-allowlisted-shadow.md)。盒子上仍留 S2 验收资源 `bogda-s2-acceptance-20260901-...`（未删）
-- **下一跳**：NOW-06 线上层已备（审查热修、身份、日志、清理按钮、>20 CNY 签发、usage-unknown 适配器、审批库 `get_open`）。owner 线下接 runner 后按 [`2026-09-02-bogda-runner-handshake.md`](docs/reports/2026-09-02-bogda-runner-handshake.md) 填精确白名单与共享文件路径。**仍缺** DEF-03 真 checkpoint。**不要**接 Wake Bridge、**不要**改 3100、**不要**把研究任务丢进 `pi-service`
+- **下一跳（runner 到手前软件已合）**：NOW-06 已并入本线（身份、日志、清理、>20 CNY 签发、usage-unknown、审批库 `get_open`）。owner 接 runner 后按 [`2026-09-02-bogda-runner-handshake.md`](docs/reports/2026-09-02-bogda-runner-handshake.md) 填精确白名单与共享文件。**仍缺** DEF-03 真 checkpoint（要有专用 worker）。**不要**接 Wake Bridge、**不要**改 3100、**不要**把研究任务丢进 `pi-service`
+- **Orchestra 冻结（2026-09-02）**：现网已 `disable --now orchestra-timer.timer`（夜间雷达停）。**未停**：broker、exam-watch、backup、housekeeping、Samba、3100、Prefect。恢复：`sudo systemctl enable --now orchestra-timer.timer`。记录 [`2026-09-02-orchestra-pre-runner-freeze.md`](docs/reports/2026-09-02-orchestra-pre-runner-freeze.md)
+- SSH：维护优先 Tailscale `rk3528` / `100.78.158.80`；直连 `10.77.0.1` 可能 host key 失败
 - 4B 已空：Orchestra + Samba NAS + Bogda 均在 RK3528（`10.77.0.1` / `\\10.77.0.1\nas` / Prefect `:4200`）。4B 可断电。
 - 入学前（2026-09-08）：宿舍–实验室 Tailscale 实测；4B 弱密码已改（2026-08-20），核桃派 pi 密码待上线后同步
 - 雷达→Zotero 直连推迟到开学后再设计（`docs/superpowers/plans/2026-08-20-radar-digest-reading-note.md`）
 - **GUI 控制台 v2 主入口 3100**（Homepage v1 仅回退）；留言=`orchestra/console/messages.md`；`ORCHESTRA_MONITOR_TOKEN` 已配用户环境变量（值绝不入库/入对话）。v1.5 tailnet 手机访问仍挂账
 - 锐评有意不做：全文证据扫描器、原子 `releases/<sha>` 发布、Hermes / OpenClaw
-- 待用户拍板：SD 旧副本删除、512G SSD 用途、宿舍 NAS、QQ bot、宿舍 runner 预算三档、**触发式 agent 与 dsh 能力面**（闲时不烧 token；dsh 白名单未设计）
+- 待用户拍板：SD 旧副本删除、512G SSD 用途、宿舍 NAS、QQ bot、**触发式 agent 与 dsh 能力面**（闲时不烧 token；dsh 白名单未设计）
+- 宿舍 runner：**采购暂停**（2026-08-30，硬件涨价）。该层暂由第二台笔记本顶替；**未**接 Prefect `dorm-x86`、Wake Bridge、或提高并发。RFC 三档预算不再当采购清单
 - 注释惯例：xju-desktop（以及未来的独立仓库）只以文档引用，不 gitlink 嵌入；会话调试产物统一 D:\Temp\.codex-session

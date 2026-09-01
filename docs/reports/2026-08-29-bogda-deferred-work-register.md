@@ -22,7 +22,7 @@
 | NOW-03 | Stage E：运行接线与迁移前验收 | Task 1–4：ledger、paid-call+SQLite、官方余额 **live GET**、本机 Flash/Pro dsh stdout `pong`。缺 `usage.json` 精确对账。真 suspend 未做。Gate 6 **已通过**；Gate 7 的 3101 real Prefect S1 只读与 S2 exact-allowlist 专用写入均已通过，仍不代表生产切换 | [Stage E 开工](2026-08-30-bogda-stage-e-start.md)、[Gate 7 entry](2026-09-01-bogda-gate7-entry-decision.md)、[S1](2026-09-01-bogda-console-s1-real-shadow.md)、[S2](2026-09-01-bogda-console-s2-allowlisted-shadow.md) |
 | NOW-04 | Gate 6 收尾 | **已完成。** trial `20260830T154019Z` 覆盖 24h08m56s，275 个样本零缺口、零 API/DB/OOM 失败；受控 reboot、正常 fsck/mount、独立 restore 与最终日志复核全部通过 | [最终验收](2026-08-31-bogda-rk3528-gate6-final-acceptance.md)、[e2fsck/重试日志](2026-08-30-bogda-rk3528-e2fsck-remediation.md) |
 | NOW-05 | Runner 开工包本地准入 | `admit_runner_packet` + 6 个契约测试已过。未接线到 Prefect worker / 3101 | [spec](../superpowers/specs/2026-08-30-bogda-runner-dsh-design.md) §5.7、[计划](../superpowers/plans/2026-08-30-bogda-runner-packet.md) |
-| NOW-06 | 正式研究运行前接线 | Gate 7 审查 Important 已修。3101 已有身份/日志/清理按钮/>20 CNY 签发/usage-unknown 适配器。worker 共享文件与精确白名单见握手说明。未切 3100。S2 验收资源仍留 Prefect | [本轮报告](2026-09-02-bogda-now06-pre-research.md)、[handshake](2026-09-02-bogda-runner-handshake.md)；**不**接 Wake Bridge、**不**切 3100 |
+| NOW-06 | 正式研究运行前接线 | **线上层已合。** 3101 身份/日志/清理/>20 CNY 签发/usage-unknown/审批库已在本线。现网雷达 timer 已停，broker/exam-watch/backup 未停。owner 接 runner 后填精确白名单。**仍缺** DEF-03 真 checkpoint | [handshake](2026-09-02-bogda-runner-handshake.md)、[冻结](2026-09-02-orchestra-pre-runner-freeze.md)；**不**接 Wake Bridge、**不**切 3100 |
 
 ## 必要延期项
 

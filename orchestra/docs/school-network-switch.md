@@ -15,7 +15,7 @@
 | Broker 上报目标 | RK3528 `/home/liuxfs/broker/config.json` 的 `api_url` | `http://192.168.0.200:5000` | 改 tailnet 名 `http://walnutpi.<tailnet>.ts.net:5000` 或新 IP |
 | sync/deploy 脚本 | Windows env `ORCHESTRA_SSH_HOST` | `10.77.0.1` | 改 `rk3528.<tailnet>.ts.net`（env 驱动，零代码改动） |
 | usage-monitor 部署 | `deepseek-usage-monitor/usage-monitor/deploy_to_pi.py` 默认值 | `192.168.0.200` | 改 tailnet 名或传 `PI_HOST` env |
-| Windows known_hosts | `~/.ssh/known_hosts` | 按 IP | tailnet 名首次连接会重新确认指纹（正常） |
+| Windows known_hosts | `~/.ssh/known_hosts` | 按 IP | 优先用 Tailscale `100.78.158.80` / `rk3528`；直连 `10.77.0.1` 指纹可能与 tailnet 不一致（2026-08-30 已见） |
 | RK3528/核桃派 寻址 | 网络配置 | 直连 `10.77.0.1` / 核桃派 `192.168.0.200` | 宿舍网可能不允许静态 → 靠 tailnet 名 `rk3528` / `walnutpi` |
 | SMB 共享 | Windows 映射 | `\\10.77.0.1\nas` | 改 `\\rk3528.<tailnet>.ts.net\nas`（tailnet 上 SMB 走加密隧道） |
 

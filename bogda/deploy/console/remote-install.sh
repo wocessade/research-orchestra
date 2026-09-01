@@ -10,18 +10,17 @@ sed -i 's/\r$//' "$STAGE/maintain.sh" "$STAGE/remote-install.sh" "$STAGE/bogda-c
 install -d -o bogda -g bogda "$APP"
 rm -rf "$APP/src" "$APP/frontend"
 mkdir -p "$APP/frontend"
+if [ ! -f "$STAGE/fixtures/normal-active.json" ]; then
+    echo "stage fixtures missing; refusing install (create_app always loads them)" >&2
+    exit 1
+fi
 cp -a "$STAGE/src" "$APP/src"
 cp -a "$STAGE/pyproject.toml" "$APP/pyproject.toml"
 cp -a "$STAGE/dist" "$APP/frontend/dist"
-if [ -d "$STAGE/fixtures" ]; then
-    cp -a "$STAGE/fixtures" "$APP/fixtures"
-fi
+cp -a "$STAGE/fixtures" "$APP/fixtures"
 install -m 0755 "$STAGE/maintain.sh" "$APP/maintain.sh"
 install -m 0644 "$STAGE/dsh-maintain.md" "$APP/dsh-maintain.md"
-chown -R bogda:bogda "$APP/src" "$APP/frontend" "$APP/pyproject.toml" "$APP/maintain.sh" "$APP/dsh-maintain.md"
-if [ -d "$APP/fixtures" ]; then
-    chown -R bogda:bogda "$APP/fixtures"
-fi
+chown -R bogda:bogda "$APP/src" "$APP/frontend" "$APP/pyproject.toml" "$APP/fixtures" "$APP/maintain.sh" "$APP/dsh-maintain.md"
 
 if [ ! -x "$APP/.venv/bin/python" ]; then
     sudo -u bogda env HOME="$APP" UV_NO_CONFIG=1 uv venv --python /opt/bogda/.venv/bin/python "$APP/.venv"

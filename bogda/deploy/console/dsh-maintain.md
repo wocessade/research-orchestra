@@ -19,3 +19,5 @@ sudo -n /opt/bogda-console/maintain.sh restart
 - 常驻会话等人说话
 
 进程由 systemd 保活。dsh 是手脚：看一眼、必要时 restart。挂着不动不打模型请求则不烧 token；本任务仍应干完退出。
+
+人看页面用 MagicDNS：`http://rk3528.tail6d8b09.ts.net:3101/`（裸 Tailscale IP `:3101` 会 404）。

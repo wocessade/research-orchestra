@@ -129,3 +129,9 @@
 59. **recovery 写入开关必须跟真实 backend 绑定**：allowlisted-test 的 owner 若只因角色打开 `resolve_decision`，Unwired adapter 会把原来的 403 变成 503，并让前端露出假按钮。规则：`recovery_writes_enabled` 仅在配置了 `BOGDA_USAGE_UNKNOWN_DB` 时为真。
 60. **`slots=True` 的 frozen dataclass 没有 `__dict__`**：HMAC 凭证复制要用 `dataclasses.replace`，不要 `**obj.__dict__`。
 61. **审批库必须成对出现，MAC 不准出 API**：`BOGDA_APPROVAL_DB` 与 `HMAC_KEY` 只配一个就 fail-closed；签发回执不含 mac/nonce，worker 用同一文件 `get_open`/`consume_open`。
+
+## P. 3101 上盒（2026-09-02）
+
+62. **`real-readonly` 仍会读 fixtures**：`create_app` 无条件 `MockPowerAdapter(load_fixture(...))`。漏拷 `bogda-console/fixtures` 会 crash loop，`tailscale serve` 仍占 `:3101` 返回 404。规则：部署必须带 fixtures；缺文件 fail-closed，不要 optional copy。
+63. **`tailscale serve --http=3101` 认 MagicDNS 不认裸 IP**：`http://rk3528.tail6d8b09.ts.net:3101/` 200，`http://100.78.158.80:3101/` 404。规则：文档和健康检查用主机名。
+64. **已占用 `main` 的仓不要 `move_agent_to_root` 进别的 worktree**：Cursor 会先 checkpoint 再 `git checkout main`，而 `main` 已在 `D:\pythonProject`。规则：多 worktree 任务用绝对路径改文件，不要切根到会抢 `main` 的目录。

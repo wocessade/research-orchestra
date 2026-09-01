@@ -29,6 +29,7 @@
 - MagicDNS `/` → 200，SPA 标题 Bogda Console，侧栏「3101 影子运行」，profile 文案 `real-readonly`
 - 总览读到 Prefect 项目 `bogda-main`、run `enigmatic-woodlouse`；自主模式控件禁用；电源卡仍是 fixture 模拟/陈旧（`MockPowerAdapter`）
 - 冷启动约 12s（import Prefect）。缺 `fixtures/normal-active.json` 会 crash loop，部署脚本现已 fail-closed
+- `GET /api/v1/usage-balance` 在未配 `DEEPSEEK_API_KEY` 时 503（文案 `DeepSeek balance source is not configured`）是 fail-closed，不是进程挂了。盒子上密钥在 orchestra-broker env；`remote-install.sh` 会在 `console.env` 缺该项时从 broker drop-in 拷入（不打印）。拷入后现网该 API 为 200 / `sourceStatus=up`
 
 ## 部署
 

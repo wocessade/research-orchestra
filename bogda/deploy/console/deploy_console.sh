@@ -30,6 +30,8 @@ cp -a "$ROOT/bogda/deploy/console/maintain.sh" "$STAGE_LOCAL/"
 cp -a "$ROOT/bogda/deploy/console/dsh-maintain.md" "$STAGE_LOCAL/"
 cp -a "$ROOT/bogda/deploy/console/console.env.example" "$STAGE_LOCAL/"
 cp -a "$ROOT/bogda/deploy/console/remote-install.sh" "$STAGE_LOCAL/"
+# Windows checkouts ship CRLF; remote `set -eu` dies before remote-install can strip itself.
+sed -i 's/\r$//' "$STAGE_LOCAL/maintain.sh" "$STAGE_LOCAL/remote-install.sh" "$STAGE_LOCAL/bogda-console.service"
 
 scp -q -r "$STAGE_LOCAL" "$SSH_USER@$SSH_HOST:$REMOTE_STAGE"
 ssh "$SSH_USER@$SSH_HOST" "sudo bash $REMOTE_STAGE/remote-install.sh $REMOTE_STAGE"

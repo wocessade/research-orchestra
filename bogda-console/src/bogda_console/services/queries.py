@@ -4,8 +4,8 @@ import json
 from datetime import UTC, datetime
 from typing import Any, Awaitable, Callable, TypeVar
 
-from bogda.contracts.runner_packet import PI_SERVICE_POOL, RESEARCH_POOL
 from bogda_console.config import Settings
+from bogda_console.constants import PI_SERVICE_POOL, RESEARCH_POOL
 from bogda_console.contracts.models import (
     ApiEnvelope,
     ApiError,

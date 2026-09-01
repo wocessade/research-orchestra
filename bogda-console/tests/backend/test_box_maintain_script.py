@@ -63,6 +63,7 @@ def test_deploy_scripts_require_fixtures() -> None:
     assert "fixtures/normal-active.json" in remote
     assert "rk3528.tail6d8b09.ts.net" in deploy
     assert "BOGDA_CONSOLE_MAGICDNS_HOST" in deploy
+    assert "s/\\r$//" in deploy
     assert "BOGDA_CONSOLE_PUBLIC_PORT" in remote
     assert "DEEPSEEK_API_KEY" in remote
     assert "orchestra-broker.service.d/env.conf" in remote

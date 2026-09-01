@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Mapping
 
-from bogda.budget.deepseek_balance import DEFAULT_DEEPSEEK_API_BASE
+from bogda_console.constants import DEFAULT_DEEPSEEK_API_BASE
 
 
 SAFE_PROFILES = frozenset({"mock-all", "real-readonly", "allowlisted-test"})

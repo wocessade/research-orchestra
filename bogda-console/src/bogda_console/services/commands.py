@@ -7,9 +7,9 @@ from typing import Any, Awaitable, Callable
 
 import httpx
 
-from bogda.contracts.runner_packet import RESEARCH_POOL
 from bogda_console.adapters.mock_run_results import ReviewConflict
 from bogda_console.config import Settings
+from bogda_console.constants import RESEARCH_POOL
 from bogda_console.contracts.models import (
     ApiErrorCode,
     ApiErrorDetails,

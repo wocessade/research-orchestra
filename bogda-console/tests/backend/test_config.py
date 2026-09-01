@@ -3,6 +3,11 @@ from __future__ import annotations
 import pytest
 
 from bogda_console.config import Settings, assert_public_host, assert_safe_port
+from bogda_console.constants import (
+    DEFAULT_DEEPSEEK_API_BASE,
+    PI_SERVICE_POOL,
+    RESEARCH_POOL,
+)
 
 
 def test_default_mock_profile_uses_3101_and_loopback_3102() -> None:
@@ -233,4 +238,15 @@ def test_artifact_cleanup_requires_owner_and_artifact_root() -> None:
         }
     )
     assert observer.artifact_cleanup_enabled is False
+
+
+def test_console_named_defaults_stay_aligned_with_bogda() -> None:
+    from bogda.budget.deepseek_balance import DEFAULT_DEEPSEEK_API_BASE as bogda_base
+    from bogda.contracts.runner_packet import PI_SERVICE_POOL as bogda_pi
+    from bogda.contracts.runner_packet import RESEARCH_POOL as bogda_research
+
+    assert DEFAULT_DEEPSEEK_API_BASE == bogda_base
+    assert PI_SERVICE_POOL == bogda_pi
+    assert RESEARCH_POOL == bogda_research
+    assert Settings.from_env({}).deepseek_api_base == DEFAULT_DEEPSEEK_API_BASE
 

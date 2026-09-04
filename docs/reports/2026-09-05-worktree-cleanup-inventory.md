@@ -2,7 +2,13 @@
 
 ## 结论
 
-本轮只盘点，不删除工作树、分支或文件。`main` 与 `origin/main` 同步于 `5566939`；Bogda 历史开发分支均已成为 `origin/main` 的祖先。
+初次盘点时不执行删除；后续在用户明确同意后按本清单实施。Bogda 历史开发分支均已成为 `origin/main` 的祖先，工作树清理不删除这些分支。
+
+## 执行结果
+
+用户随后授权继续推进。`bogda-console-rk3528`、`bogda-gate6-hardening`、`bogda-paid-model-runtime`、`bogda-policy-panel-redesign`、`bogda-pre-runner-land`、`bogda-stage-d-console`、`bogda-stage-e-integration`、`bogda-stage-e-owner-control`、`local-main-salvage` 与 `bogda-gate7-real-shadow` 共十个工作树已在逐项确认干净且已合入后移除；未使用 `--force`，对应分支均保留。
+
+四组 worktree-local `.tasks` 已在删除前逐文件校验并归档：文件数分别为 6、6、6、44。当前只保留主工作树、doc2ppt 和 RF 三个工作树。
 
 ## A：可以清理的已合入工作树
 
@@ -32,7 +38,7 @@
 
 | 工作树 | 原因 |
 | --- | --- |
-| `.worktrees/codex-nature-doc2ppt-phase1` | 相对 `origin/main` 有 5 个独立提交、36 个文件和约 5,745 行新增，尚未合入 |
+| `.worktrees/codex-nature-doc2ppt-phase1` | 活跃分支已推进到 `ae5c593`，相对 `origin/main` 有 6 个独立提交，尚未合入 |
 | 主工作树 `D:\pythonProject` | 当前生产开发入口；并含尚未提交的开学日程修正，待本轮提交 |
 
 ## D：先检查内容，再决定

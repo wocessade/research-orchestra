@@ -12,18 +12,18 @@
 | --- | --- | --- | --- |
 | `.worktrees/bogda-console-rk3528` | `codex/bogda-console-rk3528` | `97c5c25` | RK3528 控制台部署阶段已合入 |
 | `.worktrees/bogda-gate6-hardening` | `codex/bogda-gate6-hardening` | `d05ccd6` | Gate6 已合入 |
-| `.worktrees/bogda-paid-model-runtime` | `codex/bogda-paid-model-runtime` | `63b8527` | 付费模型运行时已合入 |
 | `.worktrees/bogda-policy-panel-redesign` | `codex/bogda-policy-panel-redesign` | `a9e29d1` | 策略页重设计已合入 |
 | `.worktrees/bogda-pre-runner-land` | `codex/bogda-pre-runner-land` | `100315e` | runner 前软件落地已合入 |
-| `.worktrees/bogda-stage-d-console` | `codex/bogda-stage-d-console` | `13553ac` | Stage D 已合入 |
 | `.worktrees/bogda-stage-e-integration` | `codex/bogda-stage-e-integration` | `69e46b5` | Stage E 集成已合入 |
-| `.worktrees/bogda-stage-e-owner-control` | `codex/bogda-stage-e-owner-control` | `fad57e1` | owner control 已合入 |
 | `.worktrees/local-main-salvage` | `wip/local-main-salvage` | `8aaa661` | salvage 成果已合入 |
 
 ## B：代码已合入，但删除前需导出 mission 记录
 
 | 工作树 | 当前分支 | HEAD | 删除前动作 |
 | --- | --- | --- | --- |
+| `.worktrees/bogda-paid-model-runtime` | `codex/bogda-paid-model-runtime` | `63b8527` | 导出 `.tasks/active/048_bogda-paid-model-runtime` |
+| `.worktrees/bogda-stage-d-console` | `codex/bogda-stage-d-console` | `13553ac` | 导出 `.tasks/active/049_bogda-owner-console-stage-d` |
+| `.worktrees/bogda-stage-e-owner-control` | `codex/bogda-stage-e-owner-control` | `fad57e1` | 导出 `.tasks/completed/049_bogda-price-aware-owner-control` |
 | `.worktrees/bogda-gate7-real-shadow` | `codex/bogda-now06-pre-research` | `eb4c812` | 其中忽略目录 `.tasks/` 保存 Gate7 与 NOW-06 的执行日志；状态已校准，但在删除工作树前应复制到不冲突的长期归档位置 |
 
 该路径名称仍是 `bogda-gate7-real-shadow`，实际检出的分支已经是 NOW-06。这只是历史命名残留，不影响代码。
@@ -43,8 +43,8 @@
 
 ## 建议执行顺序
 
-1. 先清理 A 组工作树；是否删除对应本地分支另作一次选择。
-2. 将 B 组的 Gate7/NOW-06 mission 记录复制到无编号冲突的长期归档，再清理该工作树。
+1. 先清理 A 组中没有 worktree-local mission 档案的工作树；是否删除对应本地分支另作一次选择。
+2. 将 B 组的四套 `.tasks` 记录复制到无编号冲突的长期归档，再清理对应工作树。
 3. 保留 C 组继续开发。
 4. 单独检查 D 组未跟踪目录，确认保存、纳入版本控制或放弃后再处理。
 

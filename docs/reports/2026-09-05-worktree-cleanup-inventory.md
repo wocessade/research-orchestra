@@ -1,0 +1,51 @@
+# 2026-09-05 工作树清理清单
+
+## 结论
+
+本轮只盘点，不删除工作树、分支或文件。`main` 与 `origin/main` 同步于 `5566939`；Bogda 历史开发分支均已成为 `origin/main` 的祖先。
+
+## A：可以清理的已合入工作树
+
+以下工作树没有已跟踪或未跟踪改动，且 HEAD 已包含在 `origin/main`。删除工作树不会删除远端 `main` 中的成果；是否随后删除本地分支应另行决定。
+
+| 工作树 | 分支 | HEAD | 备注 |
+| --- | --- | --- | --- |
+| `.worktrees/bogda-console-rk3528` | `codex/bogda-console-rk3528` | `97c5c25` | RK3528 控制台部署阶段已合入 |
+| `.worktrees/bogda-gate6-hardening` | `codex/bogda-gate6-hardening` | `d05ccd6` | Gate6 已合入 |
+| `.worktrees/bogda-paid-model-runtime` | `codex/bogda-paid-model-runtime` | `63b8527` | 付费模型运行时已合入 |
+| `.worktrees/bogda-policy-panel-redesign` | `codex/bogda-policy-panel-redesign` | `a9e29d1` | 策略页重设计已合入 |
+| `.worktrees/bogda-pre-runner-land` | `codex/bogda-pre-runner-land` | `100315e` | runner 前软件落地已合入 |
+| `.worktrees/bogda-stage-d-console` | `codex/bogda-stage-d-console` | `13553ac` | Stage D 已合入 |
+| `.worktrees/bogda-stage-e-integration` | `codex/bogda-stage-e-integration` | `69e46b5` | Stage E 集成已合入 |
+| `.worktrees/bogda-stage-e-owner-control` | `codex/bogda-stage-e-owner-control` | `fad57e1` | owner control 已合入 |
+| `.worktrees/local-main-salvage` | `wip/local-main-salvage` | `8aaa661` | salvage 成果已合入 |
+
+## B：代码已合入，但删除前需导出 mission 记录
+
+| 工作树 | 当前分支 | HEAD | 删除前动作 |
+| --- | --- | --- | --- |
+| `.worktrees/bogda-gate7-real-shadow` | `codex/bogda-now06-pre-research` | `eb4c812` | 其中忽略目录 `.tasks/` 保存 Gate7 与 NOW-06 的执行日志；状态已校准，但在删除工作树前应复制到不冲突的长期归档位置 |
+
+该路径名称仍是 `bogda-gate7-real-shadow`，实际检出的分支已经是 NOW-06。这只是历史命名残留，不影响代码。
+
+## C：必须保留
+
+| 工作树 | 原因 |
+| --- | --- |
+| `.worktrees/codex-nature-doc2ppt-phase1` | 相对 `origin/main` 有 5 个独立提交、36 个文件和约 5,745 行新增，尚未合入 |
+| 主工作树 `D:\pythonProject` | 当前生产开发入口；并含尚未提交的开学日程修正，待本轮提交 |
+
+## D：先检查内容，再决定
+
+| 工作树 | 原因 |
+| --- | --- |
+| `.worktrees/codex-rf-noise-generator-pcb` | 分支 HEAD 已合入，但存在未跟踪目录 `rf-noise-generator/`；未确认其是否为待保存成果前不得删除 |
+
+## 建议执行顺序
+
+1. 先清理 A 组工作树；是否删除对应本地分支另作一次选择。
+2. 将 B 组的 Gate7/NOW-06 mission 记录复制到无编号冲突的长期归档，再清理该工作树。
+3. 保留 C 组继续开发。
+4. 单独检查 D 组未跟踪目录，确认保存、纳入版本控制或放弃后再处理。
+
+本清单不包含缓存、`D:\Temp`、C 盘旧文件或远端分支；这些属于独立清理任务。

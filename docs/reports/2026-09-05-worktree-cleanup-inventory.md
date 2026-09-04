@@ -39,7 +39,7 @@
 | 工作树 | 原因 |
 | --- | --- |
 | `.worktrees/codex-nature-doc2ppt-phase1` | 活跃分支已推进到 `ae5c593`，相对 `origin/main` 有 6 个独立提交，尚未合入 |
-| 主工作树 `D:\pythonProject` | 当前生产开发入口；并含尚未提交的开学日程修正，待本轮提交 |
+| 主工作树 `D:\pythonProject` | 当前生产开发入口；开学日程修正已由 `29d4069` 提交并推送 |
 
 ## D：先检查内容，再决定
 

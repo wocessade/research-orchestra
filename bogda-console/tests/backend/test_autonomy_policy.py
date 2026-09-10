@@ -209,3 +209,91 @@ async def test_real_profiles_do_not_silently_use_mock_policy(profile: str) -> No
         assert response.status_code == 503
         assert response.json()["data"] is None
         assert response.json()["errors"][0]["code"] == "AUTONOMY_POLICY_UNAVAILABLE"
+
+
+@pytest.mark.asyncio
+async def test_policy_path_wires_real_store_for_owner(tmp_path) -> None:
+    from bogda.policy import PolicyStore
+
+    path = tmp_path / "autonomy-policy.json"
+    env = {
+        "BOGDA_CONSOLE_ROLE": "owner",
+        "BOGDA_AUTONOMY_POLICY_PATH": str(path),
+    }
+    app = create_app(_settings("allowlisted-test", **env))
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as http:
+        caps = (await http.get("/api/v1/capabilities")).json()["data"]
+        assert caps["canSetAutonomyMode"] is True
+
+        initial = await http.get("/api/v1/autonomy-policy")
+        assert initial.status_code == 200
+        assert _snapshot(initial.json())["revision"] == 0
+
+        written = await http.post(
+            "/api/v1/autonomy-policy/global",
+            json={"mode": "manual", "expectedRevision": 0},
+        )
+        assert written.status_code == 200
+        assert _snapshot(written.json())["globalDefault"] == "manual"
+        assert _snapshot(written.json())["revision"] == 1
+
+    resolved = PolicyStore(path).resolve_mode("bogda-main")
+    assert resolved.effective_mode.value == "manual"
+    assert resolved.policy_revision == 1
+
+    restarted = create_app(_settings("allowlisted-test", **env))
+    async with AsyncClient(
+        transport=ASGITransport(app=restarted), base_url="http://test"
+    ) as http:
+        persisted = _snapshot((await http.get("/api/v1/autonomy-policy")).json())
+        assert persisted == {"globalDefault": "manual", "projectOverrides": {}, "revision": 1}
+
+
+@pytest.mark.asyncio
+async def test_policy_path_still_requires_owner(tmp_path) -> None:
+    env = {
+        "BOGDA_CONSOLE_ROLE": "operator",
+        "BOGDA_AUTONOMY_POLICY_PATH": str(tmp_path / "autonomy-policy.json"),
+    }
+    app = create_app(_settings("allowlisted-test", **env))
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as http:
+        caps = (await http.get("/api/v1/capabilities")).json()["data"]
+        assert caps["canSetAutonomyMode"] is False
+        denied = await http.post(
+            "/api/v1/autonomy-policy/global",
+            json={"mode": "manual", "expectedRevision": 0},
+        )
+        assert denied.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_real_store_revision_conflict_is_409(tmp_path) -> None:
+    env = {
+        "BOGDA_CONSOLE_ROLE": "owner",
+        "BOGDA_AUTONOMY_POLICY_PATH": str(tmp_path / "autonomy-policy.json"),
+    }
+    app = create_app(_settings("allowlisted-test", **env))
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as http:
+        first = await http.post(
+            "/api/v1/autonomy-policy/projects/bogda-main",
+            json={"mode": "autonomous", "expectedRevision": 0},
+        )
+        assert first.status_code == 200
+        stale = await http.post(
+            "/api/v1/autonomy-policy/projects/bogda-main",
+            json={"mode": "manual", "expectedRevision": 0},
+        )
+        assert stale.status_code == 409
+        error = stale.json()["errors"][0]
+        assert error["code"] == "RESOURCE_CHANGED"
+        assert error["details"]["currentResource"]["revision"] == 1
+        assert (
+            error["details"]["currentResource"]["projectOverrides"]["bogda-main"]
+            == "autonomous"
+        )

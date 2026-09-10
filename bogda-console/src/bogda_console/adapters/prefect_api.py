@@ -58,6 +58,10 @@ def _value(value: Any) -> str:
     return str(getattr(value, "value", value))
 
 
+def _decision_key(run_id: str, kind: str) -> str:
+    return f"bogda-decision-{kind.replace('_', '-')}-{UUID(run_id)}"
+
+
 class PrefectApiAdapter:
     """Thin Prefect 3.8.3 client mapping; it owns no scheduler or durable state."""
 
@@ -342,7 +346,7 @@ class PrefectApiAdapter:
         for kind in DECISION_KINDS:
             artifacts = await client.read_artifacts(
                 artifact_filter=ArtifactFilter(
-                    key=ArtifactFilterKey(any_=[f"bogda-decision-{kind}-{run_id}"]),
+                    key=ArtifactFilterKey(any_=[_decision_key(run_id, kind)]),
                     type=ArtifactFilterType(any_=[DECISION_TYPE]),
                 ),
                 sort=ArtifactSort.CREATED_DESC,

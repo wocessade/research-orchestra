@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from bogda_console.adapters.prefect_api import PrefectApiAdapter
+from bogda_console.adapters.local_autonomy_policy import LocalAutonomyPolicyAdapter
 from bogda_console.adapters.mock_autonomy_policy import MockAutonomyPolicyAdapter
 from bogda_console.adapters.mock_power import MockPowerAdapter
 from bogda_console.adapters.mock_prefect import MockPrefectAdapter
@@ -22,6 +24,7 @@ from bogda_console.adapters.unwired_autonomy_policy import UnwiredAutonomyPolicy
 from bogda_console.adapters.unwired_model_control import UnwiredModelControlAdapter
 from bogda_console.adapters.deepseek_balance import DeepSeekBalanceAdapter, MockUsageBalanceAdapter
 from bogda_console.api.routes import router
+from bogda_console.api.store_routes import router as store_router
 from bogda_console.config import Settings
 from bogda_console.contracts.models import (
     ApiEnvelope,
@@ -58,54 +61,124 @@ def _log_reader(settings: Settings):
     return SafeLogReader(Path(settings.artifact_root))
 
 
-def _core_model_control(settings: Settings):
-    if not settings.usage_unknown_db:
-        return UnwiredModelControlAdapter()
-    try:
-        from datetime import datetime, timezone
-        from decimal import Decimal
+class _BalanceUsagePort:
+    """Sync usage port backed by the async DeepSeek balance adapter.
 
+    The budget kernel evaluates synchronously; callers refresh() right before
+    an admission so the snapshot the guard sees is current.
+    """
+
+    def __init__(self, balance: Any) -> None:
+        self._balance = balance
+        self._snapshot: Any = None
+
+    def get_snapshot(self):
+        from bogda.budget.usage import UsageSnapshotV1, UsageSourceStatus
+
+        if self._snapshot is not None:
+            return self._snapshot
+        return UsageSnapshotV1(
+            provider="deepseek",
+            available=False,
+            total_balance=Decimal("0"),
+            currency="CNY",
+            observed_at=datetime.now(timezone.utc),
+            source_status=UsageSourceStatus.UNAVAILABLE,
+        )
+
+    async def refresh(self) -> None:
+        from bogda.budget.usage import UsageSnapshotV1, UsageSourceStatus
+
+        try:
+            balance = await self._balance.get_balance()
+        except Exception:
+            self._snapshot = UsageSnapshotV1(
+                provider="deepseek",
+                available=False,
+                total_balance=Decimal("0"),
+                currency="CNY",
+                observed_at=datetime.now(timezone.utc),
+                source_status=UsageSourceStatus.UNAVAILABLE,
+            )
+            return
+        self._snapshot = UsageSnapshotV1(
+            provider="deepseek",
+            available=True,
+            total_balance=balance.total_balance,
+            currency="CNY",
+            observed_at=balance.observed_at,
+            source_status=UsageSourceStatus.UP,
+        )
+
+
+@dataclass(slots=True)
+class CoreStores:
+    approvals: Any
+    ledger: Any
+    guard: Any
+    budget: Any
+    recovery_store: Any
+    recovery: Any
+    sink: Any
+    balance_usage: Any
+
+
+def _core_stores(
+    settings: Settings, usage_balance: Any, approvals: Any
+) -> CoreStores | None:
+    if not settings.usage_unknown_db:
+        return None
+    try:
         from bogda.budget.durable_ledger import SqliteBudgetLedger
         from bogda.budget.guard import BudgetGuard
         from bogda.budget.service import BudgetAdmissionService
-        from bogda.budget.usage import UsageSnapshotV1, UsageSourceStatus
         from bogda.events.jsonl import JsonlRunEventSink
         from bogda.model_runtime.recovery import (
             SqliteUsageUnknownStore,
             UsageUnknownRecoveryService,
         )
-
-        from bogda_console.adapters.core_model_control import CoreUsageUnknownAdapter
     except ImportError:
-        return UnwiredModelControlAdapter()
+        return None
 
     db = Path(settings.usage_unknown_db)
+    db.parent.mkdir(parents=True, exist_ok=True)
     ledger = SqliteBudgetLedger(db.with_name(db.stem + "-ledger.sqlite"))
-
-    class _FreshUsage:
-        def get_snapshot(self) -> UsageSnapshotV1:
-            return UsageSnapshotV1(
-                provider="deepseek",
-                available=True,
-                total_balance=Decimal("0"),
-                currency="CNY",
-                observed_at=datetime.now(timezone.utc),
-                source_status=UsageSourceStatus.UP,
-            )
-
+    guard = BudgetGuard(ledger)
+    usage = _BalanceUsagePort(usage_balance)
     sink = JsonlRunEventSink(db.with_name(db.stem + "-events.jsonl"))
     budget = BudgetAdmissionService(
-        usage=_FreshUsage(),
-        guard=BudgetGuard(ledger),
+        usage=usage,
+        guard=guard,
         ledger=ledger,
         event_sink=sink,
+        approvals=approvals,
     )
+    recovery_store = SqliteUsageUnknownStore(db)
     recovery = UsageUnknownRecoveryService(
-        store=SqliteUsageUnknownStore(db),
+        store=recovery_store,
         budget=budget,
         event_sink=sink,
     )
-    return CoreUsageUnknownAdapter(recovery)
+    return CoreStores(
+        approvals=approvals,
+        ledger=ledger,
+        guard=guard,
+        budget=budget,
+        recovery_store=recovery_store,
+        recovery=recovery,
+        sink=sink,
+        balance_usage=usage,
+    )
+
+
+def _core_model_control(stores: CoreStores | None):
+    if stores is None:
+        return UnwiredModelControlAdapter()
+    try:
+        from bogda_console.adapters.core_model_control import CoreUsageUnknownAdapter
+    except ImportError:
+        return UnwiredModelControlAdapter()
+    return CoreUsageUnknownAdapter(stores.recovery)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -126,6 +199,7 @@ class Container:
     policy: Any
     model_control: Any
     usage_balance: Any
+    stores: Any = None
 
     @classmethod
     def build(cls, settings: Settings, scenario: str | None = None) -> "Container":
@@ -139,12 +213,17 @@ class Container:
                 allowed_deployment_ids=settings.allowed_deployment_ids,
             )
             power = MockPowerAdapter(load_fixture(settings.fixture_scenario))
-            policy = UnwiredAutonomyPolicyAdapter()
-            model_control = _core_model_control(settings)
+            if settings.autonomy_policy_path:
+                policy = LocalAutonomyPolicyAdapter(settings.autonomy_policy_path)
+            else:
+                policy = UnwiredAutonomyPolicyAdapter()
             usage_balance = DeepSeekBalanceAdapter(
                 settings.deepseek_api_key,
                 api_base=settings.deepseek_api_base,
             )
+            approvals = _approval_store(settings)
+            stores = _core_stores(settings, usage_balance, approvals)
+            model_control = _core_model_control(stores)
             queries = QueryService(
                 settings=settings,
                 prefect=prefect,
@@ -161,10 +240,10 @@ class Container:
                 results=prefect,
                 policy=policy,
                 model_control=model_control,
-                approvals=_approval_store(settings),
+                approvals=approvals,
                 lifecycle=_lifecycle(settings),
             )
-            return cls(settings, prefect, prefect, power, queries, commands, policy, model_control, usage_balance)
+            return cls(settings, prefect, prefect, power, queries, commands, policy, model_control, usage_balance, stores)
         fixture = load_fixture(scenario or settings.fixture_scenario)
         prefect = MockPrefectAdapter(fixture)
         results = MockRunResultAdapter(fixture)
@@ -223,6 +302,7 @@ def create_app(settings: Settings | None = None, *, frontend_dist: Path | None =
     app = FastAPI(title="Bogda Console API", version="1.0.0")
     app.state.container = Container.build(resolved)
     app.include_router(router)
+    app.include_router(store_router)
 
     @app.exception_handler(ServiceError)
     async def service_error_handler(_request: Request, error: ServiceError):

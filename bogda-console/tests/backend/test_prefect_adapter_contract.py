@@ -126,6 +126,32 @@ class FakePrefectClient:
         self.queue_paused = kwargs["is_paused"]
 
 
+@pytest.mark.asyncio
+async def test_checkpoint_query_uses_artifact_safe_decision_key() -> None:
+    run_id = uuid4()
+    seen_keys: list[str] = []
+
+    class CheckpointClient:
+        async def read_artifacts(self, **kwargs):
+            key = kwargs["artifact_filter"].key.any_[0]
+            seen_keys.append(key)
+            return [
+                SimpleNamespace(
+                    data={
+                        "kind": "plan_approval",
+                        "stage": "done",
+                        "verdict": None,
+                        "command_version": "checkpoint-v1",
+                    }
+                )
+            ]
+
+    checkpoint = await PrefectApiAdapter._checkpoint(CheckpointClient(), str(run_id))
+
+    assert checkpoint is not None
+    assert seen_keys == [f"bogda-decision-plan-approval-{run_id}"]
+
+
 def test_default_client_passes_server_auth_string_to_prefect(monkeypatch) -> None:
     captured: dict[str, object] = {}
 

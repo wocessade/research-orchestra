@@ -162,3 +162,17 @@
 - **npm 装 CLI 必须钉版对齐现网**：默认装成 0.1.5-rc.1 而 RK 现网是 0.1.0-rc.7，会话格式/参数都是版本面。规则：新机器装同款工具前先对照 `--version`。
 - **登录 shell 没有服务 env**：runner 上 `bash -lc` 直接跑 Prefect 客户端会静默退回本地 SQLite（aiosqlite 报错、run 根本没建）。规则：验收脚本前 `set -a; . runner.env; set +a`。
 - **PATH 顺序决定影子 wrapper 是否生效**：runner.env 里 `PATH=/opt/node22/bin:$PATH` 把真 dsh 排在 `~/.local/bin` 前，绕过 usage 桥。规则：环境文件的 PATH 行把 wrapper 目录放最前，改完用 `command -v` 实证。
+
+## 2026-09-11 — Bogda 模型策略、定价目录与首个科研实投（夜班）
+
+- **定价要按"生效时间"选目录，不是全局改一份**：`current_catalog(as_of)` 取生效时间 ≤ as_of 的最新目录，`next_off_peak_start()` 供峰谷排程。规则：价格/费率变更一律登记为带 `effective_at` 的新版本并保留旧的，跨切换点的历史 run 才不会被改写；解析器超 `review_by` 失败关闭。
+- **真实 Prefect artifact 的 `data` 是 JSON 字符串**：`ValidRunResult.model_validate(dict)` 会静默失败 → 所有 RunResult 一律 `availability=invalid`、评审功能整体不可用（前端看着有、点了不工作）。规则：读 artifact 先判 `isinstance(data, str)` 再 `json.loads`；接口层面的"看起来像 dict"永远要用真机数据证一次。
+- **`extra="forbid"` 不是默认值**：pydantic 默认 `extra="ignore"`，货币字段的 float 会被静默吞掉，测试"应当抛错"反而不抛。规则：策略/账本这类配置模型显式声明 `extra="forbid"`，并用一条"未知字段必抛"的测试锁住。
+- **含每次唯一路径的系统提示 = 缓存结构性失效**：dsh 会话 system prompt 里带 `.../artifacts/{run_id}/attempt-0001`，在 4181 字符中第 172 字符即分叉 → 同一 harness 的 17 次调用 cache 命中全 0。规则：想让 agent 编排吃上 provider 侧前缀缓存，提示词必须把变量部分后置或剥离（前缀精确匹配才命中）；排查缓存失效先 diff 提示前缀，别先怀疑计量桥。
+- **`usage.json` 全零不一定是采集 bug**：dsh 桥与 provider 返回的 `cacheReadTokens: 0` 一致——先是"桥漏了"的假设，实际是结构性分叉。规则：怀疑计量前先看 provider 侧原始响应字段是否也为 0。
+- **自定义检查点要按 (kind, commandVersion) 集合逐条决定**：只置一个"已批准"标志会让第二个检查点悬空、run 以 Crashed 收尾；改成集合循环后 Completed。规则：多检查点流程的自动化脚本必须枚举全部挂起项并打印各自决定，而不是给一个全局 approve。
+- **控制面"来源新鲜度"必须由后端按真实观测点回填**：真实 profile 返回 `UNAVAILABLE/None` 会让界面常显琥珀色"不可用/无观测时间"，看起来像故障。规则：读到了哪个观测点就填哪个的 `observedAt/lastSuccessfulAt`，别让 UI 用缺省值暗示故障。
+- **部署脚本对"新增文件"要容错**：`cp file file.bak` 在首次部署新文件时 `cannot stat`。规则：`[ -f "$f" ] && cp ...` 再写，备份只在文件已存在时做。
+- **跨 ssh→cmd→wsl 的引号地狱用"文件化脚本"破**：嵌套引号里 `$PATH` 被本地展开、`$(basename ...)` 语法错、`>` 重定向错。规则：本地写 `.sh` → scp → 远端 `bash /path/script.sh`，一次传一层。
+- **非 raw 字符串里的 `\u`/`\url` 会炸 Python**：`\url{...}` 在普通字符串里被当 unicode 转义 → `truncated \uXXXX escape`。规则：含 LaTeX 反斜杠的文本用编辑工具写文件，或用 raw 字符串。
+- **`verify_paper.py` 的 `no_locator` 是软警告但要清干净**：bib 条目缺 doi/eprint/url 会一直挂着。规则：arXiv 条目给 `eprint+archivePrefix+url`，网页/法规给 `url`，一次补齐再复验（本次结果 hard=0 soft=0）。

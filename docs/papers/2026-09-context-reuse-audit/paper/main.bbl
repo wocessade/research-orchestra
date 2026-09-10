@@ -1,0 +1,48 @@
+\begin{thebibliography}{1}
+
+\bibitem{sadasivan2025tmlr}
+Vinu~Sankar Sadasivan, Aounon Kumar, Sriram Balasubramanian, Wenxiao Wang, and
+  Soheil Feizi.
+\newblock Can {AI}-generated text be reliably detected?
+\newblock {\em Transactions on Machine Learning Research}, 2025.
+
+\bibitem{cac2025labeling}
+{国家互联网信息办公室、工业和信息化部、公安部、国家广播电视总局}.
+\newblock 人工智能生成合成内容标识办法:
+  国信办通字〔2025〕2号.
+\newblock \url{https://www.cac.gov.cn/2025-03/14/c_1743654684782215.htm}, 2025.
+
+\bibitem{deepseekcache}
+{DeepSeek}.
+\newblock Context caching.
+\newblock DeepSeek API Docs.
+
+\bibitem{song2025earlybird}
+Linke Song, Zixuan Pang, Wenhao Wang, Zihao Wang, XiaoFeng Wang, Hongbo Chen,
+  et~al.
+\newblock The early bird catches the leak: Unveiling timing side channels in
+  {LLM} serving systems.
+\newblock {\em IEEE Transactions on Information Forensics and Security}, 2025.
+
+\bibitem{wu2025iknow}
+Guanlong Wu, Zheng Zhang, Yao Zhang, Weili Wang, Jianyu Niu, Ye~Wu, and Yinqian
+  Zhang.
+\newblock I know what you asked: Prompt leakage via {KV}-cache sharing in
+  multi-tenant {LLM} serving.
+\newblock In {\em Network and Distributed System Security Symposium (NDSS)},
+  2025.
+
+\bibitem{kirchenbauer2023watermark}
+John Kirchenbauer, Jonas Geiping, Yuxin Wen, Jonathan Katz, Ian Miers, and Tom
+  Goldstein.
+\newblock A watermark for large language models.
+\newblock In {\em Proceedings of the 40th International Conference on Machine
+  Learning (ICML)}, 2023.
+
+\bibitem{gim2024promptcache}
+In~Gim, Guojun Chen, Seung-seob Lee, Nikhil Sarda, Anurag Khandelwal, and Lin
+  Zhong.
+\newblock Prompt cache: Modular attention reuse for low-latency inference.
+\newblock In {\em Proceedings of Machine Learning and Systems (MLSys)}, 2024.
+
+\end{thebibliography}

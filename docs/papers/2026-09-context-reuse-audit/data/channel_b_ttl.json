@@ -1,0 +1,24 @@
+[
+ {
+  "tag": "t1",
+  "condition": "revisit-cached-doc",
+  "doc": "D1",
+  "status": 200,
+  "latency_ms": 1028.1,
+  "prompt_tokens": 688,
+  "cache_hit_tokens": 512,
+  "cache_miss_tokens": 176,
+  "response_id": "5b0fe079-9008-4cf2-b24c-c17b016495de"
+ },
+ {
+  "tag": "t2",
+  "condition": "fresh-doc-control",
+  "doc": "D3",
+  "status": 200,
+  "latency_ms": 1406.6,
+  "prompt_tokens": 643,
+  "cache_hit_tokens": 0,
+  "cache_miss_tokens": 643,
+  "response_id": "1cd08de9-2635-41af-a83f-37b2ec97811b"
+ }
+]

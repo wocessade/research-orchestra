@@ -16,11 +16,11 @@ from types import MappingProxyType
 from typing import Mapping, TypeVar
 
 from bogda.budget.pricing import (
-    DEEPSEEK_CN_2026_08_28,
     MILLION,
     PricePeriod,
     PricingCatalogV1,
     TokenPrices,
+    current_catalog,
     period_for_window,
 )
 from bogda.contracts import BudgetSource, ModelTier, RunBudgetEnvelope, TaskIntent
@@ -247,11 +247,11 @@ class WorkloadEstimator:
     def __init__(
         self,
         *,
-        catalog: PricingCatalogV1 = DEEPSEEK_CN_2026_08_28,
+        catalog: PricingCatalogV1 | None = None,
         contingency_policy: Mapping[tuple[TaskIntent, ModelTier], Decimal]
         | None = None,
     ) -> None:
-        if not isinstance(catalog, PricingCatalogV1):
+        if catalog is not None and not isinstance(catalog, PricingCatalogV1):
             raise ValueError("catalog must be a PricingCatalogV1")
         self._catalog = catalog
         self._contingency_policy = _validate_policy(
@@ -284,17 +284,18 @@ class WorkloadEstimator:
                 raise ValueError(f"{name} must be timezone-aware")
         if end <= start:
             raise ValueError("estimation window must be positive")
-        if start < self._catalog.effective_at:
+        catalog = self._catalog if self._catalog is not None else current_catalog(as_of)
+        if start < catalog.effective_at:
             raise ValueError("pricing catalog is not effective for the full window")
-        if end > self._catalog.review_by:
+        if end > catalog.review_by:
             raise ValueError("pricing catalog review deadline does not cover window")
-        if as_of < self._catalog.effective_at:
+        if as_of < catalog.effective_at:
             raise ValueError("pricing catalog is not effective at as_of")
-        if as_of > self._catalog.review_by:
+        if as_of > catalog.review_by:
             raise ValueError("pricing catalog review deadline has passed")
 
         period = period_for_window(start, end)
-        prices = _catalog_price_row(self._catalog, tier, period)
+        prices = _catalog_price_row(catalog, tier, period)
 
         if history is not None and history.verified_cache_hit_ratio is not None:
             with localcontext() as context:
@@ -340,7 +341,7 @@ class WorkloadEstimator:
             historical_p90_cost=historical_p90,
             authorized_ceiling=authorized_ceiling,
             period=period,
-            pricing_version=self._catalog.version,
+            pricing_version=catalog.version,
         )
 
     def to_budget_envelope(

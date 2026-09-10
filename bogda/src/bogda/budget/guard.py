@@ -10,7 +10,7 @@ from types import MappingProxyType
 from typing import Callable, Iterable
 
 from bogda.budget.ledger import BudgetLedger, LedgerFacts
-from bogda.budget.pricing import DEEPSEEK_CN_2026_08_28, PricingCatalogV1
+from bogda.budget.pricing import CATALOGS, PricingCatalogV1
 from bogda.budget.usage import (
     UsageSnapshotStaleError,
     UsageSnapshotV1,
@@ -128,7 +128,7 @@ class BudgetGuard:
         if pricing_catalog is not None:
             source = (pricing_catalog,)
         elif source is None:
-            source = (DEEPSEEK_CN_2026_08_28,)
+            source = CATALOGS
         elif isinstance(source, PricingCatalogV1):
             source = (source,)
         try:

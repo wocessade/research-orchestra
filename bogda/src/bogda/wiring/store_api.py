@@ -18,7 +18,7 @@ from typing import Any, Mapping
 
 from bogda.budget.guard import BudgetDecision, BudgetDecisionKind
 from bogda.budget.ledger import Reservation, ReservationState
-from bogda.budget.pricing import DEEPSEEK_CN_2026_08_28
+from bogda.budget.pricing import catalog_registry
 from bogda.budget.service import BudgetAdmissionResult
 from bogda.contracts import ModelTier, TaskIntent
 from bogda.model_runtime.recovery import UsageUnknownCase, UsageUnknownState
@@ -388,8 +388,8 @@ class RemoteBudgetService:
         return reservation_from_wire(data["reservation"])
 
     def catalog_for(self, version: str) -> Any:
-        catalog = DEEPSEEK_CN_2026_08_28
-        if catalog.version != version:
+        catalog = catalog_registry().get(version)
+        if catalog is None:
             raise StoreApiError("unknown pricing version")
         return catalog
 

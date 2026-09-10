@@ -1,9 +1,15 @@
 from bogda.budget.pricing import (
+    CATALOGS,
     DEEPSEEK_CN_2026_08_28,
+    DEEPSEEK_CN_2026_09_11,
+    DEEPSEEK_CN_2026_09_14,
     PricePeriod,
     PricingCatalogV1,
     TokenPrices,
+    catalog_registry,
+    current_catalog,
     estimate_token_cost,
+    next_off_peak_start,
     period_at,
     period_for_window,
     prices_for,
@@ -76,11 +82,17 @@ from bogda.budget.service import (
 )
 
 __all__ = [
+    "CATALOGS",
     "DEEPSEEK_CN_2026_08_28",
+    "DEEPSEEK_CN_2026_09_11",
+    "DEEPSEEK_CN_2026_09_14",
     "PricePeriod",
     "PricingCatalogV1",
     "TokenPrices",
+    "catalog_registry",
+    "current_catalog",
     "estimate_token_cost",
+    "next_off_peak_start",
     "period_at",
     "period_for_window",
     "prices_for",

@@ -140,6 +140,19 @@ def period_for_window(start: datetime, end: datetime) -> PricePeriod:
     return PricePeriod.OFF_PEAK
 
 
+def next_off_peak_start(instant: datetime) -> datetime:
+    """Earliest instant at or after ``instant`` priced off-peak, in Beijing time."""
+
+    local = _require_aware(instant, "instant").astimezone(BEIJING_TIMEZONE)
+    if local.weekday() >= 5:
+        return local
+    if time(9) <= local.time() < time(12):
+        return local.replace(hour=12, minute=0, second=0, microsecond=0)
+    if time(14) <= local.time() < time(18):
+        return local.replace(hour=18, minute=0, second=0, microsecond=0)
+    return local
+
+
 def _coerce_tier(tier: ModelTier) -> ModelTier:
     try:
         tier = ModelTier(tier)
@@ -170,7 +183,7 @@ def prices_for(
 ) -> TokenPrices:
     """Return the reviewed price row for a concrete model tier and period."""
 
-    resolved = catalog or DEEPSEEK_CN_2026_08_28
+    resolved = catalog if catalog is not None else current_catalog(as_of)
     if not isinstance(resolved, PricingCatalogV1):
         raise ValueError("catalog must be a PricingCatalogV1")
     tier = _coerce_tier(tier)
@@ -244,13 +257,112 @@ DEEPSEEK_CN_2026_08_28 = PricingCatalogV1(
     ),
 )
 
+DEEPSEEK_CN_2026_09_11 = PricingCatalogV1(
+    version="deepseek-cn-2026-09-11",
+    effective_at=datetime(2026, 9, 11, 0, 0, tzinfo=BEIJING_TIMEZONE),
+    review_by=datetime(2026, 10, 11, 0, 0, tzinfo=BEIJING_TIMEZONE),
+    source=(
+        "DeepSeek official CN pricing page (api-docs.deepseek.com/zh-cn/quick_start/pricing) "
+        "reviewed 2026-09-11; flash row corrected to current DeepSeek-V4.1-Flash rates"
+    ),
+    flash=_PriceRows(
+        off_peak=TokenPrices(
+            cache_hit_input=Decimal("0.02"),
+            cache_miss_input=Decimal("1"),
+            output=Decimal("4"),
+        ),
+        peak=TokenPrices(
+            cache_hit_input=Decimal("0.04"),
+            cache_miss_input=Decimal("2"),
+            output=Decimal("8"),
+        ),
+    ),
+    pro=_PriceRows(
+        off_peak=TokenPrices(
+            cache_hit_input=Decimal("0.15"),
+            cache_miss_input=Decimal("4.5"),
+            output=Decimal("13.5"),
+        ),
+        peak=TokenPrices(
+            cache_hit_input=Decimal("0.30"),
+            cache_miss_input=Decimal("9.0"),
+            output=Decimal("27.0"),
+        ),
+    ),
+)
+
+DEEPSEEK_CN_2026_09_14 = PricingCatalogV1(
+    version="deepseek-cn-2026-09-14",
+    effective_at=datetime(2026, 9, 14, 12, 0, tzinfo=BEIJING_TIMEZONE),
+    review_by=datetime(2026, 10, 14, 12, 0, tzinfo=BEIJING_TIMEZONE),
+    source=(
+        "DeepSeek official CN pricing page note 2: V4 Pro retirement at 2026-09-14 12:00 "
+        "Beijing time — deepseek-v4-pro requests routed to V4.1 Flash, billed at Flash price"
+    ),
+    flash=_PriceRows(
+        off_peak=TokenPrices(
+            cache_hit_input=Decimal("0.02"),
+            cache_miss_input=Decimal("1"),
+            output=Decimal("4"),
+        ),
+        peak=TokenPrices(
+            cache_hit_input=Decimal("0.04"),
+            cache_miss_input=Decimal("2"),
+            output=Decimal("8"),
+        ),
+    ),
+    pro=_PriceRows(
+        off_peak=TokenPrices(
+            cache_hit_input=Decimal("0.02"),
+            cache_miss_input=Decimal("1"),
+            output=Decimal("4"),
+        ),
+        peak=TokenPrices(
+            cache_hit_input=Decimal("0.04"),
+            cache_miss_input=Decimal("2"),
+            output=Decimal("8"),
+        ),
+    ),
+)
+
+
+CATALOGS: tuple[PricingCatalogV1, ...] = (
+    DEEPSEEK_CN_2026_08_28,
+    DEEPSEEK_CN_2026_09_11,
+    DEEPSEEK_CN_2026_09_14,
+)
+
+
+def catalog_registry() -> dict[str, PricingCatalogV1]:
+    """Every reviewed catalog keyed by version."""
+
+    return {catalog.version: catalog for catalog in CATALOGS}
+
+
+def current_catalog(as_of: datetime) -> PricingCatalogV1:
+    """Newest catalog effective at as_of; fails closed once its review deadline passes."""
+
+    as_of = _require_aware(as_of, "as_of")
+    effective = [catalog for catalog in CATALOGS if catalog.effective_at <= as_of]
+    if not effective:
+        raise ValueError("no pricing catalog is effective yet")
+    catalog = max(effective, key=lambda item: item.effective_at)
+    _validate_catalog_as_of(as_of, catalog)
+    return catalog
+
 
 __all__ = [
+    "CATALOGS",
     "DEEPSEEK_CN_2026_08_28",
+    "DEEPSEEK_CN_2026_09_11",
+    "DEEPSEEK_CN_2026_09_14",
     "PricePeriod",
     "PricingCatalogV1",
     "TokenPrices",
+    "catalog_registry",
+    "current_catalog",
     "estimate_token_cost",
+    "next_off_peak_start",
     "period_at",
     "period_for_window",
     "prices_for",

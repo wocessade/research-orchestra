@@ -5,7 +5,7 @@ import pytest
 
 from bogda.budget.guard import BudgetDecision, BudgetDecisionKind, BudgetGuard
 from bogda.budget.ledger import LedgerFacts, SingleFlightBudgetLedger
-from bogda.budget.pricing import DEEPSEEK_CN_2026_08_28, PricingCatalogV1
+from bogda.budget.pricing import CATALOGS, DEEPSEEK_CN_2026_08_28, PricingCatalogV1
 from bogda.budget.usage import UsageSnapshotV1, UsageSourceStatus
 from bogda.contracts import BudgetSource, ModelTier, RunBudgetEnvelope
 
@@ -272,7 +272,9 @@ def test_wrong_pricing_version_denies_without_touching_ledger() -> None:
 
 def test_pricing_version_configuration_is_immutable_and_not_a_string() -> None:
     guard, _ = make_guard()
-    assert guard.accepted_pricing_versions == frozenset({PRICING})
+    assert guard.accepted_pricing_versions == frozenset(
+        catalog.version for catalog in CATALOGS
+    )
     with pytest.raises(AttributeError):
         guard.accepted_pricing_versions.add("other")  # type: ignore[attr-defined]
     with pytest.raises(ValueError):

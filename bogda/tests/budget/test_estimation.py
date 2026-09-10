@@ -288,3 +288,9 @@ def test_to_budget_envelope_preserves_calling_budget_controls() -> None:
     assert envelope.expected_cost == result.expected_cost
     assert envelope.authorized_ceiling == result.authorized_ceiling
     assert envelope.pricing_version == result.pricing_version
+
+
+def test_default_catalog_resolves_to_the_current_official_version() -> None:
+    start = datetime(2026, 9, 14, 13, 0, tzinfo=BEIJING)
+    result = estimate(start=start, end=start + timedelta(minutes=30), as_of=start)
+    assert result.pricing_version == "deepseek-cn-2026-09-14"

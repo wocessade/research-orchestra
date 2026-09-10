@@ -202,6 +202,18 @@ class SqliteBudgetLedger:
         with self._lock:
             return self._get_unlocked(reservation_id)
 
+    def list_for_run(self, run_id: str) -> tuple[Reservation, ...]:
+        if not isinstance(run_id, str) or not run_id:
+            raise InvalidReservationError("run_id must be a non-empty string")
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT id, run_id, reserved, state, created_at, updated_at, "
+                "actual_cost, released_amount, overspend FROM reservations "
+                "WHERE run_id = ? ORDER BY created_at, id",
+                (run_id,),
+            ).fetchall()
+        return tuple(_row_to_reservation(row) for row in rows)
+
     def reserve(
         self,
         *,

@@ -18,7 +18,6 @@ def run_shell(
     resolved_attempts_root = attempts_root.resolve()
     attempt_dir = (
         resolved_attempts_root
-        / request.job_id
         / run_id
         / f"attempt-{attempt:04d}"
     ).resolve()

@@ -33,8 +33,13 @@ class CheckpointInput(RunInput):
     command_version: str | None = None
 
 
+def _kind_slug(kind: CheckpointKind) -> str:
+    """Prefect server keys only allow lowercase letters, numbers, and dashes."""
+    return kind.value.replace("_", "-")
+
+
 def decision_key(run_id: str, kind: CheckpointKind) -> str:
-    return f"bogda-decision-{kind}-{UUID(run_id)}"
+    return f"bogda-decision-{_kind_slug(kind)}-{UUID(run_id)}"
 
 
 def required_checkpoints(mode: AutonomyMode) -> tuple[CheckpointKind, ...]:
@@ -130,7 +135,7 @@ def prefect_receive(pending: ResearchDecision) -> dict[str, Any]:
     payload = pause_flow_run(
         wait_for_input=CheckpointInput,
         timeout=86400,
-        key=f"{pending.kind}-{pending.command_version}",
+        key=f"{_kind_slug(pending.kind)}-{pending.command_version}",
         poll_interval=5,
     )
     if payload is None:

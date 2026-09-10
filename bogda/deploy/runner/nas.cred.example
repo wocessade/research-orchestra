@@ -1,0 +1,5 @@
+# Copy to ~/.config/bogda/nas.cred and chmod 600.
+# Username is the Samba account on RK3528. Password stays on this machine.
+username=liuxfs
+password=
+domain=

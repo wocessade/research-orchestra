@@ -142,7 +142,7 @@ def test_local_vertical_slice(tmp_path) -> None:
             return_state=True,
         )
         retried = RunResult.model_validate(retried_state.result())
-        retry_dir = tmp_path / retry_request.job_id / retried.run_id
+        retry_dir = tmp_path / retried.run_id
 
         assert retried_state.name == "Completed"
         assert retried.attempt == 2

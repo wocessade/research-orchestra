@@ -37,7 +37,7 @@ def test_shell_executor_completes_when_required_artifact_exists(tmp_path) -> Non
 
     result = run_shell(request, tmp_path, "run-1")
 
-    attempt_dir = tmp_path / "job-1" / "run-1" / "attempt-0001"
+    attempt_dir = tmp_path / "run-1" / "attempt-0001"
     assert result.execution_status is ExecutionStatus.COMPLETED
     assert result.scientific_status.value == "unreviewed"
     assert (attempt_dir / "stdout.log").exists()
@@ -74,25 +74,22 @@ def test_attempt_directories_do_not_overwrite_each_other(tmp_path) -> None:
     run_shell(request, tmp_path, "run-4", attempt=1)
     run_shell(request, tmp_path, "run-4", attempt=2)
 
-    assert (tmp_path / "job-1" / "run-4" / "attempt-0001" / "result.txt").exists()
-    assert (tmp_path / "job-1" / "run-4" / "attempt-0002" / "result.txt").exists()
+    assert (tmp_path / "run-4" / "attempt-0001" / "result.txt").exists()
+    assert (tmp_path / "run-4" / "attempt-0002" / "result.txt").exists()
 
 
 @pytest.mark.parametrize(
-    ("job_id", "run_id"),
+    "run_id",
     [
-        ("../escaped", "run-5"),
-        ("job-1", "../../escaped"),
+        "../escaped",
+        "../../escaped",
     ],
 )
 def test_shell_executor_rejects_attempt_directories_outside_root(
     tmp_path,
-    job_id,
     run_id,
 ) -> None:
-    request = request_for([sys.executable, "-c", "print('must not run')"]).model_copy(
-        update={"job_id": job_id}
-    )
+    request = request_for([sys.executable, "-c", "print('must not run')"])
     attempts_root = tmp_path / "attempts"
 
     with pytest.raises(ValueError, match="attempt directory must be inside attempts root"):
@@ -107,7 +104,7 @@ def test_shell_executor_returns_failed_result_and_logs_launch_error(tmp_path) ->
 
     result = run_shell(request, tmp_path, "run-6")
 
-    attempt_dir = tmp_path / "job-1" / "run-6" / "attempt-0001"
+    attempt_dir = tmp_path / "run-6" / "attempt-0001"
     assert result.execution_status is ExecutionStatus.FAILED
     assert "command launch failed" in result.summary
     assert (attempt_dir / "stdout.log").read_text(encoding="utf-8") == ""

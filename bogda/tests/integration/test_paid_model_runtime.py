@@ -345,7 +345,7 @@ def test_insufficient_balance_suspends_and_resumes_identical_envelope(
     )
 
     assert returned["status"] == "finished"
-    assert suspender.keys == ["budget:run-1:call-1:1"]
+    assert suspender.keys == ["budget-run-1-call-1-1"]
     assert recording_service.resume_events == [("run-1", "call-1")]
     assert recording_service.requests[0] is recording_service.requests[1]
     assert recording_service.requests[0].budget == request.budget

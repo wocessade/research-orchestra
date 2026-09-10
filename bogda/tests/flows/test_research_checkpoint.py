@@ -1,7 +1,10 @@
 from types import SimpleNamespace
 
 import pytest
+from prefect.artifacts import Artifact
+from prefect.client.schemas.objects import FlowRunInput
 from prefect.states import StateType
+from uuid import UUID
 
 from bogda.contracts import (
     AutonomyMode,
@@ -83,6 +86,43 @@ def test_supervised_and_manual_require_type_b_gates_autonomous_does_not() -> Non
     )
     assert CheckpointKind.PLAN_APPROVAL in research_checkpoint.required_checkpoints(
         AutonomyMode.MANUAL
+    )
+
+
+def test_all_checkpoint_keys_are_valid_prefect_artifact_keys() -> None:
+    for kind in CheckpointKind:
+        Artifact(
+            key=research_checkpoint.decision_key(RUN_ID, kind),
+            type=research_checkpoint.DECISION_TYPE,
+            data={},
+            flow_run_id=UUID(RUN_ID),
+        )
+
+
+@pytest.mark.parametrize("kind", list(CheckpointKind))
+def test_pause_key_is_valid_prefect_run_input_key(monkeypatch, kind) -> None:
+    captured: dict = {}
+
+    def fake_pause(wait_for_input=None, timeout=None, key=None, poll_interval=None):
+        captured["key"] = key
+        return {}
+
+    monkeypatch.setattr("prefect.flow_runs.pause_flow_run", fake_pause)
+
+    research_checkpoint.prefect_receive(
+        ResearchDecision(
+            run_id=RUN_ID,
+            kind=kind,
+            stage=StageStatus.DONE,
+            verdict=None,
+            command_version="checkpoint-v1",
+        )
+    )
+
+    FlowRunInput(
+        flow_run_id=UUID(RUN_ID),
+        key=f"paused-{captured['key']}-{RUN_ID}-schema",
+        value="{}",
     )
 
 

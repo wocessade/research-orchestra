@@ -197,7 +197,7 @@ def test_supervised_cycle_pauses_at_type_b_gates_and_cannot_acquit(monkeypatch, 
     assert returned["scientific_status"] == ScientificStatus.UNREVIEWED.value
     assert returned["execution_status"] == ExecutionStatus.COMPLETED.value
     assert returned["status"] == "awaiting_scientific_review"
-    assert Path(tmp_path, "cycle-1", RUN_ID, "attempt-0001", "result.txt").is_file()
+    assert Path(tmp_path, RUN_ID, "attempt-0001", "result.txt").is_file()
 
 
 def test_missing_required_artifact_is_type_a_failure_not_accepted(monkeypatch, tmp_path) -> None:

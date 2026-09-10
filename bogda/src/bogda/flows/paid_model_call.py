@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import os
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Protocol
 
 from prefect import flow
+from prefect.context import get_run_context
 from prefect.flow_runs import suspend_flow_run
 
 from bogda.contracts import JobRequest
@@ -66,7 +68,7 @@ def _result_payload(result: PaidCallResult) -> dict[str, Any]:
 def run_paid_model_call(
     request_data: dict[str, Any],
     prompt: str,
-    service: PaidModelCallService,
+    service: Any = None,
     suspender: Any = None,
     *,
     run_id: str | None = None,
@@ -86,15 +88,25 @@ def run_paid_model_call(
         request_data, "allow_low_risk_fallback", allow_low_risk_fallback
     )
     if not isinstance(resolved_run_id, str) or not resolved_run_id:
-        raise ValueError("run_id is required")
+        resolved_run_id = str(get_run_context().flow_run.id)
     if not isinstance(resolved_call_id, str) or not resolved_call_id:
-        raise ValueError("call_id is required")
+        resolved_call_id = "call-1"
     if resolved_attempt_dir is None:
-        raise ValueError("attempt_dir is required")
+        artifact_root = os.environ.get("BOGDA_ARTIFACT_ROOT", "").strip()
+        if not artifact_root:
+            raise ValueError("attempt_dir is required")
+        resolved_attempt_dir = Path(artifact_root) / resolved_run_id / "attempt-0001"
     if not isinstance(resolved_pro_available, bool):
         raise ValueError("pro_available must be a boolean")
     if not isinstance(resolved_fallback, bool):
         raise ValueError("allow_low_risk_fallback must be a boolean")
+
+    if service is None:
+        from bogda.wiring.paid_runtime import build_paid_service_from_env
+
+        service = build_paid_service_from_env(run_id=resolved_run_id)
+    if not callable(getattr(service, "execute", None)):
+        raise ValueError("service must implement PaidModelCallService.execute")
 
     budget_suspender = suspender or PrefectBudgetSuspender()
     suspension_round = 1
@@ -111,7 +123,7 @@ def run_paid_model_call(
         if result.status is not PaidCallStatus.BUDGET_PAUSED:
             return _result_payload(result)
         budget_suspender.suspend(
-            f"budget:{resolved_run_id}:{resolved_call_id}:{suspension_round}"
+            f"budget-{resolved_run_id}-{resolved_call_id}-{suspension_round}"
         )
         service.record_budget_resume(resolved_run_id, resolved_call_id, request)
         suspension_round += 1

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from decimal import Decimal
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -120,6 +121,60 @@ def call_flow(
     )
 
 
+def test_flow_self_identifies_from_context_when_ids_omitted(monkeypatch) -> None:
+    service = ScriptedService([result(PaidCallStatus.FINISHED)])
+    monkeypatch.setattr(
+        paid_model_call,
+        "get_run_context",
+        lambda: SimpleNamespace(flow_run=SimpleNamespace(id="flow-run-id-1")),
+    )
+    monkeypatch.setenv("BOGDA_ARTIFACT_ROOT", "/tmp/artifact-root")
+
+    returned = paid_model_call.run_paid_model_call.fn(
+        request_payload(),
+        PROMPT,
+        service,
+        RecordingSuspender(),
+        pro_available=True,
+        allow_low_risk_fallback=False,
+    )
+
+    assert returned["status"] == "finished"
+    assert service.calls[0][0] == "flow-run-id-1"
+    assert service.calls[0][1] == "call-1"
+    assert str(service.calls[0][3]) == str(
+        Path("/tmp/artifact-root") / "flow-run-id-1" / "attempt-0001"
+    )
+
+
+def test_flow_constructs_service_from_env_when_omitted(monkeypatch) -> None:
+    built: list[str] = []
+    service = ScriptedService([result(PaidCallStatus.FINISHED)])
+
+    def fake_factory(*, run_id: str):
+        built.append(run_id)
+        return service
+
+    monkeypatch.setattr(
+        "bogda.wiring.paid_runtime.build_paid_service_from_env", fake_factory
+    )
+
+    returned = paid_model_call.run_paid_model_call.fn(
+        request_payload(),
+        PROMPT,
+        None,
+        RecordingSuspender(),
+        run_id="run-9",
+        call_id="call-9",
+        attempt_dir=Path("attempts/run-9"),
+        pro_available=True,
+        allow_low_risk_fallback=False,
+    )
+
+    assert built == ["run-9"]
+    assert returned["status"] == "finished"
+
+
 def test_budget_pause_suspends_then_rechecks_same_request() -> None:
     service = ScriptedService(
         [result(PaidCallStatus.BUDGET_PAUSED), result(PaidCallStatus.FINISHED)]
@@ -128,7 +183,7 @@ def test_budget_pause_suspends_then_rechecks_same_request() -> None:
 
     returned = call_flow(service, suspender)
 
-    assert suspender.keys == ["budget:run-1:call-1:1"]
+    assert suspender.keys == ["budget-run-1-call-1-1"]
     assert service.resume_events == [("run-1", "call-1")]
     assert service.requests[0] is service.requests[1]
     assert service.requests[0].budget == service.requests[1].budget
@@ -148,8 +203,8 @@ def test_multiple_budget_pauses_use_numbered_keys_and_resume_once_each() -> None
     returned = call_flow(service, suspender)
 
     assert suspender.keys == [
-        "budget:run-1:call-1:1",
-        "budget:run-1:call-1:2",
+        "budget-run-1-call-1-1",
+        "budget-run-1-call-1-2",
     ]
     assert service.resume_events == [("run-1", "call-1"), ("run-1", "call-1")]
     assert len(service.calls) == 3
@@ -221,6 +276,6 @@ def test_flow_is_persistent_and_real_suspender_forwards_to_prefect(monkeypatch) 
     )
 
     assert paid_model_call.run_paid_model_call.persist_result is True
-    paid_model_call.PrefectBudgetSuspender().suspend("budget:run-1:call-1:1")
+    paid_model_call.PrefectBudgetSuspender().suspend("budget-run-1-call-1-1")
 
-    assert calls == [{"key": "budget:run-1:call-1:1", "timeout": None}]
+    assert calls == [{"key": "budget-run-1-call-1-1", "timeout": None}]

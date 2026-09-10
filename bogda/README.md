@@ -1,8 +1,12 @@
 # Bogda
 
-Bogda is the Prefect-based successor to Research Orchestra. This directory is independent from orchestra/. The local vertical slice still lives here; **production Prefect (control plane + `pi-service` worker) runs on RK3528**, not the retired Pi 4B.
+<!-- campus-runner-status:2026-09-11 -->
+> 2026-09-11 现状更新：Orchestra/3100 已停用；Y7000 已接入 WSL2、NAS 和 dorm-x86，并发 1。checkpoint 修复与落地接线（store 窄接口/日志发布/付费审批/usage-unknown 恢复/自主策略）已部署并现网验收通过；**真实 dsh 已安装并真实验收**（run `3157b68c`，actual 0.02271 CNY；usage.json 由 `~/.local/bin/dsh` 桥产出）；**DEF-03 申报通过：3101 接替 3100 落地**。3101 现为 `allowlisted-test` + 精确白名单（两个 deployment + `dorm-x86`）。WSL 由 S4U 开机任务无登录启动；宿舍网络掉线需人工恢复。详见[落地验收报告](../docs/reports/2026-09-11-bogda-landing-acceptance.md)。
+<!-- /campus-runner-status -->
 
-## Production host (2026-09-02)
+Bogda is the Prefect-based successor to Research Orchestra. This directory is independent from orchestra/. The local vertical slice still lives here; **Prefect control plane and the maintenance `pi-service` worker run on RK3528; the `dorm-x86` process worker runs on the Y7000 WSL2 instance**. The Pi 4B is retired.
+
+## Production hosts (2026-09-10)
 
 | 项 | 值 |
 |---|---|
@@ -23,7 +27,7 @@ Do not treat Pi 4B (`192.168.0.250` / Tailscale `liuxfs`) as a scheduler. Early 
 |---|---|---|
 | 雷达 / exam-watch / 任务队列 / 3100 留言 | `orchestra/`，SSH 盒子上 `orchestra-*` timer | Prefect unit、`pi-service` |
 | Prefect UI、worker、`/mnt/nas/.bogda` | RK3528 `:4200`，`bogda-prefect-*` / `bogda-pi-worker` | Orchestra broker 数据根 |
-| 3101 影子控制台 | `bogda-console/`，默认 mock / real-readonly | 未授权不接真 Prefect 写入 |
+| 3101 控制台 | `bogda-console/`，现网 `allowlisted-test` + 精确白名单（`owner`） | 只在白名单资源上写 |
 
 `deploy/pi/` 路径名是有意冻结，不是「还跑在树莓派上」。
 
@@ -178,8 +182,8 @@ The fixed ARM64 deployment inventory is in [deploy/pi/manifest.toml](deploy/pi/m
 ## Deferred
 
 - Gate 6 **已通过**（2026-08-31）；Gate 7 S1/S2 影子 **已通过**。生产科研仍禁 `pi-service`
-- Wake Bridge/WoL（宿舍塔停购；第二台笔记本暂代 runner，仍未接线）
-- Laptop `dorm-x86` pool（控制台契约有名；真机未接）
+- Wake Bridge/WoL 未接入；Y7000 已承担 runner，Windows 登录后由 WSL/systemd 启动。
+- Laptop `dorm-x86` 已接入并通过自主 smoke；完整 checkpoint、日志发布和审批/recovery 接线待完成。
 - Windows Power Agent/game mode
 - Task migration
 - CPU/GPU worker and higher concurrency

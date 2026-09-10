@@ -138,3 +138,27 @@
 65. **离机审批用 3101 按钮，不要聊天连 dsh**：自由文本会绕过机械白名单；文件也到不了 runner。规则：材料用 git/inbox/计算端路径；盒子 dsh 只 `maintain.sh` 或 Prefect 白名单 `brief`。
 66. **inbox 必须是 NAS 两段路径**：`/mnt/nas/.bogda/inbox/<run_id>/<file>`，默认 8MiB/文件、硬顶 32MiB（`BOGDA_INBOX_MAX_FILE_BYTES`）；相对路径和 `D:\` 都拒。规则：先 `prepare_runner_share.sh` 建目录，再让 runner 读同一棵树。
 67. **盒子 Tailscale IP 不要写死在安全允许名单**：`SAFE_PUBLIC_HOSTS` 默认含当前 `100.78.158.80`，换 IP 用 `BOGDA_CONSOLE_SAFE_PUBLIC_HOSTS`；loopback 始终可绑。规则：`maintain.sh` / `tailscale serve` 读 `BOGDA_CONSOLE_PUBLIC_PORT`，brief 只许 `pi-service`。
+
+## 2026-09-10 — Bogda runner 接机
+
+- Windows 内置 OpenSSH 与独立 MSI 的服务注册可能在重启后切换：本次服务变为 System32 7.7/Manual，恢复 Program Files 10/Automatic 后独立 SSH 登录通过。排障先核对实际 ImagePath，不先调大服务超时。
+- WSL 与 systemd 共同读取 fstab 时，NAS 项使用 noauto + x-systemd.automount，由 systemd 触发挂载；实际 WSL 重启恢复必须验证。登录触发任务不等于无需 Windows 登录的开机服务。
+- 慢下载可从原 uv.lock 导出带哈希 requirements，经可达镜像安装；验证 require-hashes、锁文件不变和离线启动，避免通过升级依赖解决网络问题。
+- checkpoint 测试应实例化真实 Prefect Artifact：mock store 没有发现下划线 key 被拒绝，真机验证才暴露。core 与 console 查询 key 必须一致。
+- 同一 NAS 目录可读写不等于跨主机 SQLite WAL 可用，也不等于 worker store 或日志发布已接线；分别记录验收结果。
+- PowerShell 向远端 shell 直接管道传多行文本可能留下 CR 文件名；本次后续改用 UTF-8/LF 的 base64 脚本传输。误生成文件不擅自删除。
+
+## 2026-09-11 — Bogda 落地（付费接线 / 开机链）
+
+- **计划任务拉 WSL：只有 S4U + cmd 包装这一路可靠**。InteractiveToken 任务从 SSH on-demand `/run` 会回"成功: 尝试运行"但实例僵在 0x41301、WSL 不启动；`powershell -WindowStyle Hidden -Command "& wsl.exe ..."` 包装在 S4U 下同样挂死；`cmd.exe /c "wsl.exe -d <distro> -u root --exec /bin/sleep infinity > log 2>&1"` + S4U principal + AtStartup 才真正把发行版拉起来（且可从 SSH `schtasks /run` 远程触发）。规则：判断任务是否真干活看 `wsl -l --running`，不要信 schtasks 的"尝试运行"；验证"到没到位"看 LastTaskResult（267009=实例存活=keepalive 正常）。
+- **宿舍网络掉线不会自愈**：掉线时 sshd/Tailscale/WSL/worker 全链完好，但网络本身不通且不会自动回（owner 此前手动恢复过，疑为校园网门户认证）。规则：无人值守/自愈类文档必须以"网络先行"为前提声明；网络恢复是人工步骤，不写成自愈。
+- **本机 `wsl -l` 每次先吐一行「系统找不到指定的路径」**：纯杂音，不影响后续列表输出。规则：忽略，不要为它排障。
+- **开机时 worker 的 NAS automount 竞态由 systemd Restart 自愈**：冷启 journal 记 "shared path missing: /mnt/nas/.bogda/runner/artifacts (mount NAS first)" 后自动重启成功（NRestarts=1，pool 回 READY）。规则：这是预期恢复路径，不改 start-worker.sh 去追。
+- **跨主机 store 一律窄接口，不开共享盘**：NAS 同目录可读写 ≠ 跨主机 SQLite WAL 可用；方案为 RK 单机持库 + HMAC 窄 HTTP（域分离消息 `domain\nts\nmethod\npath\nsha256(body)`，±300s 重放窗），预算/审批/usage 权威全在 console 侧，runner 只持 HTTP 适配器。规则：runner 永不直接打开 SQLite 文件。
+- **验收顺序：先把接线验透，再装外围软件**。付费链用受控执行器打通（真实端点/账本/凭证，仅执行器是 stub），验收后移 stub；真实 dsh 安装另行评估。规则：不要让"装软件"混进接线验收，阻塞点要能分开报。
+- **dsh 会话日志是追加式多帧 zstd**：`session.jsonl.zstd` 每次写入独立成帧（一次 pong 调用 5 帧），node 的 `zstdDecompressSync` 和 stream 解码都只出第一帧（读到 153B 头存根，误判"没有 usage"）；zstd CLI 默认解全部帧（所以 RK 上取证成功、runner 上 node 失败）。规则：按 zstd magic 切帧分别解码、失败切片合并重试；或直接装 zstd 二进制。
+- **dsh token 语义与 bogda 契约不同名同义**：dsh 的 `inputTokens` 是 cache-miss 部分、`cacheReadTokens` 是命中部分，相加才是总输入；bogda 的 `input_tokens` 要求总量（服务端有 `cache_read > input` 拒绝校验）。规则：跨系统适配先对齐语义，不照抄字段名。
+- **一次 dsh 调用产生多个子会话**（主会话 + 会话标题 LLM 调用）且全部计费。规则：用量汇总要对全部子会话求和；"取最新一个"会漏账。
+- **npm 装 CLI 必须钉版对齐现网**：默认装成 0.1.5-rc.1 而 RK 现网是 0.1.0-rc.7，会话格式/参数都是版本面。规则：新机器装同款工具前先对照 `--version`。
+- **登录 shell 没有服务 env**：runner 上 `bash -lc` 直接跑 Prefect 客户端会静默退回本地 SQLite（aiosqlite 报错、run 根本没建）。规则：验收脚本前 `set -a; . runner.env; set +a`。
+- **PATH 顺序决定影子 wrapper 是否生效**：runner.env 里 `PATH=/opt/node22/bin:$PATH` 把真 dsh 排在 `~/.local/bin` 前，绕过 usage 桥。规则：环境文件的 PATH 行把 wrapper 目录放最前，改完用 `command -v` 实证。

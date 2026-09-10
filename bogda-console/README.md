@@ -1,8 +1,10 @@
 # Bogda Console
 
-Bogda Console 是现有 Orchestra 3100 控制台的独立影子重写。它运行在
-`codex/bogda-console` 分支的 `bogda-console/` 目录，不修改 `bogda/` 核心、
-`orchestra/console/`、旧控制台数据或真实基础设施。
+<!-- campus-runner-status:2026-09-11 -->
+> 2026-09-11 现状更新：Orchestra/3100 已停用；Y7000 已接入 WSL2、NAS 和 dorm-x86，并发 1。checkpoint 修复与落地接线（RK 侧 store + HMAC 窄接口、日志发布、付费审批、usage-unknown 恢复、自主策略）已部署并现网验收通过；真实 dsh 已安装并真实验收（run `3157b68c`）；**DEF-03 申报通过：3101 接替 3100 落地**。3101 现为 `allowlisted-test` + 精确白名单（两个 deployment + `dorm-x86`）。详见[落地验收报告](../docs/reports/2026-09-11-bogda-landing-acceptance.md)。
+<!-- /campus-runner-status -->
+
+Bogda Console 是旧 Orchestra 3100 控制台的独立继任界面，现网位于 RK3528 的 3101。旧 3100 已停用。现网 profile 为 `allowlisted-test` + `owner`，精确白名单为两个验收 deployment（shell/paid）与 pool `dorm-x86`；store（预算/审批/usage-unknown）HMAC 接口与日志发布已于 2026-09-11 接线验收。
 
 第一版范围是 B：监控、提交已注册 Deployment、取消 Flow Run、暂停/恢复
 Deployment schedule 或 Work Queue，以及基于 RunResult Artifact 的科研评审。
@@ -194,6 +196,7 @@ Stop-Process -Id $bogdaListener.OwningProcess
 | `BOGDA_CONSOLE_ALLOWED_SCHEDULE_IDS` | 空 | 精确 schedule UUID/ID，逗号分隔 |
 | `BOGDA_CONSOLE_ALLOWED_QUEUE_IDS` | 空 | 精确 Work Queue UUID/ID，逗号分隔 |
 | `BOGDA_CONSOLE_ALLOWED_WORK_POOL_NAMES` | 空 | 精确 Work Pool 名称，逗号分隔 |
+| `BOGDA_AUTONOMY_POLICY_PATH` | 空 | 盒子本地自主策略文件（core `PolicyStore` JSON）。配置后 allowlisted-test + owner 接入真实策略后端；留空保持只读 |
 
 Allowlist 不支持 `*`。命令提交前和 Prefect 权威回读后都会检查资源；本地不做
 乐观状态写入。
@@ -206,9 +209,9 @@ Allowlist 不支持 `*`。命令提交前和 Prefect 权威回读后都会检查
 | `real-readonly` | 真实 Prefect API | 是 | 否 | 否 |
 | `allowlisted-test` | 真实 Prefect API | 是 | 单副本且命中 allowlist | 命中 allowlist |
 
-影子运行只使用 `real-readonly`。只有隔离的 S2 验收环境才使用
-`allowlisted-test`，并必须填写精确的 Deployment、schedule、queue 和 pool
-allowlist。不能把 S2 指向生产资源。
+只读比较仍用 `real-readonly`。现网 3101 自 2026-09-11 起使用 `allowlisted-test`，
+配置精确的 Deployment/pool allowlist（`dorm-x86` 与其上的两个验收 deployment，
+owner 授权）；写入仍只允许命中的白名单资源，不放宽。
 
 ## Mock 场景
 
@@ -228,10 +231,11 @@ maintenance 数据都来自 `MockPowerAdapter`，界面始终标注“模拟数�
 ## 科研自主模式控制
 
 3101总览页提供“手动 / 监督执行 / 范围内自主”三档控制，以及项目“继承全局”。
-当前只有`mock-all`使用进程内策略适配器并允许修改；修改带revision并发检查，
-只影响随后创建的运行。`real-readonly`和`allowlisted-test`没有接入真实Bogda
-Policy后端，保持`canSetAutonomyMode=false`，界面显示只读与“策略后端尚未接入”，
-不会静默使用mock策略。真实策略接线属于后续S2任务。
+修改带revision并发检查，只影响随后创建的运行。`mock-all`使用进程内策略适配器；
+`allowlisted-test`在配置了 `BOGDA_AUTONOMY_POLICY_PATH`（盒子本地 core
+`PolicyStore` 文件，如 `/var/lib/bogda/autonomy-policy.json`）且角色为 owner 时
+接入真实策略后端并允许写入；其余情况保持 `canSetAutonomyMode=false`，界面显示只读与
+“策略后端尚未接入”，不会静默使用 mock 策略。`real-readonly` 始终只读。
 
 ## 验证
 

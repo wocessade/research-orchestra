@@ -171,14 +171,37 @@ def _core_stores(
     )
 
 
-def _core_model_control(stores: CoreStores | None):
+def _core_model_control(
+    settings: Settings, stores: CoreStores | None, usage_balance: Any
+):
     if stores is None:
         return UnwiredModelControlAdapter()
     try:
         from bogda_console.adapters.core_model_control import CoreUsageUnknownAdapter
     except ImportError:
         return UnwiredModelControlAdapter()
-    return CoreUsageUnknownAdapter(stores.recovery)
+    recovery = CoreUsageUnknownAdapter(stores.recovery)
+    if not settings.model_policy_path:
+        return recovery
+    try:
+        from bogda.policy import ModelPolicyStore, PolicyStore
+        from bogda_console.adapters.local_model_control import LocalModelControlAdapter
+    except ImportError:
+        return recovery
+
+    return LocalModelControlAdapter(
+        store=ModelPolicyStore(settings.model_policy_path),
+        recovery=recovery,
+        preparations_path=settings.run_preparations_path
+        or str(Path(settings.model_policy_path).with_name("run-preparations.json")),
+        autonomy=(
+            PolicyStore(settings.autonomy_policy_path)
+            if settings.autonomy_policy_path
+            else None
+        ),
+        balance=usage_balance,
+        ledger=stores.ledger,
+    )
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -223,7 +246,7 @@ class Container:
             )
             approvals = _approval_store(settings)
             stores = _core_stores(settings, usage_balance, approvals)
-            model_control = _core_model_control(stores)
+            model_control = _core_model_control(settings, stores, usage_balance)
             queries = QueryService(
                 settings=settings,
                 prefect=prefect,

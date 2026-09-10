@@ -378,9 +378,15 @@ class PrefectApiAdapter:
     @staticmethod
     def _artifact_view(artifact: Any) -> RunResultView:
         try:
-            result = ValidRunResult.model_validate(artifact.data)
-        except ValidationError as error:
-            issues = [f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}" for item in error.errors()]
+            data = artifact.data
+            if isinstance(data, str):
+                data = json.loads(data)
+            result = ValidRunResult.model_validate(data)
+        except (ValidationError, ValueError) as error:
+            if isinstance(error, ValidationError):
+                issues = [f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}" for item in error.errors()]
+            else:
+                issues = [str(error)]
             return RunResultView(availability=Availability.INVALID, artifactId=str(artifact.id), artifactCreatedAt=artifact.created, validationIssues=issues)
         return RunResultView(availability=Availability.AVAILABLE, artifactId=str(artifact.id), artifactCreatedAt=artifact.created, result=result, validationIssues=[])
 

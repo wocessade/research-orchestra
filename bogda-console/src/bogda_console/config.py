@@ -110,6 +110,8 @@ class Settings:
     approval_db: str | None
     approval_hmac_key: bytes | None
     autonomy_policy_path: str | None
+    model_policy_path: str | None
+    run_preparations_path: str | None
 
     @classmethod
     def from_env(cls, env: Mapping[str, str]) -> "Settings":
@@ -172,6 +174,8 @@ class Settings:
             approval_db=approval_db,
             approval_hmac_key=approval_hmac_key,
             autonomy_policy_path=env.get("BOGDA_AUTONOMY_POLICY_PATH") or None,
+            model_policy_path=env.get("BOGDA_MODEL_POLICY_PATH") or None,
+            run_preparations_path=env.get("BOGDA_RUN_PREPARATIONS_PATH") or None,
         )
 
     @property
@@ -194,7 +198,11 @@ class Settings:
 
     @property
     def model_control_enabled(self) -> bool:
-        return self.profile == "mock-all" and self.role is ConsoleRole.OWNER
+        if self.role is not ConsoleRole.OWNER:
+            return False
+        if self.profile == "mock-all":
+            return True
+        return self.profile == "allowlisted-test" and bool(self.model_policy_path)
 
     @property
     def recovery_writes_enabled(self) -> bool:

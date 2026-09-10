@@ -226,6 +226,7 @@ async def test_policy_path_wires_real_store_for_owner(tmp_path) -> None:
     ) as http:
         caps = (await http.get("/api/v1/capabilities")).json()["data"]
         assert caps["canSetAutonomyMode"] is True
+        assert caps["effectiveAutonomyMode"] == "supervised"
 
         initial = await http.get("/api/v1/autonomy-policy")
         assert initial.status_code == 200

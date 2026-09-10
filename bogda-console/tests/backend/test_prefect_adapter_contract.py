@@ -229,6 +229,40 @@ async def test_newest_invalid_artifact_remains_authoritative(fake_adapter) -> No
 
 
 @pytest.mark.asyncio
+async def test_json_string_artifact_data_is_parsed_like_the_live_server(fake_adapter) -> None:
+    import json
+
+    adapter, client = fake_adapter
+    payload = {
+        "run_id": str(client.run_id),
+        "job_id": "job-1",
+        "execution_status": "Completed",
+        "scientific_status": "unreviewed",
+        "started_at": "2026-08-24T07:00:00Z",
+        "finished_at": "2026-08-24T07:30:00Z",
+        "executor": "shell",
+        "attempt": 1,
+        "declared_artifacts": [],
+        "summary": "string encoded",
+    }
+    client.artifacts.insert(
+        0,
+        Artifact(
+            id=uuid4(),
+            key=f"bogda-run-{client.run_id}",
+            type="bogda.run-result",
+            flow_run_id=client.run_id,
+            data=json.dumps(payload),
+            created=datetime(2026, 8, 24, 8, 4, tzinfo=UTC),
+        ),
+    )
+    latest = await adapter.get_latest(str(client.run_id))
+    assert latest.availability == "available"
+    assert latest.result is not None
+    assert latest.result.summary == "string encoded"
+
+
+@pytest.mark.asyncio
 async def test_append_review_preserves_unknown_fields_and_appends(fake_adapter) -> None:
     adapter, client = fake_adapter
     client.artifacts.pop(0)

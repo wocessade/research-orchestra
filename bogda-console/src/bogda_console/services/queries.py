@@ -79,9 +79,15 @@ class QueryService:
     async def capabilities(self) -> ApiEnvelope[CapabilitySnapshot]:
         enabled = self.settings.commands_enabled
         effective = None
-        if self.settings.profile == "mock-all" and self.policy is not None:
-            snapshot = await self.policy.get_policy()
-            effective = snapshot.project_overrides.get("bogda-main", snapshot.global_default)
+        if self.policy is not None and type(self.policy).__name__ != "UnwiredAutonomyPolicyAdapter":
+            try:
+                snapshot = await self.policy.get_policy()
+            except Exception:
+                effective = None
+            else:
+                effective = snapshot.project_overrides.get(
+                    "bogda-main", snapshot.global_default
+                )
         elif self.settings.profile == "mock-all":
             effective = "supervised"
         return ApiEnvelope(
@@ -195,11 +201,11 @@ class QueryService:
         return SourceMeta(
             source="modelControl",
             sourceMode=SourceMode.MOCK if self.settings.profile == "mock-all" else SourceMode.REAL,
-            observedAt=now if self.settings.profile == "mock-all" else None,
+            observedAt=now,
             receivedAt=now,
-            lastSuccessfulAt=now if self.settings.profile == "mock-all" else None,
+            lastSuccessfulAt=now,
             staleAfterSeconds=120,
-            freshness=Freshness.FRESH if self.settings.profile == "mock-all" else Freshness.UNAVAILABLE,
+            freshness=Freshness.FRESH,
         )
 
     def _require_model_control(self) -> ModelControlQueryPort:

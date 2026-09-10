@@ -6,7 +6,7 @@ Multi-API verification tool that queries OpenAlex, Semantic Scholar, and CrossRe
 for each reference entry, producing a three-state verdict:
 
   - true:          At least one API confirmed the reference exists
-  - false:         Reference has a DOI but NO API matches it (fabrication evidence)
+  - false:         Reference has a DOI but NO API matches it (unverified identity)
   - unresolvable:  Only title searches available, none matched (coverage gap)
 
 Also computes contamination signals per entry (preprint status, per-API unmatched flags)
@@ -18,7 +18,7 @@ Cache: SQLite ~/.cache/pipeline/verification.db, 90-day TTL.
   1. Search     — multi-API lookup (OpenAlex, Semantic Scholar, Crossref) — included
   2. Verify     — cross-database cross-validation with verdict — included
   3. Retrieve   — fetch abstract for verified entries — via --fetch-abstracts
-  4. Validate   — cross-ref ledger claims vs retrieved abstracts — via --validate-ledger
+  4. Validate   — check ledger-to-bibliography links (not semantic support) — via --validate-ledger
   5. Add        — generate formatted citations (BibTeX, APA) — via --format-output
 
 Usage:
@@ -30,7 +30,7 @@ Usage:
     # Steps 1-3: verify + retrieve abstracts
     python verify_citations.py --input bibliography.json --output-dir ./output --fetch-abstracts
 
-    # Step 4: validate ledger claims against abstracts
+    # Step 4: check ledger links; source entailment needs a separate review
     python verify_citations.py --validate-ledger evidence_ledger.jsonl --verification-report verification_report.json --output-dir ./output
 
     # Step 5: generate formatted citation output
@@ -711,7 +711,7 @@ def format_citations(verification_report: dict, output_dir: str | Path):
 
 def validate_ledger(ledger_path: str | Path, verification_report_path: str | Path,
                     output_dir: str | Path):
-    """Cross-reference evidence ledger claims against verification report."""
+    """Check latest claim links against bibliography metadata, not entailment."""
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -737,34 +737,44 @@ def validate_ledger(ledger_path: str | Path, verification_report_path: str | Pat
     with open(vp, "r", encoding="utf-8") as f:
         report = json.load(f)
 
-    # Cross-reference
-    verified_dois = {e.get("doi") or e.get("matched_doi", "")
-                     for e in report.get("entries", [])
-                     if e.get("verdict") == "true"}
-
-    citation_keys_to_dois = {}
-    for e in report.get("entries", []):
-        ck = e.get("citation_key", "")
-        doi = e.get("doi") or e.get("matched_doi", "")
-        if ck:
-            citation_keys_to_dois[ck] = doi
+    # Latest appended record per claim; manuscript coverage is audited separately.
+    raw_count = len(ledger_entries)
+    latest = {}
+    for entry in ledger_entries:
+        latest[entry["claim_id"]] = entry
+    ledger_entries = list(latest.values())
+    verified_records = [e for e in report.get("entries", []) if e.get("verdict") == "true"]
+    verified_dois = {e.get("doi") or e.get("matched_doi") for e in verified_records}
+    verified_dois.discard(None)
+    verified_dois.discard("")
+    verified_keys = {e["citation_key"] for e in verified_records if e.get("citation_key")}
 
     orphan_claims = []
-    for le in ledger_entries:
-        ref = le.get("source_ref", "")
-        # Extract citation key from [Author, Year] format
-        doi_ref = citation_keys_to_dois.get(ref, "")
-        if doi_ref and doi_ref not in verified_dois:
-            orphan_claims.append(le)
+    internal_claims = []
+    metadata_matched = []
+    for entry in ledger_entries:
+        ref = entry.get("source_ref", "").strip().strip("[]")
+        kind = entry.get("evidence_kind")
+        if kind in {"experiment", "derivation"} and entry.get("artifact_path"):
+            internal_claims.append(entry)
+        elif kind != "missing" and ref and (ref in verified_keys or ref in verified_dois):
+            metadata_matched.append(entry)
+        else:
+            orphan_claims.append(entry)
 
     result = {
         "ledger_entries": len(ledger_entries),
-        "verified_entries_in_report": len(verified_dois),
+        "historical_ledger_entries": raw_count,
+        "verified_entries_in_report": len(verified_records),
+        "metadata_matched_claims": len(metadata_matched),
+        "internal_evidence_claims": len(internal_claims),
+        "support_check": "not_performed",
+        "scope": "Latest appended claim links only; manuscript coverage, artifact existence and semantic support require evidence_audit.md.",
         "orphan_claims": len(orphan_claims),
         "orphan_details": [
             {"claim_id": c.get("claim_id"), "claim_text": c.get("claim_text", "")[:80],
              "source_ref": c.get("source_ref")}
-            for c in orphan_claims[:20]
+            for c in orphan_claims
         ],
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
@@ -783,7 +793,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Batch citation verification — multi-API existence checks for references.",
     )
-    parser.add_argument("--input", "-i", required=True,
+    parser.add_argument("--input", "-i",
                         help="Path to JSON input file (list of entry dicts)")
     parser.add_argument("--output-dir", "-o", default="./output",
                         help="Output directory for reports (default: ./output)")
@@ -818,6 +828,11 @@ def main():
             print(f"Error: verification report not found: {vp}", file=sys.stderr)
         return
 
+    # Batch verification requires input; standalone ledger/format modes do not.
+    if not args.input:
+        parser.error("--input is required for batch verification")
+    if args.validate_ledger and not args.verification_report:
+        parser.error("--validate-ledger requires --verification-report")
     # Load input
     input_path = Path(args.input)
     if not input_path.exists():

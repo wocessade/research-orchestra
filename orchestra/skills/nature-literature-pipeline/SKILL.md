@@ -1,161 +1,35 @@
 ---
 name: nature-literature-pipeline
-description: Automated daily literature discovery pipeline. Multi-source search (arXiv) → six-dimension scoring → formatted email digest → Zotero + Obsidian archival. Trigger on "文献推送", "每日文献", "literature pipeline", "arXiv 推送", "daily paper digest", "配置文献推送".
+description: "文献检索、去重、筛选、精读与日报草稿归档。用于文献推送、每日文献或 literature pipeline；发送、外部库写入和定时运行遵循已有明确授权。"
 ---
 
 # Nature Literature Pipeline
 
-A structured engine that searches, scores, classifies, and delivers research papers daily.
+执行范围与授权见 [共享执行规则](../academic-shared/references/execution-policy.md)。
 
-## What It Does
+## 项目路由
 
-```
-Cron (Claude Code CronCreate, daily 08:30 BJT)
-  │
-  ├── ① SEARCH (30 candidates)
-  │   arXiv API (primary) + Semantic Scholar (supplementary metadata)
-  │
-  ├── ② DEDUP (DOI → arXiv ID → normalized title)
-  │   Cross-reference Zotero library + local _dedup_index.json
-  │
-  ├── ③ COARSE FILTER (30 → 5)
-  │   Six-dimension scoring per references/scoring-system.md
-  │
-  ├── ④ FINE READ (5 PDFs, Haiku subagents)
-  │   Download PDF → extract experiment/results sections → parse tables
-  │   Spawn 5 Haiku agents in parallel (one per paper)
-  │
-  ├── ⑤ DELIVER
-  │   Formatted digest via mcp__email__send_email
-  │
-  └── ⑥ ARCHIVE
-      ├── Zotero: add_items (or add_items_by_doi) → linked_url arXiv PDF
-      └── Obsidian: write YAML frontmatter notes with zotero_key + key results
-          to D:/MD ideas/20-机器学习/文献/每日推送/{YYYY-MM-DD}/
-```
+Research Orchestra 的夜间雷达已于 2026-09-02 冻结，状态见根 AGENTS.md。既有雷达恢复后仍以五维评分为权威。本技能的六维量表仅用于独立精读/归档，不替换雷达排序，也不据此恢复定时任务。Zotero 直连在项目挂账中仍为延期事项。
 
-## Fine Read Protocol (④ in detail)
+## 工作流
 
-After scoring selects the TOP 5, download each PDF and extract key results
-using Haiku subagents. This is the default behavior — no user confirmation needed.
+1. 读取用户已给定的研究方向、关键词、候选数量、TOP N 与输出目录；缺省候选 30、TOP 5。仅配置任务时生成配置，不自动启动定时推送。
+2. 检索 arXiv，按需用其他可用学术检索补元数据。按 [dedup-rules.md](references/dedup-rules.md) 去重。
+3. 独立精读/归档使用 [scoring-system.md](references/scoring-system.md)，逐维检查上限并重算总分。雷达集成复用项目五维结果，不混合分值。
+4. 精读入选论文；需要全文对照读本时调用 `nature-reader`。提取贡献、方法、关键定量结果及表/页来源、作者局限。全文结果提取与短摘要分开，不能为字数限制丢失请求的表格数据。
+5. 按 [push-format.md](references/push-format.md) 生成日报草稿，按 [note-template.md](references/note-template.md) 生成 Obsidian 笔记。失败论文记录具体缺失，继续其他论文，不把摘要当作已精读全文。
+6. 邮件发送和 Zotero 写入仅在已有明确授权覆盖收件人、库和范围时执行；否则保留可审阅草稿。Zotero 流程见 [zotero-integration.md](references/zotero-integration.md)。
 
-### Spawn pattern
+精读可在可用且允许的并发工具中分派独立论文；不锁定 Haiku、5 路并发或 30 秒超时。按实际工具预算安排，保留每篇来源与完成状态。
 
-For each of the 5 papers, spawn one Haiku agent in parallel:
+## 归档契约
 
-```
-Agent(
-  subagent_type="haiku",
-  description="Read paper: <arXiv ID>",
-  prompt="
-    Download https://arxiv.org/pdf/<arxiv_id>.pdf
-    Extract:
-    1. Core contribution (1 sentence)
-    2. Method summary (2-3 sentences)
-    3. **All quantitative results**: every table with metrics, every
-       comparison number, every ablation result. Copy exact numbers.
-    4. Key limitations mentioned by authors
-    Output in Chinese, keep numbers in original format.
-    Be concise — under 400 words total.
-  "
-)
-```
+- 默认目录：`D:/MD ideas/20-机器学习/文献/每日推送/{YYYY-MM-DD}/`。仅写授权目录；覆盖已有笔记须有明确授权。
+- Zotero 若获准接入：查重 → 查 collection → 按需创建 → DOI/元数据新增 → 记录返回的 `zotero_key`。工具以当前实际 schema 为准。
+- 邮件和归档分别记录成功/失败；重试前核对是否已经发送/新增，避免重复副作用。
+- 定时创建、恢复和验证见 [cron-setup.md](references/cron-setup.md)；手动跑一次不等于授权新增持续调度。
 
-### Output format expected from Haiku
+## 参考
 
-```
-## 核心贡献
-[一句话]
-
-## 方法
-[2-3句]
-
-## 关键结果
-[逐表列出所有定量结果，保留原始数字]
-
-## 局限
-[作者提及的局限，若无则写"未提及"]
-```
-
-### Merge
-
-After all 5 agents return, merge their output into:
-- **Email digest**: the 📊关键结果 field
-- **Obsidian notes**: the 关键发现 + 批判 sections
-
-Non-blocking: if a Haiku agent fails or times out (>30s), mark that paper's
-key results as "PDF reading failed, check manually" and proceed.
-
-## Archive Protocol (⑥ in detail)
-
-For each of the TOP 5 papers, in order:
-
-**Zotero — Step A: Dedup check**
-```
-search_library(query="<paper title>")
-```
-If found → skip Zotero add, note existing key. If not found → proceed.
-
-**Zotero — Step B: Ensure collection exists**
-```
-get_collections()
-```
-If no `每日推送` collection → `create_collection(name="每日推送")`.
-
-**Zotero — Step C: Add paper**
-- DOI available → `add_items_by_doi(doi="10.xxxx/...")` (auto-resolves metadata + OA PDF)
-- arXiv only → `add_items(items=[{...}])` with full metadata
-
-**Zotero — Step D: Record key**
-Store the returned item key for cross-referencing in the Obsidian note's `zotero_key` field.
-
-**Obsidian — Step E: Write note**
-Create `{FirstAuthorLast}{Year}_{关键词}.md` with YAML frontmatter including `zotero_key`, to `D:/MD ideas/20-机器学习/文献/每日推送/{YYYY-MM-DD}/`.
-
-See `references/zotero-integration.md` for full tool signatures and error handling.
-
-## Two Modes
-
-| Mode | Trigger | What Happens |
-|------|---------|--------------|
-| **Config** | "配置文献推送" | User sets keywords, weights, delivery email, archive path. Creates config file. |
-| **Daily run** | Cron or manual "跑一次文献推送" | Full pipeline: search → score → deliver → archive |
-
-## Quick Start
-
-```
-我的研究方向是 [计算机视觉/大语言模型/...]，关键词: [transformer, attention, ...]
-```
-
-The agent will configure keywords, weights, and archive path. Then:
-
-```
-设置每日文献推送，每天早上8:30北京时间，检索30篇，推送TOP 5
-```
-
-## Archive Strategy
-
-| Store | What | How |
-|-------|------|-----|
-| **Zotero** | Full metadata (title, authors, DOI, arXiv ID, abstract) | `@xevos117/mcp-zotero` MCP tools |
-| **Obsidian** | Literature notes with scores, one-liner, methods, key results, commentary | Write to `D:/MD ideas/20-机器学习/文献/每日推送/` |
-
-## Built-in Safeguards
-
-- **Score validation**: Each dimension capped, total recalculated
-- **Deduplication**: DOI / arXiv ID / normalized title
-- **Read-only archive**: Pipeline writes to `每日推送/` directory only; never modifies existing notes without user approval
-- **Cron locality**: Claude Code CronCreate is process-local — the Claude session must be running for the cron to fire
-
-## References
-
-| Reference | Purpose |
-|-----------|---------|
-| `references/scoring-system.md` | Six-dimension scoring rubric with weights, caps, and rules |
-| `references/push-format.md` | Email digest message template with field guidelines |
-| `references/note-template.md` | Standardized Obsidian literature note format with YAML frontmatter |
-| `references/cron-setup.md` | Claude Code CronCreate guide and verification checklist |
-| `references/dedup-rules.md` | Triple deduplication rules |
-| `references/review-compilation.md` | Manual review compilation workflow (on-demand) |
-| `references/zotero-integration.md` | Concrete Zotero MCP tool calls, error handling, and archive flow |
-| `templates/config-template.yaml` | User configuration template |
+- 配置：[config-template.yaml](templates/config-template.yaml)
+- 按需汇编：[review-compilation.md](references/review-compilation.md)

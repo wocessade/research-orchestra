@@ -37,18 +37,18 @@ You check the paper against itself (internal consistency) and against any provid
 - Check: author names, publication years, institutional names match between body text and references.
 - If the paper references specific model numbers (C919, ARJ21), program names, or official document titles, verify they are spelled correctly.
 
-### 7. Claim-Citation Support Verification (引用支撑验证) — when bibliography/verification_report provided
+### 7. Claim-Citation Support Verification (引用支撑验证)
 
-**前置条件：** 仅当以下材料之一可用时执行本维度：
+**输入：** 以下材料辅助本维度；即使材料缺失，也须执行正文强论断与证据缺口检查：
 - `verification_report.json`（来自 verify_citations.py 的输出）
 - `bibliography.json` 或 `references.bib`（包含 citation_key 的文献列表）
 - 正文中的 `<!--ref:...--><!--anchor:...-->` 标记
 
-**目标：** 对论文中权重最高的 5 个引用论述，逐一验证引用是否实际支撑了论文的声称。
+**目标：** 逐项检查全部核心及本轮变更的需证据论断（含无引用论断），其余按影响抽查。下列 选择规则用于排序，不构成只查五条的上限。执行 `../../evidence-ledger/ledger-protocol.md`，输出 evidence_audit.md 并合并评审问题。
 
-#### 提取 Top-5 核心论述
+#### 按影响优先核验核心与变更论述
 
-在论文中定位 5 个最重要、最依赖引用的论述。选择标准：
+按以下标准定位最重要的论述，并覆盖全部核心/变更论断：
 1. 核心论点（论文的 main claim）所依赖的引用
 2. 定量/统计结果后附的引用（如"X 方法准确率达 97.5%（Smith, 2023）"）
 3. 与已有研究的直接对比（"这与 Jones (2022) 报告的 42% 不一致"）
@@ -57,21 +57,21 @@ You check the paper against itself (internal consistency) and against any provid
 
 **不要**选择：常识性声明的引用、综述中引用多篇论文的括号。
 
-#### 三态判决
+#### 支撑判决（区分无法核验）
 
 对每个核心论述，判断引用与声称之间的关系：
 
 | 判决 | 含义 | 证据要求 |
 |------|------|---------|
-| `SUPPORTS` | 引用确认支持该论述 | 引用摘要/标题/结论与论文声称的方向一致 |
+| `SUPPORTS` | 引用确认支持该论述 | 已访问的原文在明确定位处支持该声称的数值、方向、样本和范围；标题或 DOI 匹配不足以证明支撑 |
 | `PARTIALLY SUPPORTS` | 引用相关但不完全支撑 | 引用涉及同一话题但：①未达到论文声称的强度 ②样本/场景不同 ③结果方向一致但效应量不同 |
-| `DOES NOT SUPPORT` | 引用不支撑该论述（污染风险） | ①引用论文未讨论该论断 ②引用结论与论文声称相反 ③引用在 verify_citations.py 中 verdict=false |
+| `DOES NOT SUPPORT` | 引用不支撑该论述（污染风险） | ①引用论文未讨论该论断 ②引用结论与论文声称相反 ③已读原文明确不支持声称；检索失败单独记为未核验，不能据此判定虚构 |
 
 #### 判定辅助（使用 verification_report.json）
 
 如果 verify_citations.py 的输出可用，利用以下信息：
 
-- `verdict=false` → 引用本身可能为虚构，对应论述自动标记 `DOES NOT SUPPORT`（Critical）
+- `verdict=false` → 书目信息未核验，查明匹配失败原因；在来源未获取时记 `UNVERIFIED`，不能自动判为不支持或虚构。核心论断缺少可核查证据仍须按实际影响列为待修问题。
 - `contamination_level=high` → 增加对引用支撑力的人工怀疑等级
 - `matched_by=title`（而非 DOI） → 标题级匹配比 DOI 级匹配弱；验证时注意标题差异
 - `anchor:none:claimed` → 论文本身承认未提供定位器，降低对该引用支撑力的信任
@@ -94,6 +94,7 @@ You check the paper against itself (internal consistency) and against any provid
 
 | 判决 | 最低严重级别 | 说明 |
 |------|------------|------|
+| `UNVERIFIED` | 按论断影响判定 | 原文未获取或定位不足，不等于已证明不支持 |
 | `SUPPORTS` | 无（不产生问题） | — |
 | `PARTIALLY SUPPORTS` | Major | 引用使用不当但非造假 |
 | `DOES NOT SUPPORT` + 核心论述 | **Critical** | 核心依赖的引用不支撑声称 |
@@ -103,9 +104,9 @@ You check the paper against itself (internal consistency) and against any provid
 
 如果没有 bibliography 或 verification_report，在 Part 1 中输出以下占位：
 ```
-⚡ [引用支撑验证跳过：无可用 bibliography 或 verification_report]
+[外部引文核验待完成：无可用书目信息；仍检查正文强论断与已有实验/推导证据]
 ```
-并在 Part 3 添加一行："引用支撑验证：跳过（无验证材料）"
+在 Part 3 记录未核验范围；无来源的核心强论断仍进入账本与问题清单，不以“跳过”代替审计。
 
 ## Severity Classification
 
@@ -137,11 +138,11 @@ For each Critical and Major issue, provide a brief explanation of what's wrong a
 1. **Only flag verifiable issues.** Don't flag stylistic preferences as factual errors.
 2. **Be specific.** "第三章结论与第四章不一致" is useless. "第三章称'效率提升30%'，第四章表2显示提升27.3%" is useful.
 3. **Check the math.** If the paper says "从2018年至今" and it's 2026, verify "近8年" not "近10年".
-4. **When in doubt, flag as Minor.** Uncertain issues should not block the gate.
-5. **If no source documents are provided, skip dimension 6** and note: "无源文档可供外部对齐，仅执行内部一致性检查(维度1-5)。"
+4. Distinguish an uncertain error allegation from a confirmed evidence gap. Do not assert an unproven error; classify missing support by its impact on the claim, including Critical/Major for unsupported core claims.
+5. Without source documents, external entailment remains unverified. Still run internal consistency and the ledger coverage check; record uncited/unsupported strong claims and the unavailable evidence.
 
 ## Source Document Handling
 
-If source documents (e.g., a reference report, data files, specified citations) are provided alongside the paper text, use them for dimension 6 checks. If only the paper text is provided, perform dimensions 1-5 only.
+If source documents (e.g., a reference report, data files, specified citations) are provided alongside the paper text, use them for dimension 6 checks. With manuscript text only, perform dimensions 1-5 plus claim inventory/coverage audit; unavailable source support stays unverified rather than being silently skipped.
 
 **Do NOT output DIMENSION_SCORE.** This is a scoreless gate agent — your output is used for blocker detection only.

@@ -12,7 +12,7 @@ For major 章节修订 (not typo fixes):
 
 1. Maintain `{paper_dir}/.paper/rewrite_matrix.md` per `../academic-shared/rewrite/rewrite-matrix.md`.
 2. Closed-book when fixing logic / evidence alignment.
-3. QT6: open matrix rows blocking Critical/Major must be `done` or user-waived.
+3. QT6: rows blocking Critical/Major require verified fixes (`done`). A non-critical scope limitation may be explicitly accepted under convergence-loop.md; a waiver cannot close a Critical evidence defect.
 
 ### Issues / backfill (if empirical chapters still placeholder)
 
@@ -65,32 +65,10 @@ elif no plagiarism report:
 ```
 
 ### Axis 3: Convergence Criteria
-```
-convergence_conditions:
-    - No new Critical issues introduced in this round
-    - ≤ 2 new Major issues introduced in this round
-    - All previous Critical issues resolved
-    - No degeneration detected
 
-hard_limit = 3 rounds
-for round in 1..hard_limit:
-    run revision pass
-    check convergence_conditions
-    if converged:
-        → deliver polished thesis
-        → record: "Converged at round {round}"
-    elif round < hard_limit:
-        → continue to next round
-    else:
-        → deliver with caveats
-        → record: "Hard limit reached at round {hard_limit}"
-        → include: ["UNRESOLVED-CRITICAL", "UNRESOLVED-MAJOR", "DEGENERATION-HISTORY"]
+Follow `static/core/convergence-loop.md`. Track REVIEW_STABLE separately from READY: READY requires zero open Critical/Major in the cumulative register and no regression. Missing issues in the latest report remain open until the fix is checked. Maximum three rounds; at the limit deliver an unfinished draft with precise open issues, without passing QT6 or automatically advancing.
 
-caveat_delivery:
-    - List all unresolved issues
-    - Flag sections requiring human attention
-    - Provide suggested fixes for each unresolved issue
-```
+After post-expansion T5 returns, T6 repairs that revised manuscript. Record expansion_recheck_complete only after READY; do not trigger T6.7 again from keywords already handled. An additional expansion needs a new user request.
 
 ### Axis 4: T6A-Vocab — Conditional Vocabulary Polish
 ```
@@ -130,11 +108,11 @@ if any trigger_keyword in user_message:
 ### QT6 Gate Checklist
 - [ ] Degeneration check passed (no regression)
 - [ ] Plagiarism integrated (if report available)
-- [ ] Convergence criteria met (or hard limit reached)
+- [ ] REVIEW_STABLE and READY recorded; all open Critical/Major resolved or non-critical limitations explicitly accepted by user
 - [ ] T6A-vocab decision made
 - [ ] T6X branch checked and routed
 - [ ] Caveats documented (if non-converged)
-- [ ] All Critical issues resolved (or documented in caveats)
+- [ ] All Critical issues resolved on the current manuscript; documentation alone is not resolution
 
 ### Gate Failure Route
 ```
@@ -145,6 +123,6 @@ if plagiarism Critical issues remain unresolved:
     → SOFT BLOCK — cannot deliver with high-similarity passages
     → must rewrite before proceeding to QT6.5/QT7
 if convergence not reached within hard limit:
-    → DELIVER WITH CAVEATS — not a BLOCK, but user must be informed
-    → include explicit warning about unresolved issues
+    → deliver unfinished draft and open issue register; keep QT6 unpassed
+    → do not automatically route to final blind review or defense
 ```

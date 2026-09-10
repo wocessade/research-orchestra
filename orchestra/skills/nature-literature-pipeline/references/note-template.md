@@ -39,7 +39,7 @@ date_read: 2026-07-03
 ## Body Structure (6 sections)
 
 Sections 核心主张/方法/关键发现/批判 are populated by the Fine Read step
-(Haiku subagent reads PDF). See SKILL.md §④ for the spawn pattern.
+(read the PDF with available tools and retain page/table anchors). See SKILL.md workflow step 4.
 
 ```markdown
 ## 核心主张

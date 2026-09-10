@@ -11,6 +11,8 @@ description: >
 
 # Academic Plotting — Visual Arguments, Not Decoration
 
+执行范围与授权见 [共享执行规则](../academic-shared/references/execution-policy.md)；按当前任务读取阶段细则。
+
 Every figure is a **visual argument** with one core conclusion. Aesthetic polish
 is secondary to evidence integrity and reviewer defensibility.
 
@@ -61,7 +63,7 @@ standalone use). Pair with `academic-latex` for manuscript inclusion.
 
 1. Classify: evidence-result vs concept-method.
 2. Write figure contract (YAML or markdown).
-3. User confirms chart type / layout when ambiguous (thesis-plot style).
+3. Choose a chart/layout from the figure contract; ask only when the choice changes the intended scientific comparison.
 4. Generate asset + script/prompt under `figures/`.
 5. Export PDF/SVG (+ PNG preview ≥300 DPI).
 6. Caption + inventory + claim ledger link.
@@ -76,7 +78,7 @@ standalone use). Pair with `academic-latex` for manuscript inclusion.
 | Q5 gate | schematic + data figure minima, captions, colorblind, vector/DPI |
 | S7 | figure-text consistency |
 | S8 | paths exist; PDF compiles |
-| Visual QA (blind) | Final-width PNG / concept garbled text → `../deepseek-vision` outbound packet; single-figure quality stays here; page floats → `academic-latex` |
+| Visual QA (blind) | Inspect final-width PNG with available vision tools; external vision is optional. Figure quality stays here; page floats → `academic-latex` |
 
 Embedded routers: `nature-figure.md`, `scientific-visualization.md`,
 `scientific-schematics.md` point here for the full protocol.

@@ -1,66 +1,34 @@
-# Bogda runner handshake（线上已备，线下接 worker）
+# Bogda runner handshake — 更新至 2026-09-10
 
-日期：2026-09-02  
-适用：owner 在线下把 runner 拉起来之后，把 3101 接到**同一套文件**，而不是再写一层调度。
+本文件保留原链接作为接机入口。真机资源、部署边界和续接顺序以[最新交接](2026-09-10-bogda-runner-handoff.md)为准。
 
-**不是 3100 切换。不是 Wake Bridge。不是把研究任务丢进现网 `pi-service`。**
+## 当前已接通
 
-现网 Orchestra 雷达已停，见 [`2026-09-02-orchestra-pre-runner-freeze.md`](2026-09-02-orchestra-pre-runner-freeze.md)。broker / exam-watch / backup 仍在。
+Y7000 的 SSH、WSL2 Ubuntu、NAS、dorm-x86 worker 均通过验证；并发 1，自主 shell smoke Completed。Windows 登录启动 WSL、systemd 自动启动 worker，WSL 重启恢复通过。Orchestra 与 3100 已停用。
 
-## 已经在线上准备好的
+3101 仍为 real-readonly / observer，仅显示基础设施和结果。真实 checkpoint 在进入暂停前因 Artifact key 下划线格式失败；本地修复与回归测试完成，尚未部署。
 
-- Gate 7 联合 work-pool 白名单（submit/cancel/review/checkpoint）
-- 本机角色：`BOGDA_CONSOLE_ROLE` = owner | observer | operator
-- 受控日志：`GET /api/v1/runs/{id}/logs`
-- 产物清理：`POST /api/v1/runs/{id}/artifacts/cleanup`，确认词 `delete-content`（删 stdout/stderr，留 tombstone 与 events）
-- >20 CNY 签发：`POST /api/v1/runs/{id}/approvals`；MAC 不回显；worker 用同一 SQLite `get_open` / `consume_open`
-- usage-unknown：`BOGDA_USAGE_UNKNOWN_DB` 指向 worker 的同一库
-- 峰谷 dispatcher 内核已测，**不**调用 Prefect
+## 精确资源
 
-## 你接上 runner 之后要填的（值不入库）
+| 配置 | 已创建的目标 |
+|---|---|
+| work pool | dorm-x86 |
+| queue ID | 2e773bf9-cba7-46ed-b93d-f1b2ea65dc27 |
+| deployment ID | ebd2b9ce-46e3-4db2-9ad3-1a6e39b5fd02 |
+| Prefect API | http://100.78.158.80:4200/api |
+| NAS inbox | /mnt/nas/.bogda/inbox |
+| NAS artifact root | /mnt/nas/.bogda/runner/artifacts |
 
-3101 用 `allowlisted-test`。把 runner 的 **deployment / queue / work pool** 精确 ID 写进环境，禁止 `*`，禁止把生产 `pi-service` 填进研究白名单。
+这些 ID 已记录，但尚未写入 console 白名单。下一步先部署 checkpoint 修复，用新的幂等键重测实际暂停/恢复，再核对控制台操作范围。不要重新创建 pool/queue/deployment。
 
-```
-BOGDA_CONSOLE_PROFILE=allowlisted-test
-BOGDA_CONSOLE_ROLE=owner
-BOGDA_CONSOLE_ACTOR=local-owner
-PREFECT_API_URL=http://10.77.0.1:4200/api
-BOGDA_CONSOLE_ALLOWED_DEPLOYMENT_IDS=<runner-deployment-id>
-BOGDA_CONSOLE_ALLOWED_QUEUE_IDS=<runner-queue-id>
-BOGDA_CONSOLE_ALLOWED_WORK_POOL_NAMES=<runner-pool-name>
-```
+## 原共享数据库建议已撤回
 
-共享文件（console 与 worker 必须是同一路径，建议 NAS；**先建目录、后放库文件**，HMAC 只在机器上生成）：
+原文建议 console 和 worker 直接通过 NAS 共用 SQLite 文件。本次核实两个 store 强制启用 WAL；[SQLite 官方文档](https://sqlite.org/wal.html)要求 WAL 使用者位于同一主机。NAS 双向读写成功不能替代数据库事务验收。
 
-```
-# sudo bash bogda/deploy/shared/prepare_runner_share.sh
-BOGDA_ARTIFACT_ROOT=/mnt/nas/.bogda/runner/artifacts
-BOGDA_USAGE_UNKNOWN_DB=/mnt/nas/.bogda/runner/usage-unknown.sqlite
-BOGDA_APPROVAL_DB=/mnt/nas/.bogda/runner/approvals.sqlite
-# 小附件：/mnt/nas/.bogda/inbox/<run_id>/<file>  （默认 ≤ 8MiB/文件，硬顶 32MiB；禁止 D:\）
-# BOGDA_APPROVAL_HMAC_KEY 只写进盒子/runner 环境，不入库
-```
+当前 runner.env 中审批/recovery 路径只是预留配置，worker runtime 接线尚未完成。暂不在 console 配置这些库，不开放付费审批/恢复。后续评估由 RK 单点持有 SQLite、runner 经窄接口访问；尚未实现。
 
-生成 HMAC（只在本机或盒子上跑，不要提交、不要贴进聊天）：
+## 日志与验收剩余项
 
-```
-python -c "import secrets; print(secrets.token_hex(32))"
-```
+shell 的实际日志目录为 WSL 本地 `attempts_root/job_id/run_id/attempt-0001/`，console 读取器期待 `artifact_root/run_id/attempt-*/`。自动发布/归档尚未连接，不能仅设置 artifact root 就声称日志联动通过。
 
-模板见 `bogda-console/env.allowlisted-test.example`。
-
-## 接上后怎么验收（短）
-
-1. 3101 基础设施页能看到 runner 的 pool/queue/worker heartbeat。
-2. 只读打开一条 runner 的 run：日志区能读 stdout/stderr（根目录对上才会存在）。
-3. 需要 >20 CNY 时，运行详情签发凭证；worker 侧 `consume_open` 成功一次，重放失败。
-4. 清理按钮只删内容，events.jsonl 还在。
-5. **开放 checkpoint**：worker 真正挂起后才会出现裁决控件。没有 worker 就不要当作 DEF-03 已过。
-
-## 仍不要做
-
-- 改 3100 入口
-- 研究 Flow 进 `pi-service`
-- 未开口就删盒子上 S2 验收资源 `bogda-s2-acceptance-20260901-...`
-- 把 HMAC、API key、Prefect auth 写进仓库或对话
+待验收：真实 checkpoint 两次暂停恢复、3101 checkpoint 展示/操作、自动日志发布、一次性付费审批与 usage-unknown 恢复。没有完成这些验收前，不宣布完整接替。HMAC 与 NAS/Prefect 凭据只保留在机器的私有环境文件。

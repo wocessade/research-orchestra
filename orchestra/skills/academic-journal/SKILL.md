@@ -5,6 +5,8 @@ description: 期刊论文写作辅助：结构化写作、文风学习、多维�
 
 # Academic Journal — 期刊论文写作模块
 
+执行范围与授权见 [共享执行规则](../academic-shared/references/execution-policy.md)；按当前任务读取阶段细则。
+
 独立模块，用于撰写和打磨期刊论文。支持两种写作模式和完整的 evaluate 评审体系。
 
 ## 能力范围
@@ -27,7 +29,7 @@ description: 期刊论文写作辅助：结构化写作、文风学习、多维�
 > **默认写作顺序（Core-First Protocol）：**
 > Methods → Results → Discussion → Introduction → Abstract → Title
 >
-> Introduction 和 Abstract **必须在主体（Methods/Results/Discussion）完成之后写**——这是写论文的基本技巧：你不先搞清楚自己做了什么、发现了什么，根本不知道要引入什么、总结什么。
+> 默认在主体证据稳定后定稿 Introduction 和 Abstract；已有草稿、局部修订或作者指定顺序时直接进入对应章节。
 >
 > 作者可按需要调整顺序（如数据图表已就绪则先写 Results），AI 跟随作者的指定，不强制纠正。但默认按 Core-First 推进。
 
@@ -97,3 +99,9 @@ Validate: `python ../academic-shared/issues/validate_issues.py .paper/issues.csv
 
 When `{research_root}/.research/handoff/` exists, S1/S3 **preload** `ready_for_writing.md` (verified evidence + forbidden claims) before inventing a parallel RQ/contribution story. Skill: `../academic-research-engine/`. Sync: `py -3 ../academic-research-engine/scripts/handoff_sync.py --paper-dir {paper_dir}`.
 
+
+## Evidence and Review Contract
+
+Writing/revision uses [the evidence ledger](../academic-shared/evidence-ledger/ledger-protocol.md): include uncited evidence-requiring claims and internal results; changes invalidate prior support checks.
+Use [citation support rules](../academic-shared/citation/citation-support-bank.md) to separate bibliographic verified from source entailment.
+Review follows [convergence-loop](static/core/convergence-loop.md): stable feedback is not READY while Critical/Major defects remain. Apply [anti-defensive writing rules](static/core/do-dont.md#避免防御性写作) while retaining material uncertainty.

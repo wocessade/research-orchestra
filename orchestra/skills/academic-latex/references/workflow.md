@@ -31,7 +31,7 @@ Intake (metadata, venue, artifacts)
 Do not fill `main.tex` body with full prose until:
 
 - Metadata frozen
-- Outline approved (or user explicitly says proceed)
+- Outline approved (including existing explicit authorization to proceed; do not ask again)
 - Claim-evidence map exists for every major contribution claim
 - Venue template / document class chosen
 
@@ -74,11 +74,11 @@ When context saturates (rising hard-fail counts, drifting numbers), write:
 
 ## Done definition
 
-A section is done only if:
+For a completed draft/revision batch:
 
 1. verify_paper hard fails = 0 for that section
-2. Full compile succeeds (or soft warnings accepted by user)
-3. PDF eyeballed for changed pages — if blind, compile → page image(s) → **deepseek-vision** single-point hypothesis (column overflow, clipped figure, bad float); re-capture after fix → new vision chat
+2. Relevant checks pass under [verification.md](verification.md); final delivery requires a successful full compile
+3. Changed PDF pages visually checked when layout is affected, using available render/vision tools; record any unavailable visual check
 4. Ledger updated for new claims
 5. Unresolved markers reported as blockers
 

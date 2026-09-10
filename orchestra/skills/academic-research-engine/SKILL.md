@@ -10,6 +10,8 @@ description: >
 
 # Academic Research Engine — 科研发动机
 
+执行范围与授权见 [共享执行规则](../academic-shared/references/execution-policy.md)；按当前任务读取阶段细则。
+
 **一句话：** 研究状态机 + 编排器 — 生产并登记「可写进论文的 verified 证据」；
 `academic-journal` / `academic-thesis` 只消费这些证据。
 

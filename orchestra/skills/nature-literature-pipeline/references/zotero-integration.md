@@ -1,6 +1,6 @@
 # Zotero Integration Guide
 
-The pipeline uses the `@xevos117/mcp-zotero` MCP server (15 tools) to archive papers.
+This is an adapter example for `@xevos117/mcp-zotero`. Confirm available tools and current schemas before use. Project Zotero integration remains deferred; only write when the user explicitly authorizes the target library and scope.
 
 ## Available Tools (pipeline-relevant subset)
 
@@ -25,7 +25,7 @@ mcp__zotero__search_library(query="<paper title>")
 - **Found** → skip this paper, record existing key. Log: "已存在 Zotero: <key>"
 - **Not found** → proceed to Step 2
 
-If search returns an error, treat as "not found" and proceed — don't block the pipeline.
+A search error is not evidence of absence. Keep the local note and mark Zotero pending; resolve the lookup before adding an item.
 
 ### Step 2: Ensure collection exists
 
@@ -50,7 +50,7 @@ mcp__zotero__create_collection(name="{YYYY-MM}", parent_key="<每日推送的key
 ```
 mcp__zotero__add_items_by_doi(doi="10.xxxx/...")
 ```
-Returns the item key. Auto-resolves metadata from Crossref. OA PDF auto-attach requires `UNPAYWALL_EMAIL` env var (not currently configured).
+Returns the item key. Auto-resolves metadata from Crossref. OA PDF auto-attach requires `UNPAYWALL_EMAIL` env var; inspect presence without printing the value.
 
 **Fallback — arXiv only, no DOI:**
 ```
@@ -69,7 +69,7 @@ mcp__zotero__add_items(items=[{
 }])
 ```
 
-If `add_items_by_doi` fails (network, unknown DOI), fall back to `add_items`.
+If DOI creation definitely did not write an item, verified metadata may be used with `add_items`. After a timeout or uncertain response, check for an existing item before retrying.
 
 ### Step 4: Attach arXiv PDF (for arXiv papers)
 
@@ -86,7 +86,7 @@ mcp__zotero__add_items(items=[{
 }])
 ```
 
-This avoids the complexity of file upload to Zotero Web API (which requires multipart authorization). For arXiv papers, the PDF is always available at this stable URL.
+This avoids the complexity of file upload to Zotero Web API (which requires multipart authorization). Check that the arXiv PDF resolves; record an unavailable attachment separately.
 
 ### Step 5: Store returned key
 
@@ -107,12 +107,12 @@ Non-blocking — if this fails, papers still have metadata and arXiv linked PDFs
 
 | Failure | Action |
 |---------|--------|
-| `search_library` fails | Treat as "not found", proceed to add |
-| `get_collections` fails | Skip collection creation, add items directly |
-| `add_items_by_doi` fails | Fall back to `add_items` with manual metadata |
+| `search_library` fails | Mark Zotero pending; resolve dedup lookup before adding |
+| `get_collections` fails | Keep pending unless authorization permits adding outside the target collection |
+| `add_items_by_doi` fails | Check for partial success; use verified metadata only after confirming no write |
 | `add_items` fails | Log warning, skip this paper in Zotero but still include in Obsidian + email |
 | arXiv PDF attachment fails | Non-blocking, metadata is still stored |
-| `find_and_attach_pdfs` fails | Non-blocking, skip silently |
+| `find_and_attach_pdfs` fails | Keep metadata and report attachment failure |
 
 ## Dedup Strategy
 
@@ -123,6 +123,6 @@ Non-blocking — if this fails, papers still have metadata and arXiv linked PDFs
 ## Notes
 
 - `UNSAFE_OPERATIONS` defaults to `none` — deletions are blocked, which is correct for pipeline use
-- `UNPAYWALL_EMAIL` not configured — OA PDF auto-attach via Unpaywall won't work unless added
+- Check whether `UNPAYWALL_EMAIL` is configured before expecting OA attachment support
 - Zotero syncs to desktop client automatically via Web API
 - Returned item keys are the bridge between Zotero items and Obsidian notes

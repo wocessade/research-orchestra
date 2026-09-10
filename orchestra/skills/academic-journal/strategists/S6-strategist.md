@@ -1,6 +1,6 @@
 # Stage S6: Citations & References [Strategist]
 
-**Gate:** Q6 (BLOCK) — every citation verified (DOI resolves), BibTeX compiles, reference count matches citation count
+**Gate:** Q6 (BLOCK) — bibliography identity and source support separately checked, BibTeX compiles, reference count matches citation count
 **Goal:** Every citation is real, accessible, and correctly formatted for the target venue.
 **Needs Composers:** [citation-anchor-format, literature-precheck]
 
@@ -11,7 +11,7 @@
 ### Citation Support Bank (P1)
 
 1. Load `.paper/citation_support_bank.md` + `../academic-shared/citation/citation-support-bank.md`.
-2. Verify candidate DOIs; set `verified=true`; remove or PLACEHOLDER_ failures.
+2. Verify bibliographic identity and set `verified=true` for metadata only; unresolved lookup stays unverified. Separately record `support_status`, original `source_excerpt` and `locator` per the bank protocol. Only supports confirms the exact claim; metadata success alone does not.
 3. Prefer bank keys when normalizing bibliography; keep bank ≠ style samples.
 
 
@@ -25,7 +25,7 @@
 
 1. Run batch verification (primary mechanism)
 2. For each verdict → route accordingly
-3. Run claim-to-citation alignment for top-5 references
+3. Run claim-to-citation alignment for all core and changed claims
 4. Retraction check (advisory)
 5. Per-reference verification for failed entries (legacy methods)
 6. Chinese refs via Playwright CNKI/Wanfang workflow
@@ -59,7 +59,7 @@ Read `{output_dir}/verification/verification_report.json`. Per-entry verdicts:
 | Verdict | Action | Severity |
 |---------|--------|----------|
 | `true` | Proceed normally | — |
-| `false` (DOI existed but no API matched) | **BLOCKING.** Replace or delete the citation. Document in fix log. | CRITICAL |
+| `false` (DOI existed but no API matched) | Investigate unresolved bibliographic identity using the actual source; record missing core support separately. | By claim impact; API absence alone is not fabrication |
 | `unresolvable` | Tag as `⚠️ [待用户确认]`. Resolve via Tier 2/3 protocols before gate passes. | HIGH |
 | `contamination_level=high` | Review manually. If preprint without peer-reviewed follow-up, note in citation. | MEDIUM |
 | `preprint_post_2024=true` | Label as "preprint" in text, not as peer-reviewed publication. | MEDIUM |
@@ -68,7 +68,7 @@ Read `{output_dir}/verification/verification_report.json`. Per-entry verdicts:
 
 ### Claim-to-Citation Alignment (S6, lines 39-61) — NEW
 
-For top-5 most heavily cited references, perform alignment check:
+For all core and changed claims, perform alignment checks; order them by impact:
 
 1. Extract: "What does our manuscript CLAIM this paper says?"
 2. Verify against paper's own abstract/intro/conclusion: "What does the paper ACTUALLY say?"
@@ -108,7 +108,7 @@ For each Chinese-language reference, structured fallback chain:
 2. **Fallback 1 — Wanfang:** Retry via Playwright MCP (same browser session)
 3. **Fallback 2 — Both failed:** Mark as `[NEEDS USER CONFIRMATION]` → present to user for manual verification
 4. **If Playwright MCP unavailable:** Manual checklist. Ask user to verify flagged references against CNKI/Wanfang. Provide copy-paste-ready checklist.
-5. **Document:** "Chinese-language references verified via CNKI/Wanfang; English-language references verified via DOI resolution."
+5. **Document:** "Record bibliography lookup methods in citation_audit_summary.md, not as boilerplate in manuscript prose."
 
 ### Citation Count Targets (S6, lines 86-96)
 
@@ -134,7 +134,7 @@ Too few = poor literature grounding. Too many = indiscriminate citing. Every ref
 | Format inconsistency (APA vs Vancouver mixed) | `skills-embedded/bib-search-citation.md` auto-detect and normalize |
 
 ### STOP-AND-ASK Points
-- `false` verdict: confirm fabricated DOI suspicion with user. Replace or delete.
+- `false` verdict: investigate metadata mismatch and source access; do not label fabricated solely because lookup failed.
 - `unresolvable` after Tier 2/3 resolution: ask user to provide correct citation or accept removal.
 - `DOES NOT SUPPORT` in claim alignment: ask user whether to rewrite claim or find correct citation.
 - ≥2 retracted citations found: warn user, suggest replacements.
@@ -143,12 +143,12 @@ Too few = poor literature grounding. Too many = indiscriminate citing. Every ref
 
 ### Q6 Gate Checklist
 - [ ] `verify_citations.py` batch verification complete — `verification_report.json` reviewed
-- [ ] No `false` verdicts remain (all DOI-keyed unmatched citations resolved: replaced or deleted)
+- [ ] Metadata mismatches investigated; unresolved core support recorded as open review issues, not automatically labeled fabrication
 - [ ] No `unresolvable` citations left unresolved (all tagged as ✅ or ⚠️ user-confirmed)
 - [ ] **Metadata check: title/author/venue/year matches API response for top 20% of references**
 - [ ] Contamination signals reviewed: `contamination_level=high` entries inspected
 - [ ] Preprint citations (`preprint_post_2024=true`) correctly labeled in text
-- [ ] **Claim-to-citation alignment (6A.2) complete for top-5 references — no `DOES NOT SUPPORT` findings**
+- [ ] **Claim-to-citation alignment (6A.2) complete for all core and changed claims — no `DOES NOT SUPPORT` findings**
 - [ ] BibTeX file compiles without errors (run `skills-embedded/bib-search-citation.md` export)
 - [ ] Reference count matches citation count (no orphan refs, no missing refs)
 - [ ] Citation style matches target venue requirements (check `skills-embedded/venue-templates.md`)

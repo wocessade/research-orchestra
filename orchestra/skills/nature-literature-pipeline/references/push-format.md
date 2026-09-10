@@ -34,27 +34,17 @@ arXiv: {arxiv_id} | DOI: {doi if available}
 |-------|-----------|
 | 💡 一句话 | 15-second judgment on whether to open the original; must capture core contribution |
 | 🔬 方法 | Model family/scale, training method, dataset, benchmarks, baselines |
-| 📊 关键结果 | **Populated by Haiku subagent from PDF**. Specific metrics, benchmark comparisons, ablation numbers. Never vague. |
+| 📊 关键结果 | **Extracted from PDF with source page/table anchors**. Specific metrics, benchmark comparisons, ablation numbers. Never vague. |
 | 🧭 点评 | Actual value to the research mainline, limitations, full-text recommendation |
 | ⭐ 评分 | Coarse-filter score (0-10). Internal six-dimension uses 0-100 with per-dimension cap validation |
 
-All 💡/🔬/📊/🧭 fields come from the Fine Read step (④ in SKILL.md) —
-Haiku subagents read each paper's PDF and extract structured output.
+All 💡/🔬/📊/🧭 fields come from the Fine Read step (workflow step 4 in SKILL.md) —
+Use available tools to read each paper's PDF and extract structured output.
 Do NOT populate these fields from abstract alone.
 
 ## Email Delivery
 
-Use the email MCP server (`mcp__email__send_email`):
-
-```
-mcp__email__send_email(
-  subject="📅 {YYYY-MM-DD} 文献日报 | CS/AI Research Daily",
-  body="<formatted digest per template above>"
-)
-```
-
-The email MCP is configured in `mcp.json` and uses QQ SMTP (1904134720@qq.com).
-Default `to` address is the sender itself — no need to specify.
+Use an available email tool only when explicit authorization covers the recipient and this run (or the saved recurring task). Verify the actual recipient and tool schema; do not assume the sender is the recipient or that a named MCP is installed. Without sending authorization, deliver a reviewable digest draft.
 
 ## Archive Confirmation Footer
 

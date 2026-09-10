@@ -12,6 +12,8 @@ description: >
 
 # Academic LaTeX — Claim-Evidence Paper Engineering
 
+执行范围与授权见 [共享执行规则](../academic-shared/references/execution-policy.md)；按当前任务读取阶段细则。
+
 Treat LaTeX paper writing as **claim–evidence engineering with a compile gate**,
 not fluent prose generation. This skill is the canonical LaTeX protocol for the
 `academic-*` family (`academic-journal` / `academic-thesis` / `academic-coursework`).
@@ -31,18 +33,9 @@ reuse citation + compile gates here.
    [references/citations.md](references/citations.md).
 3. **Core-First draft order** (default): Methods → Results → Discussion →
    Introduction → Abstract → Title. Framing sections after evidence sections.
-4. **Compile before judging layout.** Never assess floats/density from `.tex`
-   alone; build PDF and inspect changed pages. Blind / text-only orchestrator:
-   render changed pages to PNG (or PDF page images) and verify **one layout
-   hypothesis** via `../deepseek-vision` (overflow, clipped float, sparse page) —
-   not a full-page describe. Single-figure quality → `academic-plotting`.
-5. **Mechanical verification after every section.** Run
-   `scripts/verify_paper.py` (or the checklist in
-   [references/verification.md](references/verification.md)) and fix hard
-   failures before the next section.
-6. **Context hygiene.** One section per sitting; open only that section’s
-   evidence; re-read artifacts before writing numbers. Long sessions → handoff
-   with a short state note (integrate with academic-shared session persistence).
+4. **Visual verification.** Compile and inspect changed PDF pages when layout is affected and before final delivery. Use available page rendering/vision tools; a named external vision service is optional.
+5. **Proportionate checks.** Run `scripts/verify_paper.py` after a meaningful draft/revision batch and at delivery. Fix relevant hard failures; repeat checks after fixes, not on a fixed number of rounds. See [references/verification.md](references/verification.md).
+6. **Focused context.** Open the evidence needed for the current section or related batch; re-read artifacts before adding numbers. Record a short handoff when pausing long work.
 7. **Figures.** Evidence plots → `academic-plotting` (deterministic). Concept
    diagrams → `academic-plotting` concept route. Never invent numbers in figures.
 8. **Do not replace the author.** Assist structuring, drafting, checking, and
@@ -103,15 +96,14 @@ Maintain concise files so future sessions avoid re-reading the whole manuscript:
 ### First invocation
 1. Inventory artifacts (code, logs, notes, venue template) — paper is written
    *from* these, not from chat memory.
-2. Build claim–evidence map; propose outline; **get user verdict** before long draft.
+2. Build claim–evidence map; use the approved outline or obtain the outstanding contribution/outline decision before long drafting.
 3. Scaffold layout per [references/project-layout.md](references/project-layout.md).
 4. Draft section-by-section (Core-First), citing as you write.
 
-### Per-section loop
-1. Open only this section’s evidence → draft.
-2. Run `python scripts/verify_paper.py <paper_root>` (hard fails block).
-3. `latexmk -pdf` (or tectonic / xelatex as required) → scan log → eyeball PDF.
-4. Update glossary + ledger; append evidence_ledger entries (shared protocol).
+### Draft/revision batch
+1. Read the affected sections and evidence, then draft or revise.
+2. Verify according to [references/verification.md](references/verification.md).
+3. Update glossary and claim ledger for changed terminology or claims.
 
 ### Revision priority
 Paper architecture → section job → paragraph logic → claim/evidence/boundary →

@@ -1,40 +1,33 @@
 # Shared Convergence Loop Protocol
 
-Used by review-and-revise stages to iterate until quality stabilizes or the hard limit is reached.
+Each review/revision cycle uses the current manuscript and a cumulative issue register. Maximum three review rounds; reaching the cap stops automatic iteration, not evidence checks.
 
-## Protocol
+## Issue Register and Closure
 
-### 3-Round Max Loop
+Keep stable issue IDs, severity, affected claim/section, status (open / resolved / accepted), and closure evidence in the review report. This review register is separate from the experiment backfill issues.csv contract.
+An issue is resolved only after its fix is checked in the current manuscript. A user may explicitly accept a non-critical scope limitation with rationale; this does not turn missing evidence into verified evidence. Critical validity/evidence defects remain open until fixed or the affected claim is removed/narrowed and reviewed.
+An item disappearing from a later review is a closure candidate, not proof of resolution. `diff_issues.py` FULLY_ADDRESSED means no match in that review; inspect the original issue and fix evidence before closing it. Keep unmatched unresolved issues in the cumulative register.
 
-Each round: apply Critical + Major fixes from the consolidated review, then re-run the review stage against the revised output. Maximum 3 rounds (initial review + 2 revision cycles).
+## Two Separate Decisions
 
-### Round Procedure
+- **REVIEW_STABLE:** no new Critical and at most two new Major items. This measures review stability only.
+- **READY:** zero open Critical and zero open Major across the cumulative register, no regression, and applicable stage checks completed on the current manuscript. Accepted non-critical limitations must have explicit user rationale; review scores cannot waive evidence defects.
+- **CONVERGED:** REVIEW_STABLE and READY. Otherwise continue targeted repairs within the round limit.
 
-1. **Apply fixes:** Fix all Critical items. Fix all Major items (document any that cannot be fixed). Minor items as time permits, can be deferred.
-2. **Save previous evaluation:** Back up the current review report before re-running.
-3. **Re-run review:** Execute the same review agents against the revised output.
-4. **Run semantic diff:** Compare current vs. previous issue lists using `evaluate/scripts/diff_issues.py`.
-5. **Evaluate convergence:** Check criteria below.
+## Round Procedure
 
-### Convergence Criteria
+1. Fix open Critical/Major findings and record original issue, affected version/location and fix evidence.
+2. Preserve the previous report; re-review the revised manuscript and update the cumulative register.
+3. Use semantic diff as matching assistance, not as the gate decision. Check old unresolved items even when no new problems are reported.
+4. Reappearing resolved issues reopen; inspect the cause and repair the affected scope before claiming READY.
+5. Record both REVIEW_STABLE and READY, counts of all open Critical/Major, accepted limitations and remaining actions in `{output_dir}/{prefix}_convergence_report.md`.
 
-- **CONVERGED:** New Critical = 0 AND New Major <= 2
-- **CONTINUE:** New Critical > 0 OR New Major > 2
+## Hard Limit and Delivery
 
-### Degeneration Detection
+At round three, stop automatic review loops. If not READY, deliver the current draft and concrete open issues as unfinished work; do not mark the gate passed or advance automatically to submission, blind-review finalization or defense. Continue affected fixes when authorized. Do not pad the manuscript with generic disclaimers to hide unresolved defects.
 
-Check `NOT_ADDRESSED` items from the diff against the fix log's `Original:` fields. If a previously-fixed issue reappears unchanged in the current review, **STOP** immediately. The fix approach needs re-examination -- do not continue iterating. Present the degenerated issues to the user.
+## Outputs
 
-### Hard Limit
-
-Maximum 3 rounds. If not converged after 3 rounds: report remaining issues to the user, note the hard limit, and deliver with a caveat about unresolved items.
-
-### Fix Log Requirements
-
-Every fix log entry must include an `Original:` field with the full issue description from the consolidated review. This enables degeneration cross-referencing between rounds.
-
-### Per-Round Outputs
-
-- Fix log: `{output_dir}/{prefix}_fix_log_round{N}.md`
-- Convergence report: `{output_dir}/{prefix}_convergence_report.md`
-- Saved previous evaluation: `{output_dir}/report_previous.json`
+- `{output_dir}/{prefix}_fix_log_round{N}.md`: Original issue, stable ID, fix and verification.
+- `{output_dir}/{prefix}_convergence_report.md`: cumulative register, stability and readiness.
+- `{output_dir}/report_previous.json`: previous evaluation.

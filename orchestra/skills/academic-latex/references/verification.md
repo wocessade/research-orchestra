@@ -2,14 +2,11 @@
 
 Long-document generation degrades silently. Trust scans, not impressions.
 
-## Loop
+## When to verify
 
-```text
-draft section -> verify_paper.py -> fix hard fails -> re-run
-             -> CLEAN -> compile PDF -> next section
-```
+Run `verify_paper.py` after a meaningful draft/revision batch and before delivery. Compile and inspect changed pages for layout-affecting edits and inspect the final PDF at delivery. Repeat after a fix or new change; do not require fixed repair rounds or a full compile after every paragraph.
 
-Two fix passes are normal; fixes introduce new errors.
+Draft placeholders may remain while evidence is being collected; report them as unresolved. They block a final-ready claim, not unrelated draft work. Citation and numerical evidence requirements remain unchanged.
 
 ## Hard failures (block)
 
@@ -36,7 +33,7 @@ After:  ...
 Why:    ...
 ```
 
-Group, let user accept/reject, apply batch, re-verify.
+Apply authorized mechanical fixes as a batch and verify. Ask before changing scientific meaning or resolving an outstanding author decision.
 
 ## Pre-submit bundle
 

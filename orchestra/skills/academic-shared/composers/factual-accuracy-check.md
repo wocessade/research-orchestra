@@ -26,14 +26,14 @@
 | 5 | Internal contradiction | Does the paper contradict itself anywhere? | Yes |
 | 6 | Source-document alignment | Does the manuscript match the source documents? | Only when source docs exist |
 
-**If no source documents are provided:** The agent notes this and runs dimensions 1-5 only (internal consistency check).
+**If no source documents are provided:** Run dimensions 1-5 plus the ledger coverage audit; record unavailable source support and classify core evidence gaps by impact.
 
 ### 3. Severity Classification
 
 | Severity | Meaning | Action |
 |----------|---------|--------|
 | Critical | Blocks Q7 gate | Must be fixed — same severity as paper-audit Critical items |
-| Major | Must be addressed | Fixed or deferred with documented reason |
+| Major | Must be addressed | Resolved or explicitly accepted as a non-critical scope limitation under convergence-loop.md; evidence defects remain open |
 | Minor | Advisory | Can be acknowledged without action |
 
 ### 4. Documenting Results
@@ -49,10 +49,10 @@ The agent writes results to `{output_dir}/agent_reports/factual_accuracy_review.
 ```
 1. Load agent prompt from {pipeline_root}/evaluate/stage_agents.md
 2. Dispatch factual_accuracy subagent with manuscript text
-3. Agent runs 6-dimension check (dimension 6 skipped if no source documents)
+3. Agent runs internal/source checks plus current-manuscript ledger coverage; unavailable sources remain unverified
 4. Results written to {output_dir}/agent_reports/factual_accuracy_review.md
 5. All Critical errors resolved before gate
-6. Major errors fixed or deferred (documented)
+6. Major errors resolved under convergence-loop.md; no waiver of evidence defects
 7. Minor errors documented as advisory
 ```
 
@@ -60,17 +60,17 @@ The agent writes results to `{output_dir}/agent_reports/factual_accuracy_review.
 
 - [ ] `factual_accuracy` agent prompt loaded from `{pipeline_root}/evaluate/stage_agents.md`
 - [ ] Agent dispatched with complete polished manuscript text
-- [ ] All 6 dimensions evaluated (or 5 if no source documents)
+- [ ] Internal/source checks and ledger coverage completed; unavailable support recorded explicitly
 - [ ] Report written to `{output_dir}/agent_reports/factual_accuracy_review.md`
 - [ ] Report follows 3-part format (annotated text / explanation / change log)
 - [ ] No Critical factual errors remain (blocks Q7 gate)
-- [ ] All Major errors fixed or deferred with documented reason
+- [ ] All Major errors resolved under convergence-loop.md; accepted scope limitations recorded separately
 - [ ] Minor errors documented as advisory
 
 ## Common Pitfalls
 
 - **Skipping the agent prompt:** Running the check without loading `stage_agents.md` means the agent lacks the domain-specific factual accuracy rubric. Always load the prompt.
-- **Failing to distinguish source-document alignment from internal consistency:** When no source documents exist, dimension 6 is not applicable. Do not fabricate a "no source" finding — simply note it was skipped and run dimensions 1-5.
+- **Failing to distinguish source-document alignment from internal consistency:** When no source documents exist, dimension 6 is not applicable. Do not invent an error in an unavailable source. Still record concrete unsupported core claims and the evidence needed to verify them.
 - **Treating Minor findings as blockers:** Minor factual issues are advisory. Spending time fixing every comma or phrasing inconsistency in the accuracy pass distracts from real Critical/Major issues.
 - **Overlapping with paper-audit:** Factual accuracy focuses on objective truth (numbers, cross-references, contradictions), while paper-audit focuses on writing quality and argument strength. Keep the audits separate — do not merge them.
-- **Deferring without documentation:** If a Major error is deferred, the reason must be documented in the change log. A bare "deferred" with no rationale is not acceptable.
+- **Deferring without documentation:** Only a non-critical scope limitation may be explicitly accepted under convergence-loop.md. Missing core evidence remains open; a deferred label cannot pass the gate.

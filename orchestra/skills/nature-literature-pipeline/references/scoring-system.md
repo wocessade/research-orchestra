@@ -1,6 +1,6 @@
 # Six-Dimension Scoring System
 
-Used in the coarse-filtering stage (30 → 5 papers). Each paper is scored 0-100 across six weighted dimensions.
+For standalone close-reading/archival selection (30 → 5 papers), score 0–100 across six dimensions. Research Orchestra nightly radar uses its own authoritative five-dimension rubric; do not replace or mix radar scores with this scale.
 
 ## Dimensions
 

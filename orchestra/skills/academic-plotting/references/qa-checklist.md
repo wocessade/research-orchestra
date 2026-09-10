@@ -18,7 +18,7 @@ Use before S5 exit, Q5 gate, and camera-ready.
 - [ ] Panel labels consistent
 - [ ] Colorblind-safe + grayscale OK when needed
 - [ ] Vector for line art; DPI OK for rasters
-- [ ] Blind / unsure on readability or concept-diagram garbled text → export final-width PNG and ask **deepseek-vision** one falsifiable hypothesis (e.g. axis labels still legible; no mojibake). Do not ask for a full-figure description. Numbers still reconcile from CSV/scripts, not from vision.
+- [ ] Blind / unsure on readability or concept-diagram garbled text → export final-width PNG and inspect with available vision tools against one concrete question (e.g. axis labels still legible; no mojibake). Do not ask for a full-figure description. Numbers still reconcile from CSV/scripts, not from vision.
 
 ## Stats / integrity
 

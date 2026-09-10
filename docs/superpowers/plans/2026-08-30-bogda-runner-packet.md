@@ -1,5 +1,9 @@
 # Bogda Runner 开工包（本地准入）Implementation Plan
 
+<!-- campus-runner-status:2026-09-10 -->
+> 2026-09-10 现状更新：Orchestra/3100 已停用；Y7000 已接入 WSL2、NAS 和 dorm-x86，并发 1，自主 smoke 与 WSL 重启恢复通过。checkpoint key 本地修复已测、尚未部署，DEF-03 未通过现网验收。3101 仍为只读 observer。下文历史设计/操作步骤不代表已经部署；“runner 未到手/未联网/仅雷达停用”等旧状态以[最新交接](../../reports/2026-09-10-bogda-runner-handoff.md)为准。共享 SQLite 和日志发布接线仍待完成。
+<!-- /campus-runner-status -->
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Encode spec §5.3 / §5.7 as a versioned `RunnerPacket` plus `admit_runner_packet`, so a research JobRequest cannot be treated as runnable without frozen git/staged/inbox attachments, a runbook, and a non-`pi-service` pool.

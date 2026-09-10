@@ -5,6 +5,8 @@ description: Build full-paper Chinese-English side-by-side, figure/table-aware, 
 
 # Full-Paper Markdown Reader
 
+执行范围与授权见 [共享执行规则](../academic-shared/references/execution-policy.md)；按当前任务读取阶段细则。
+
 This skill is split into two layers:
 - **Static layer** (`static/`): versioned, reusable content fragments (core principles, reading workflow, output contract, per-source-format extraction guidance).
 - **Dynamic layer** (this file + `manifest.yaml`): detects the request's source format and loads only the fragments needed.
@@ -52,6 +54,6 @@ If constraints prevent full processing, create a draft reader and label missing 
 - Exact field schemas for `paper.md` / `source_map.json` → `references/output-spec.md`
 - Answering follow-up questions with source citations → `references/grounding-rules.md`
 
-## Upstream: deepseek-vision
+## Scanned sources
 
-For `scanned-pdf` inputs: this skill does not do OCR. Route through **deepseek-vision** with a **page/region outbound packet** (falsifiable OCR hypothesis + PASS/FAIL/UNSURE) — never a full-page describe. Feed returned text back as `pasted-text`. See `static/fragments/source/scanned-pdf.md`. Fuzzy figure/table text may use a separate cropped vision round.
+Use available OCR or vision tools for scanned pages, preserving page/region anchors and marking uncertain text. `deepseek-vision` is optional when available and authorized. See [scanned-PDF guidance](static/fragments/source/scanned-pdf.md).

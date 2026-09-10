@@ -1,118 +1,64 @@
 # Evidence Ledger Protocol
 
-证据账本（Evidence Ledger）是写作阶段自动维护的结构化记录，将论文中的每个论断（claim）追溯到其引用来源。受 Paper-Pilot 的 Evidence Ledger 模式启发。
+账本记录所有需要证据的论断，供 S4/T4 写作与 S7/T5 评审共同使用。字段及状态以 [ledger-schema.json](ledger-schema.json) 为准。
 
-## 核心原则
+## 收录范围
 
-1. **每段一记录** — 写作 agent 每写完一个包含论断的段落，追加一条 ledger 条目
-2. **可追溯** — 每个条目记录 `claim_text`、`source_ref`、`source_excerpt`（原文摘录）
-3. **可审计** — evaluate 阶段独立审计 ledger，标记孤儿论断和出处不匹配
+- 每个论断一条记录。包括带引用的事实、作者归因、研究结果，以及无引用的数值、因果、比较、创新性和适用范围声明。
+- 实验结果可以关联内部产物，理论论断可以关联推导；没有外部引用不等于没有证据。
+- 缺证据的强论断仍须入账，使用 `evidence_kind=missing`、空 `source_ref`、`source_excerpt=null`、`audit_status=orphan`。不得补造引文。
+- 只有不承担论证作用、无需证据的一般背景常识可跳过；不把“首次”“SOTA”“普遍适用”等主张当作常识。
 
-## Ledger 条目格式
+## 记录示例
 
-每一条 ledger 条目是一个 JSON 对象，追加写入 `{output_dir}/evidence_ledger.jsonl`（每行一条）：
+以下是结构演示，不是真实实验结果，不得复制进论文当作事实。
 
 ```json
 {
   "claim_id": "CLM-001",
-  "section": "2.3",
-  "subsection": "2.3.1",
-  "paragraph_index": 4,
-  "claim_text": "Prior work has shown that federated learning reduces communication costs by up to 40% in cross-device settings.",
-  "source_ref": "[McMahan et al., 2017]",
-  "source_excerpt": "We find that the FedAvg algorithm reduces communication rounds by 10-100x compared to synchronous SGD in heterogeneous networks.",
+  "contribution_id": "C1",
+  "section": "3.2",
+  "paragraph_index": 0,
+  "claim_type": "result",
+  "claim_text": "在该实验的独立测试集上，准确率为 92.3%。",
+  "source_ref": "EXP-001/run-1",
+  "source_excerpt": null,
+  "evidence_kind": "experiment",
+  "artifact_path": ".research/experiments/EXP-001/runs/run-1/metrics.json",
+  "locator": "metrics.test_accuracy",
   "confidence": "high",
-  "claim_type": "factual",
-  "audit_status": "pending"
+  "audit_status": "pending",
+  "claim_revision": 1,
+  "manuscript_revision": "draft-1"
 }
 ```
 
-### 字段说明
+## 字段与生命周期
 
-| 字段 | 说明 | 示例 |
-|------|------|------|
-| `claim_id` | 唯一标识，格式 `CLM-{NNN}` | CLM-001 |
-| `section` | 所属章节 | 2.3 |
-| `subsection` | 所属子节（可选） | 2.3.1 |
-| `paragraph_index` | 段落在章节中的序号（0-based） | 4 |
-| `claim_text` | 论断原文（完整句） | Prior work has shown... |
-| `source_ref` | 引用标记（文内引用格式） | [McMahan et al., 2017] |
-| `source_excerpt` | 来源原文摘录（支撑该论断的句子） | We find that... |
-| `confidence` | 论断可信度：`high`/`medium`/`low` | high |
-| `contribution_id` | Optional link to confirmed contribution (`C1`…) / experiment map | C1 |
-| `claim_type` | 论断类型：`factual`/`attribution`/`method`/`result`/`interpretation` | factual |
-| `audit_status` | 审计状态：`pending`/`verified`/`orphan`/`mismatch` | pending |
+文件为 `{output_dir}/evidence_ledger.jsonl`，UTF-8 JSONL；`paragraph_index` 统一从 0 开始。
+`claim_id` 为稳定 ID（CLM-001…），`claim_revision` 随论断文字、证据或证据解释变化递增。
+新记录写入稿件版本 `manuscript_revision`；一条记录可通过 `contribution_id` 关联贡献。
+`evidence_kind` 为 literature / experiment / derivation / missing；文献摘录必须为原文，转述放在 `claim_text`。
+`locator` 指明页码、表格、段落、指标键或推导步骤，`artifact_path` 指向实际分析产物。
 
-## 写作 agent 集成
+追加新版本，不为同一论断反复分配新 ID。审计同一稿件版本中每个 claim_id 的最新修订；旧版本仅作历史。
+原文修改、实验产物重算或来源变更后，新修订回到 pending；旧 verified 不能沿用。单纯移动段落可以保持结论，但须更新位置并核对原句。
+与当前正文逐项对照：正文新增论断补录，正文已删论断不计入当前覆盖率，旧条目不得代替当前证据。
 
-写作 agent 在每个章节写作完成后，执行以下步骤：
+## 审计
 
-1. 扫描刚写的段落，识别每个包含引用标记 `[...]` 的论断句
-2. 为每个论断创建一条 ledger 条目：
-   - `claim_text`: 包含引用的完整句子
-   - `source_ref`: 该句的引用标记
-   - `source_excerpt`: 从参考文献中摘录的对应原文（如文献不可达则为 `null`）
-   - `confidence`: 根据是否直接访问了原文来判断（有原文摘录=high，仅凭记忆=low）
-3. 追加到 `evidence_ledger.jsonl`
+现有事实/内容评审执行本协议，不依赖尚未配置的专用 agent。
 
-### 写入位置
+1. 从当前正文独立提取需证据的论断，再与账本对照，不能只检查账本已有条目。
+2. 检查文献身份、可定位原文/产物，以及主张与证据的指标、数值、方向、样本和范围是否一致。
+3. DOI 存在、标题相近或 writer confidence=high 均不构成支撑证明。来源不可获取时保留 pending，确认没有来源时为 orphan；原文与声称不符为 mismatch。
+4. verified 需要可定位的原文或产物，并由审计者实际核对支持关系。Schema 只能检查结构，不能证明语义正确。
+5. 核心结论、数值、因果、比较、创新性论断逐项核对；其他论断按影响抽查并记录未核验项。不用“引用数/段落数”作为质量得分或添加引用的配额。
+6. 输出 `{output_dir}/evidence_audit.md`：稿件版本、claim_id、状态、定位、问题严重度、修复/降级建议；并合并进该轮问题清单。关键证据缺失或不匹配按实际影响判为 Critical/Major，不能被平均分抵消。
 
-- 文件: `{output_dir}/evidence_ledger.jsonl`
-- 格式: JSONL（每行一个完整 JSON 对象，无外层数组）
-- 编码: UTF-8
-- 追加模式: 每条新条目 append 到文件末尾，不覆盖已有条目
+## 兼容已有账本
 
-## 审计规则
-
-evaluate 阶段新增 `evidence_ledger_auditor` agent，执行以下检查：
-
-### 1. 孤儿论断检测
-扫描 ledger 中 `confidence=low` 的条目。`confidence=low` 意味着写作 agent 无法提供 source_excerpt（可能凭记忆生成）。标记为审计关注。
-
-### 2. 出处不匹配检测
-对 `confidence=high` 的条目，验证 `claim_text` 的核心主张与 `source_excerpt` 是否一致。如 `source_excerpt` 内容不支持 `claim_text` 中的论断，标记为 `mismatch`。
-
-### 3. 证据密度评分
-按章节统计：总论断数 / 总段落数。阈值：
-- ≥ 0.8: 高证据密度（good）
-- 0.4-0.8: 中等（acceptable）
-- < 0.4: 低证据密度（需补充引用）
-
-### 4. 审计报告输出
-
-```json
-{
-  "audit_id": "AUDIT-EV-001",
-  "total_claims": 42,
-  "status": {
-    "verified": 35,
-    "orphan": 4,
-    "mismatch": 2,
-    "pending": 1
-  },
-  "orphan_claims": ["CLM-012", "CLM-023", "CLM-031", "CLM-040"],
-  "mismatched_claims": [
-    {"claim_id": "CLM-005", "issue": "claim_text overstates source_excerpt scope"}
-  ],
-  "density": {
-    "overall": 0.67,
-    "by_section": {"1": 0.5, "2": 0.8, "3": 0.6}
-  },
-  "recommendation": "Review orphan claims CLM-012, CLM-023, CLM-031, CLM-040. Source not found for these claims."
-}
-```
-
-## 集成到 Stage
-
-### 写作阶段（S4/T4/C3）
-- 写作 agent prompt 末尾增加："在完成每个章节后，按 evidence-ledger 协议生成 ledger 条目"
-- ledger 文件路径为 `{output_dir}/evidence_ledger.jsonl`
-
-### 评审阶段（S7/T5/C4）
-- evaluate 配置增加 `evidence_ledger_auditor` agent
-- 审计结果纳入综合评分
-- 孤儿论断数 > 5 且占比 > 20% → 标记为 AI 幻觉风险，建议人工核查
-
-### 命令（/check-refs）
-- 独立命令，读取 `evidence_ledger.jsonl` 并运行审计
-- 不修改论文，只输出审计报告
+旧记录可缺少新增的版本和证据类型字段，读取时按物理追加顺序定位旧修订，不改造历史文件。
+旧 verified 若没有可定位证据，只能作为历史状态；下次消费时追加 pending 修订并重新核验。
+旧 `discrepancy_found` 映射为 mismatch，`needs_review` 映射为 pending；保留原文件，新增记录只写 pending / verified / orphan / mismatch。
+使用 [test_ledger_contract.py](test_ledger_contract.py) 验证示例、兼容入口和拒绝条件。

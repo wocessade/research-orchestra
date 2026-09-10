@@ -107,10 +107,10 @@ Run standalone factual accuracy audit BEFORE Q7 gate.
 
 **Conditional source-document handling:**
 - IF source documents exist → run all 6 dimensions (structure-data consistency, cross-reference validity, numerical consistency, terminology consistency, internal contradiction, source-document alignment).
-- IF no source documents provided → run dimensions 1-5 only (internal consistency). Agent notes the limitation.
+- IF no source documents provided → run dimensions 1-5 and the ledger coverage audit; source support remains unverified and core evidence gaps enter the issue register.
 
 ### Composer Sequence
-1. composer: literature-precheck {batch-verify all DOIs via OpenAlex API; then spot-check 5 random citations for claim-to-citation alignment}
+1. composer: literature-precheck {batch-verify all DOIs via OpenAlex API; then check all core and changed claims, then sample other citations for claim-to-citation alignment}
 2. composer: paper-audit-orchestration {first pass — structural/severity audit}
 3. composer: polish-protocols {section-specific polish per S7C routing}
 4. composer: de-ai-detect {language-specific De-AI scan}
@@ -118,17 +118,23 @@ Run standalone factual accuracy audit BEFORE Q7 gate.
 6. composer: factual-accuracy-check {standalone factual accuracy audit}
 7. composer: paper-audit-orchestration {re-audit after fixes — verify no Critical/Major remain}
 
+
+### Evidence Ledger Audit
+
+Before accepting the current draft, the existing factual/content reviewer loads `../academic-shared/evidence-ledger/ledger-protocol.md`. Compare current prose with the ledger, including uncited numerical, causal, comparative and novelty claims; inspect sources/run artifacts and record pending/orphan/mismatch without fabricating support. Check all core claims and changed claims, record other unchecked items, and merge findings into the cumulative review register. Write `{output_dir}/evidence_audit.md`; schema validity and DOI identity alone do not establish support.
+
 ## Gate
 
 ### Q7 Gate Checklist
+- [ ] Current-manuscript evidence audit completed; core and changed claims checked, missing support recorded in the cumulative issue register
 - [ ] Literature verification pre-check complete — all DOIs passed existence checks (existing-manuscript: verify ALL; normal: spot-check at least 20%)
 - [ ] No fabricated/fictional references (Critical item)
 - [ ] Cited papers' titles/authors/sources/years match API results (Major items fixed)
-- [ ] Spot-check: verify 5 random citations for claim-to-citation alignment
+- [ ] Spot-check: verify all core and changed claims, then sample other citations for claim-to-citation alignment
 - [ ] paper-audit returns PASS (or PASS with only moderate/minor advisory items). All Critical and Major items fixed. (If Major items remain: go back to relevant stage — don't polish past structural problems. Moderate/minor only: fix what you can, acknowledge the rest. If moderate/minor items persist after 2 polish passes with no improvement → go back to S3 or re-examine outline structure.)
 - [ ] If multi-referee model used: cross-review synthesis complete, conflicts resolved, consolidated issue list with referee source tags
 - [ ] De-AI pass complete — no AI rhythm patterns detected
-- [ ] Factual accuracy check complete — no Critical factual errors. All Major factual errors fixed or deferred.
+- [ ] Factual accuracy check complete — no Critical factual errors. All Major factual errors resolved; an explicitly accepted non-critical scope limitation must satisfy convergence-loop.md and cannot waive missing evidence.
 - [ ] Terminology consistent across all sections (one term per concept)
 - [ ] Style consistency checked (if profile in passport) — style_profile deviations reviewed
 - [ ] Tense consistency: Methods/Results past, Intro present, Discussion mixed
@@ -142,4 +148,4 @@ Q7 is BLOCK.
 1. Inspect specific failed items:
    - IF Critical/Major issues → route back to S7A (polish loop), fix, re-verify.
    - IF factual accuracy errors → route back to S7G (factual accuracy check), fix, re-run paper-audit.
-2. After 2 repair attempts still fail → STOP-AND-ASK: accept a degraded pass with known limitations documented, or return to S3 to restructure.
+2. After 2 repair attempts still fail, deliver the unfinished draft and concrete open issues; retain the failed gate. Continue targeted fixes or return to S3 within the authorized scope. A generic limitations paragraph is not a degraded pass.

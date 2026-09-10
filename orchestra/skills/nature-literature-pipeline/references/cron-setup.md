@@ -1,37 +1,11 @@
-# Cron Setup Guide
+# 定时文献任务
 
-## Creating a Daily Push with Claude Code CronCreate
+仅在用户明确要求定时任务或恢复既有任务时使用。Research Orchestra 夜间雷达当前冻结；恢复属于生产变更，需明确授权。手动生成日报不隐含创建定时器或发送邮件。
 
-Use Claude Code's built-in `CronCreate` tool:
+1. 先检查现有调度，优先更新同一任务；不要重复创建。
+2. 记录时区、运行时间、检索范围、收件人、归档位置及通知意图。沿用明确的已有授权，不反复询问。
+3. 使用运行环境实际提供的调度工具或项目运维流程，按当前 schema 创建/更新。是否持久化、是否依赖会话及过期规则，以工具返回或当前官方文档为准；不假定存在 CronCreate 的 durable 参数或固定 7 天期限。
+4. 读取保存结果核对时间、状态和任务内容。先用不外发的样例验证检索、渲染；只有授权覆盖时才测试真实发送和外部归档。
+5. 未变化且不可操作的状态保持安静，仅在有意义的变化、失败或需要用户处理时通知，除非用户另有要求。
 
-```
-CronCreate:
-  cron: "30 8 * * *"       # 08:30 Beijing time daily
-  prompt: "Run the daily literature pipeline: search arXiv for papers matching [keywords], score top 30, deliver top 5 to email, archive to Zotero and Obsidian."
-  recurring: true
-  durable: true             # Survives session restarts
-```
-
-### Verify
-
-After creation, immediately verify:
-1. `cron list` shows the job
-2. Manually trigger once to confirm end-to-end: search → score → email → Zotero → Obsidian
-3. Check email arrives
-4. Check Zotero has new entries
-5. Check Obsidian has new notes
-
-### Lessons from Past Failures
-
-The original nature-skills pipeline failed because Hermes cron was a local/profile scheduler — jobs were lost on restart. Claude Code's `CronCreate` with `durable: true` persists to `.claude/scheduled_tasks.json` and survives restarts.
-
-### Manual Fallback
-
-If the cron doesn't fire:
-1. Don't spend time debugging — just run manually: "跑一次文献推送"
-2. Check `cron list` to confirm the job still exists
-3. Verify email/Zotero/Obsidian chains independently
-
-### 7-Day Auto-Expiry
-
-Recurring tasks auto-expire after 7 days. Set a reminder to re-create or confirm renewal before expiry.
+失败时检查保存的任务与调度状态，报告原因；可完成已授权的手动草稿，但不能用额外定时器或重复发送掩盖失败。

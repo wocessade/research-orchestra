@@ -26,7 +26,7 @@ python literature/verify_citations.py \
 
 | Verdict | Meaning | Action |
 |---------|---------|--------|
-| `false` | DOI existed but no API matched | **BLOCKING**. Replace or delete the citation. Document in fix log. |
+| `false` | DOI existed but no API matched | Metadata unresolved: inspect the actual source or correct record. API absence alone is not fabrication. |
 | `unresolvable` | DOI could not be resolved | Tag as `TODO [awaiting user confirmation]`. Must resolve before gate. |
 | `contamination_level=high` | Suspicious citation signal | Review manually. If the paper is a preprint without peer-reviewed follow-up, note this. |
 | `preprint_post_2024=true` | Published after 2024 as preprint | Ensure citation is labeled "preprint" in the text, not as peer-reviewed. |
@@ -35,10 +35,10 @@ python literature/verify_citations.py \
 
 ### 2. Claim-to-Citation Alignment (Spot-Check)
 
-After batch verification, perform a claim alignment check on 5 random citations:
+After metadata verification, check every core and changed evidence-requiring claim, then sample other claims by impact:
 
-1. For each of the 5 papers, extract: "What does our manuscript CLAIM this paper says?"
-2. For the same 5 papers, verify against the paper's own abstract/intro/conclusion: "What does the paper ACTUALLY say?"
+1. For each selected source, extract: "What does our manuscript CLAIM this paper says?"
+2. For the same sources, verify against the paper's own abstract/intro/conclusion: "What does the paper ACTUALLY say?"
 3. Classify each alignment:
 
 | Classification | Meaning | Action |
@@ -48,8 +48,8 @@ After batch verification, perform a claim alignment check on 5 random citations:
 | `DOES NOT SUPPORT` | Claim contradicts or is absent from the cited paper | **Critical** -- rewrite or find correct citation |
 
 **Scale by entry type:**
-- `entry_type=existing-manuscript` -> spot-check 5 random citations (all references are verified for DOI existence, so claim alignment is a representative sample)
-- `entry_type=normal` -> spot-check 5 citations (from the 20% DOI-verified subset if possible)
+- `entry_type=existing-manuscript` -> check all core and changed claims, then sample other citations (all references are verified for DOI existence, so claim alignment is a representative sample)
+- `entry_type=normal` -> check all core and changed claims, then sample other citations (from the 20% DOI-verified subset if possible)
 
 ### 3. Retraction Check (Advisory)
 
@@ -70,7 +70,7 @@ For Chinese-language references, use Playwright MCP browser automation:
 
 4. **If Playwright MCP unavailable:** Fallback to manual checklist. Ask user to verify flagged references against CNKI/Wanfang. Provide a copy-paste-ready checklist.
 
-5. **Document:** Add a note in the manuscript: "Chinese-language references verified via CNKI/Wanfang; English-language references verified via DOI resolution."
+5. **Document:** Add a note in the manuscript: "Record bibliography lookup methods in citation_audit_summary.md, not as boilerplate in manuscript prose."
 
 ### 5. Documentation
 
@@ -95,7 +95,7 @@ Document results in `{output_dir}/citation_audit_summary.md`:
 - [ ] `verify_citations.py` batch verification complete -- `verification_report.json` reviewed
 - [ ] For existing-manuscript: all DOIs verified (100% coverage)
 - [ ] For normal entry: at least 20% of DOIs verified
-- [ ] No `false` verdicts remain (all DOI-keyed unmatched citations resolved: replaced or deleted)
+- [ ] Metadata mismatches investigated; unresolved core support recorded as open review issues, not automatically labeled fabrication
 - [ ] No `unresolvable` citations left unresolved (all tagged as user-confirmed or replaced)
 - [ ] Contamination signals reviewed: `contamination_level=high` entries inspected
 - [ ] Preprint citations (`preprint_post_2024=true`) correctly labeled in text

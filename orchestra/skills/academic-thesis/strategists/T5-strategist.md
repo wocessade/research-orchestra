@@ -96,9 +96,15 @@ delivery_format:
     7. Grading: quality_score (1-100) based on issue density and severity
 ```
 
+
+### Evidence Ledger Audit
+
+Before accepting the current draft, the existing factual/content reviewer loads `../academic-shared/evidence-ledger/ledger-protocol.md`. Compare current prose with the ledger, including uncited numerical, causal, comparative and novelty claims; inspect sources/run artifacts and record pending/orphan/mismatch without fabricating support. Check all core claims and changed claims, record other unchecked items, and merge findings into the cumulative review register. Write `{output_dir}/evidence_audit.md`; schema validity and DOI identity alone do not establish support.
+
 ## Gate
 
 ### QT5 Gate Checklist
+- [ ] Current-manuscript evidence audit completed; core and changed claims checked, missing support recorded in the cumulative issue register
 - [ ] Tier correctly identified and routed
 - [ ] All agents executed (or failures documented)
 - [ ] Agent failures within tolerance (< 3 failures)

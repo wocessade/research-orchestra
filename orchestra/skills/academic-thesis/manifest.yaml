@@ -209,8 +209,8 @@ strategists:
       value: master
   T6.7:
     file: strategists/T6.7-strategist.md
-    next: null
-    note: "Hidden branch (v7) — conditionally loaded by T6.md trigger only when user mentions keywords such as padding/de-AI/plagiarism-check after T6 convergence. Not in the standard Thesis workflow. Padding executes after evaluate."
+    next: T5
+    note: "User-requested gap expansion. Re-run T5/T6 on the changed manuscript before T6.5 (master) or requested defense; expansion state prevents repeated keyword activation."
   T7:
     file: strategists/T7-strategist.md
     next: null  # terminal — defense preparation complete. Loaded when dependency_graph path includes T7 (e.g., existing-manuscript-defense, thesis)
@@ -230,19 +230,19 @@ composers:
 # ── Dependency Graph ──────────────────────────────
 dependency_graph:
   thesis: [T1, T2, T3, T4, T5, T6, T7]
-  thesis-inflated: [T1, T2, T3, T4, T5, T6, T6.7, T7]
+  thesis-inflated: [T1, T2, T3, T4, T5, T6, T6.7, T5, T6, T7]
   thesis-master: [T1, T2, T3, T4, T5, T6, T6.5, T7]
-  thesis-master-inflated: [T1, T2, T3, T4, T5, T6, T6.5, T6.7, T7]
+  thesis-master-inflated: [T1, T2, T3, T4, T5, T6, T6.7, T5, T6, T6.5, T7]
   thesis-with-data: [T1, T1.5, T2, T3, T4, T5, T6, T7]
-  thesis-with-data-inflated: [T1, T1.5, T2, T3, T4, T5, T6, T6.7, T7]
+  thesis-with-data-inflated: [T1, T1.5, T2, T3, T4, T5, T6, T6.7, T5, T6, T7]
   thesis-master-with-data: [T1, T1.5, T2, T3, T4, T5, T6, T6.5, T7]
-  thesis-master-with-data-inflated: [T1, T1.5, T2, T3, T4, T5, T6, T6.5, T6.7, T7]
+  thesis-master-with-data-inflated: [T1, T1.5, T2, T3, T4, T5, T6, T6.7, T5, T6, T6.5, T7]
   existing-manuscript: [T5, T6]
   existing-manuscript-defense: [T5, T6, T7]
-  existing-manuscript-inflated: [T5, T6, T6.7]
+  existing-manuscript-inflated: [T5, T6, T6.7, T5, T6]
   existing-manuscript-master: [T5, T6, T6.5]
   existing-manuscript-master-defense: [T5, T6, T6.5, T7]
-  existing-manuscript-master-inflated: [T5, T6, T6.5, T6.7]
+  existing-manuscript-master-inflated: [T5, T6, T6.7, T5, T6, T6.5]
 
 # ── On Demand: References ───────────────────────────
 references:

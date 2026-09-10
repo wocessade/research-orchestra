@@ -5,6 +5,8 @@ description: 学位论文写作辅助：开题建议、文献综述、方法设�
 
 # Academic Thesis — 学位论文撰写模块
 
+执行范围与授权见 [共享执行规则](../academic-shared/references/execution-policy.md)；按当前任务读取阶段细则。
+
 独立完整的学位论文撰写模块，可从用户指令直接调用。
 
 ## 能力范围
@@ -24,7 +26,7 @@ description: 学位论文写作辅助：开题建议、文献综述、方法设�
 
 - **完整 pipeline**: 开题 → 文献综述 → 研究方法 → 写作 → evaluate 评审 → 修改收敛 → 答辩准备
 - **evaluate 评审**: 多维度 AI + 人工审稿人模拟（学术不端检测、内容审查、方法学审查等）
-- **注水功能** (inflate): T6 收敛后启动 `scripts/inflate_paper.py`，按学位分档目标字数膨胀
+- **可选扩写** (inflate): 仅在用户要求时使用 `scripts/inflate_paper.py`；保留事实、证据和引用，不因 T6 收敛自动启动。
 - **文风学习**: 通过 `style_learning/` 子模块学习目标学位论文的文风特征
 - **断点续写**: 通过 `checkpoint/state_manager.py` 手动按需保存和恢复写作进度（T4 阶段段落级 checkpoint，非自动）
 - **术语表**: 通用 pipeline 概念见 `../academic-shared/GLOSSARY.md`
@@ -84,7 +86,7 @@ description: 学位论文写作辅助：开题建议、文献综述、方法设�
 
 **触发方式：**
 - 手动检测：输入 `/resume` 命令检查未完成项目
-- 提示恢复：检测到 checkpoint 文件后询问是否继续
+- 恢复：用户要求续写且 checkpoint 对应当前论文时直接恢复；存在多个候选或状态冲突时再询问
 
 **工具：** `checkpoint/state_manager.py` 提供状态管理 API（手动按需调用，非自动）
 
@@ -117,3 +119,10 @@ Never use `../academic-latex` from inside `skills-embedded/` — that path does 
 - T4: `issues.csv` + results-backfill for empirical chapters
 - T6: `rewrite_matrix.md` for major 修订
 - Protocols under `../academic-shared/issues|rewrite|citation/`
+
+
+## Evidence and Review Contract
+
+Writing/revision uses [the evidence ledger](../academic-shared/evidence-ledger/ledger-protocol.md): include uncited evidence-requiring claims and internal results; changes invalidate prior support checks.
+Use [citation support rules](../academic-shared/citation/citation-support-bank.md) to separate bibliographic verified from source entailment.
+Review follows [convergence-loop](static/core/convergence-loop.md): stable feedback is not READY while Critical/Major defects remain. Apply [anti-defensive writing rules](static/core/do-dont.md#避免防御性写作) while retaining material uncertainty.

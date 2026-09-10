@@ -1,5 +1,9 @@
 # Orchestra 控制台（GUI 汇合面）
 
+<!-- campus-runner-status:2026-09-10 -->
+> 2026-09-10 现状更新：Orchestra/3100 已停用；Y7000 已接入 WSL2、NAS 和 dorm-x86，并发 1，自主 smoke 与 WSL 重启恢复通过。checkpoint key 本地修复已测、尚未部署，DEF-03 未通过现网验收。3101 仍为只读 observer。下文历史设计/操作步骤不代表已经部署；“runner 未到手/未联网/仅雷达停用”等旧状态以[最新交接](../../docs/reports/2026-09-10-bogda-runner-handoff.md)为准。共享 SQLite 和日志发布接线仍待完成。
+<!-- /campus-runner-status -->
+
 以双层日历为核心的只读控制台。**v2 默认入口**：自研浅色静态页 `http://127.0.0.1:3100/`（与 glue 八产物同端口）。Homepage（3000）配置仍保留作兼容回退。
 
 - 设计 spec：`docs/superpowers/specs/2026-08-20-console-design.md`

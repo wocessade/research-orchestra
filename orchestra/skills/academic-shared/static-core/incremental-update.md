@@ -157,3 +157,8 @@ DAG lookup:
 Earliest start: S1.5. Union of affected stages: S1.5 → S2 → S2.5 → S3 → S4 → S5 → S7.
 
 Presentation: "Minimal rerun: start from S1.5, re-execute through S7. Partially reusable: S6 citations, S6.5 reproducibility (if citations didn't change)."
+
+## Claim Evidence and Post-Expansion Invalidation
+
+Any change to claim wording, source or computed result appends a pending ledger revision and resets the affected citation support_status to pending; bibliography identity may remain verified if unchanged. Review the latest claim revisions against the current manuscript, not historical verified entries.
+T6.7 changes invalidate T5/T6 readiness and any previous T6.5 completion. Route T6.7 → T5 → T6 → T6.5 for master; continue to T7 only when defense is requested. Store the reviewed manuscript_revision with expansion_recheck_complete to avoid re-entering expansion from an old keyword.

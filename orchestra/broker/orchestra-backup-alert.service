@@ -1,6 +1,0 @@
-[Unit]
-Description=Orchestra backup failure alert
-
-[Service]
-Type=oneshot
-ExecStart=/bin/bash -c 'echo "$$(date -Iseconds) [ALERT] cold backup FAILED, check backup.log" >> /mnt/broker/logs/backup.log'

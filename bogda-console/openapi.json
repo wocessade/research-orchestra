@@ -1113,6 +1113,102 @@
         "title": "Availability",
         "type": "string"
       },
+      "BudgetAdmitRequest": {
+        "properties": {
+          "envelope": {
+            "additionalProperties": true,
+            "title": "Envelope",
+            "type": "object"
+          },
+          "intent": {
+            "title": "Intent",
+            "type": "string"
+          },
+          "reservation_cny": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reservation Cny"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "intent",
+          "envelope"
+        ],
+        "title": "BudgetAdmitRequest",
+        "type": "object"
+      },
+      "BudgetReconcileRequest": {
+        "properties": {
+          "actual_cost_cny": {
+            "title": "Actual Cost Cny",
+            "type": "string"
+          },
+          "intent": {
+            "title": "Intent",
+            "type": "string"
+          },
+          "pricing_version": {
+            "title": "Pricing Version",
+            "type": "string"
+          },
+          "requested_tier": {
+            "title": "Requested Tier",
+            "type": "string"
+          },
+          "reservation_id": {
+            "title": "Reservation Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reservation_id",
+          "intent",
+          "requested_tier",
+          "pricing_version",
+          "actual_cost_cny"
+        ],
+        "title": "BudgetReconcileRequest",
+        "type": "object"
+      },
+      "BudgetReleaseRequest": {
+        "properties": {
+          "intent": {
+            "title": "Intent",
+            "type": "string"
+          },
+          "pricing_version": {
+            "title": "Pricing Version",
+            "type": "string"
+          },
+          "requested_tier": {
+            "title": "Requested Tier",
+            "type": "string"
+          },
+          "reservation_id": {
+            "title": "Reservation Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reservation_id",
+          "intent",
+          "requested_tier",
+          "pricing_version"
+        ],
+        "title": "BudgetReleaseRequest",
+        "type": "object"
+      },
       "BudgetState": {
         "enum": [
           "ready",
@@ -4147,6 +4243,88 @@
         "title": "UsageBalanceSnapshot",
         "type": "object"
       },
+      "UsageUnknownCaseRequest": {
+        "properties": {
+          "call_id": {
+            "title": "Call Id",
+            "type": "string"
+          },
+          "case_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case Id"
+          },
+          "effective_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Tier"
+          },
+          "intent": {
+            "title": "Intent",
+            "type": "string"
+          },
+          "pricing_version": {
+            "title": "Pricing Version",
+            "type": "string"
+          },
+          "prompt_artifact": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Artifact"
+          },
+          "prompt_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Hash"
+          },
+          "requested_tier": {
+            "title": "Requested Tier",
+            "type": "string"
+          },
+          "reservation_id": {
+            "title": "Reservation Id",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "call_id",
+          "reservation_id",
+          "intent",
+          "requested_tier",
+          "pricing_version"
+        ],
+        "title": "UsageUnknownCaseRequest",
+        "type": "object"
+      },
       "ValidRunResult": {
         "additionalProperties": true,
         "properties": {
@@ -5569,6 +5747,196 @@
           }
         },
         "summary": "Review"
+      }
+    },
+    "/api/v1/store/budget/admit": {
+      "post": {
+        "operationId": "budget_admit_api_v1_store_budget_admit_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BudgetAdmitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Budget Admit"
+      }
+    },
+    "/api/v1/store/budget/reconcile": {
+      "post": {
+        "operationId": "budget_reconcile_api_v1_store_budget_reconcile_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BudgetReconcileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Budget Reconcile"
+      }
+    },
+    "/api/v1/store/budget/release": {
+      "post": {
+        "operationId": "budget_release_api_v1_store_budget_release_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BudgetReleaseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Budget Release"
+      }
+    },
+    "/api/v1/store/usage-unknown/blocked": {
+      "get": {
+        "operationId": "usage_unknown_blocked_api_v1_store_usage_unknown_blocked_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "call_id",
+            "required": true,
+            "schema": {
+              "title": "Call Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Usage Unknown Blocked"
+      }
+    },
+    "/api/v1/store/usage-unknown/cases": {
+      "post": {
+        "operationId": "usage_unknown_open_case_api_v1_store_usage_unknown_cases_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UsageUnknownCaseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Usage Unknown Open Case"
       }
     },
     "/api/v1/test/scenario": {

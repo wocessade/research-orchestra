@@ -36,7 +36,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     queryKey: ["capabilities"],
     queryFn: () => api.get<CapabilitySnapshot>("/api/v1/capabilities"),
   });
-  const publicPort = capabilities.data?.data?.publicPort ?? 3101;
+  const snapshot = capabilities.data?.data;
+  const publicPort = snapshot?.publicPort ?? 3101;
+  const consoleState = snapshot
+    ? `${snapshot.role} · ${snapshot.profile} · ${snapshot.canSubmitRegisteredDeployment ? "可写 Prefect" : "只读"}`
+    : "能力快照读取中";
 
   return (
     <div className="app-shell">
@@ -46,7 +50,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Navigation />
         <div className="rail-foot">
           <span className="source-dot" aria-hidden="true" />
-          <span><strong>{publicPort} 影子运行</strong><small>影子控制台 · 不写现网 Prefect</small></span>
+          <span><strong>{publicPort} 控制台</strong><small>{consoleState}</small></span>
         </div>
       </aside>
       <main id="main-content" tabIndex={-1}>{children}</main>

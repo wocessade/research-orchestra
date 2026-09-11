@@ -12,7 +12,7 @@ describe("OverviewPage", () => {
     expect(attention.compareDocumentPosition(active) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(active.compareDocumentPosition(recent) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByText("Prefect 决定执行事实，科研结论另判。")).toBeVisible();
-    expect(await screen.findByText("3101 影子运行")).toBeVisible();
+    expect(await screen.findByText("3101 控制台")).toBeVisible();
   });
 
   it("offers a review entry in the waiting-review block without one-click judgment", async () => {

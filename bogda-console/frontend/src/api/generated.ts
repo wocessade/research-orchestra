@@ -463,6 +463,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/store/budget/admit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Budget Admit */
+        post: operations["budget_admit_api_v1_store_budget_admit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/store/budget/reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Budget Reconcile */
+        post: operations["budget_reconcile_api_v1_store_budget_reconcile_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/store/budget/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Budget Release */
+        post: operations["budget_release_api_v1_store_budget_release_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/store/usage-unknown/blocked": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Usage Unknown Blocked */
+        get: operations["usage_unknown_blocked_api_v1_store_usage_unknown_blocked_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/store/usage-unknown/cases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Usage Unknown Open Case */
+        post: operations["usage_unknown_open_case_api_v1_store_usage_unknown_cases_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/test/scenario": {
         parameters: {
             query?: never;
@@ -872,6 +957,43 @@ export interface components {
          * @enum {string}
          */
         Availability: "available" | "missing" | "invalid";
+        /** BudgetAdmitRequest */
+        BudgetAdmitRequest: {
+            /** Envelope */
+            envelope: {
+                [key: string]: unknown;
+            };
+            /** Intent */
+            intent: string;
+            /** Reservation Cny */
+            reservation_cny?: string | null;
+            /** Run Id */
+            run_id: string;
+        };
+        /** BudgetReconcileRequest */
+        BudgetReconcileRequest: {
+            /** Actual Cost Cny */
+            actual_cost_cny: string;
+            /** Intent */
+            intent: string;
+            /** Pricing Version */
+            pricing_version: string;
+            /** Requested Tier */
+            requested_tier: string;
+            /** Reservation Id */
+            reservation_id: string;
+        };
+        /** BudgetReleaseRequest */
+        BudgetReleaseRequest: {
+            /** Intent */
+            intent: string;
+            /** Pricing Version */
+            pricing_version: string;
+            /** Requested Tier */
+            requested_tier: string;
+            /** Reservation Id */
+            reservation_id: string;
+        };
         /**
          * BudgetState
          * @enum {string}
@@ -1923,6 +2045,29 @@ export interface components {
             /** Totalbalance */
             totalBalance: string;
         };
+        /** UsageUnknownCaseRequest */
+        UsageUnknownCaseRequest: {
+            /** Call Id */
+            call_id: string;
+            /** Case Id */
+            case_id?: string | null;
+            /** Effective Tier */
+            effective_tier?: string | null;
+            /** Intent */
+            intent: string;
+            /** Pricing Version */
+            pricing_version: string;
+            /** Prompt Artifact */
+            prompt_artifact?: string | null;
+            /** Prompt Hash */
+            prompt_hash?: string | null;
+            /** Requested Tier */
+            requested_tier: string;
+            /** Reservation Id */
+            reservation_id: string;
+            /** Run Id */
+            run_id: string;
+        };
         /** ValidRunResult */
         ValidRunResult: {
             /** Attempt */
@@ -2832,6 +2977,170 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiEnvelope_CommandReceipt_RunResultView__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    budget_admit_api_v1_store_budget_admit_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BudgetAdmitRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    budget_reconcile_api_v1_store_budget_reconcile_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BudgetReconcileRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    budget_release_api_v1_store_budget_release_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BudgetReleaseRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    usage_unknown_blocked_api_v1_store_usage_unknown_blocked_get: {
+        parameters: {
+            query: {
+                run_id: string;
+                call_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    usage_unknown_open_case_api_v1_store_usage_unknown_cases_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UsageUnknownCaseRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

@@ -15,6 +15,6 @@ test("the shadow application and every same-origin resource stay on 3101", async
   await page.waitForLoadState("networkidle");
   expect(new URL(page.url()).port).toBe("3101");
   expect([...requestedPorts]).toEqual(["3101"]);
-  await expect(page.getByText("3101 影子运行", { exact: true })).toHaveCount(1);
+  await expect(page.getByText("3101 控制台", { exact: true })).toHaveCount(1);
   assertNoErrors();
 });

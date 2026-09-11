@@ -149,28 +149,55 @@ def output_similarity(rows):
     return {"answers": len(answers), "pairs": pairs}
 
 
+CONDITIONS = {
+    "same-prefix-2nd": "reuse",
+    "same-prefix-3rd": "reuse",
+    "verbatim-repeat": "reuse",
+    "interleaved-return": "reuse",
+    "flash-after-pro": "reuse",
+    "cross-tier-pro": "cross-tier",
+    "miss-anchor": "control",
+    "diff-doc-baseline": "control",
+}
+CONDITION_STYLE = {
+    "reuse": ("#4C72B0", "same-document reuse"),
+    "cross-tier": ("#DD8452", "cross-tier call"),
+    "control": ("#C44E52", "negative control"),
+}
+
+
 def figure(rows, out_path: Path) -> None:
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
 
     labels = [row["tag"] for row in rows]
     hits = [row["cache_hit_tokens"] or 0 for row in rows]
-    colors = [
-        "#4C72B0" if row["tag"] in {"s2", "s3", "s5", "s6", "s8"}
-        else ("#DD8452" if row["tag"] == "s7" else "#C44E52")
-        for row in rows
-    ]
-    fig, ax = plt.subplots(figsize=(6.4, 2.6), dpi=200)
-    ax.bar(labels, hits)
-    for bar, color in zip(ax.patches, colors):
-        bar.set_color(color)
+    kinds = [CONDITIONS[row["condition"]] for row in rows]
+    top = max(hits) * 1.25
+
+    fig, ax = plt.subplots(figsize=(6.4, 2.8), dpi=200)
+    ax.axhline(0, color="#B0B0B0", linewidth=0.8, zorder=1)
+    for index, (hit, kind) in enumerate(zip(hits, kinds)):
+        color = CONDITION_STYLE[kind][0]
+        # 竖线画长度、圆点标位置：命中为 0 时线段退化，靠 y=0 上的圆点保持可见
+        ax.vlines(index, 0, hit, color=color, linewidth=2.4, zorder=2)
+        ax.plot(index, hit, "o", color=color, markersize=7, zorder=3)
+        ax.text(index, hit + top * 0.06, str(hit), ha="center", fontsize=8, color="#333333")
+    ax.set_xticks(range(len(labels)))
+    ax.set_xticklabels(labels)
     ax.set_ylabel("cache-hit tokens")
     ax.set_xlabel("raw-API call (in execution order)")
-    ax.set_ylim(0, max(hits) * 1.25)
-    for index, value in enumerate(hits):
-        ax.text(index, value + max(hits) * 0.03, str(value), ha="center", fontsize=8)
+    ax.set_ylim(-top * 0.12, top)
+    ax.grid(axis="y", color="#E8E8E8", linewidth=0.7, zorder=0)
+    ax.set_axisbelow(True)
+    handles = [
+        Line2D([], [], color=color, marker="o", markersize=6, label=label)
+        for _, (color, label) in CONDITION_STYLE.items()
+    ]
+    ax.legend(handles=handles, frameon=False, fontsize=8, ncol=3, loc="upper left")
     fig.tight_layout()
     fig.savefig(out_path, format=out_path.suffix.lstrip("."))
     plt.close(fig)

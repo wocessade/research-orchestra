@@ -1,7 +1,7 @@
 # 系统运行教训库（Lessons Learned）
 
-> 维护协议：**每个 mission 归档时，协调者必须把该 mission 新增的教训提炼追加到本文**（mission completion 固定步骤），并同步检查 CLAUDE.md 锚与 memory 是否需更新。本文是三层知识锚的"体"（CLAUDE.md=锚、memory=个人层）。
-> 教训格式：一句话教训 + 场景 + 规则。同类重复出现两次以上的教训升级为红线（进 CLAUDE.md）。
+> 维护协议：**每个 mission 归档时，协调者必须把该 mission 新增的教训提炼追加到本文**（mission completion 固定步骤），并同步检查根 `AGENTS.md` 锚是否需更新。本文是三层知识锚的"体"（`AGENTS.md`=跨 agent 锚、docs=体、各产品 memory/transcript=个人层且不当权威）。
+> 教训格式：一句话教训 + 场景 + 规则。同类重复出现两次以上的教训升级为红线（进 `AGENTS.md`）。
 
 ## A. Agent 纪律
 
@@ -34,7 +34,7 @@
 
 ## D. 通信/知识
 
-21. **三层知识锚**：CLAUDE.md（每会话自动加载的锚，2-3 行指针）→ docs（版本化的体，可 push 给协作者）→ memory（个人层 feedback/reference，跨项目召回）。教训先入 docs，高价值高频的再提 CLAUDE.md/memory。
+21. **三层知识锚**：`AGENTS.md`（跨 Cursor/Claude/Codex 的锚：规则、红线、挂账）→ docs（版本化的体，可 push）→ 各产品 memory/transcript（个人层索引，不当第二套现状）。教训先入 docs，高价值高频的再提 `AGENTS.md`。技能活副本在 `~/.claude/skills/`，不把技能全文或会话记录塞进锚页。
 22. **生成内容必须验证源文档事实**：凭记忆概括不可靠（028 haiku 初稿 4 处事实错误被复核修正）；数字/文件名引用必须回源核对。
 23. **模型路由纪律**：子代理默认 haiku（最便宜），视觉需求 sonnet，交叉验证 codex；模型调度策略用户自理（fcc-server 勿动）。
 
@@ -42,6 +42,7 @@
 
 - 030/031/032 的并发纪律（A1-A10）已固化进 `docs/superpowers/specs/2026-08-20-concurrent-work-modes.md` 与 memory `high_concurrency_modes`。
 - codex GBK（B12）已入 memory `codex_windows_console_encoding`。
+- **[已达红线阈值，待写入 AGENTS.md]"看起来对"不算证据，必须有一条独立通道复核**：已同类出现 7 次——#18（报告当声称清单核对）、#28（夹具锁真实契约，mock 假绿）、#43（软 schema 比缺文档更危险）、09-10 checkpoint 真实 Artifact、夜班 `data` 是 JSON 字符串、061 编号排序陷阱（字节大小交叉验证）、061 架构图（版面质检绿但箭头语义错）。规则：任何"通过了"的中间产物/交付物，都要再走一条与产生它的方式**不共享假设**的验证路径（真机数据 / 源码写入点 / 独立信号 / 按图重读）。
 
 ## F. 033 追加（2026-08-20）
 
@@ -65,7 +66,7 @@
 
 ## H. 控制台收束（2026-08-20）
 
-33. **Agent 看日程靠结构化字段，不靠刷留言**：个人临近事项进 `status.json.upcoming_personal` + CLAUDE.md 口头提醒协议；refresh 每 10 分钟跑一次，往 `messages.md` 自动追加会刷屏。卡片栏只放需要人拍板的待决/告警。
+33. **Agent 看日程靠结构化字段，不靠刷留言**：个人临近事项进 `status.json.upcoming_personal` + `AGENTS.md` 口头提醒协议；refresh 每 10 分钟跑一次，往 `messages.md` 自动追加会刷屏。卡片栏只放需要人拍板的待决/告警。
 
 ## I. 控制台/雷达（2026-08-21）
 
@@ -120,7 +121,7 @@
 
 ## N. Gate 7 影子（2026-09-01）
 
-56. **挂账页必须跟验收报告一起改**：关闭 Gate 后若锚页仍写旧红线，下一会话会按过时口径停工。规则：关闭时同步改 `CLAUDE.md`/`README.md`，历史工作台加「已关闭」横幅，不另开第二套现状；也不要用后来的服务恢复改写失败轮原文。
+56. **挂账页必须跟验收报告一起改**：关闭 Gate 后若锚页仍写旧红线，下一会话会按过时口径停工。规则：关闭时同步改 `AGENTS.md`/`README.md`，历史工作台加「已关闭」横幅，不另开第二套现状；也不要用后来的服务恢复改写失败轮原文。
 57. **S2 脚本假设会在真 Prefect 上碎**：队列名不全局唯一、Artifact 列表首项不是最新、新建 pool 会多一个 `default` 队列。规则：硬停后从已写入状态续跑，不要重放成功命令；不要把临时驱动的假设做成产品重试框架。
 
 ## O. NOW-06 预研究接线（2026-09-02）
@@ -141,11 +142,8 @@
 
 ## 2026-09-10 — Bogda runner 接机
 
-- Windows 内置 OpenSSH 与独立 MSI 的服务注册可能在重启后切换：本次服务变为 System32 7.7/Manual，恢复 Program Files 10/Automatic 后独立 SSH 登录通过。排障先核对实际 ImagePath，不先调大服务超时。
-- WSL 与 systemd 共同读取 fstab 时，NAS 项使用 noauto + x-systemd.automount，由 systemd 触发挂载；实际 WSL 重启恢复必须验证。登录触发任务不等于无需 Windows 登录的开机服务。
 - 慢下载可从原 uv.lock 导出带哈希 requirements，经可达镜像安装；验证 require-hashes、锁文件不变和离线启动，避免通过升级依赖解决网络问题。
 - checkpoint 测试应实例化真实 Prefect Artifact：mock store 没有发现下划线 key 被拒绝，真机验证才暴露。core 与 console 查询 key 必须一致。
-- 同一 NAS 目录可读写不等于跨主机 SQLite WAL 可用，也不等于 worker store 或日志发布已接线；分别记录验收结果。
 - PowerShell 向远端 shell 直接管道传多行文本可能留下 CR 文件名；本次后续改用 UTF-8/LF 的 base64 脚本传输。误生成文件不擅自删除。
 
 ## 2026-09-11 — Bogda 落地（付费接线 / 开机链）
@@ -171,7 +169,6 @@
 - **含每次唯一路径的系统提示 = 缓存结构性失效**：dsh 会话 system prompt 里带 `.../artifacts/{run_id}/attempt-0001`，在 4181 字符中第 172 字符即分叉 → 同一 harness 的 17 次调用 cache 命中全 0。规则：想让 agent 编排吃上 provider 侧前缀缓存，提示词必须把变量部分后置或剥离（前缀精确匹配才命中）；排查缓存失效先 diff 提示前缀，别先怀疑计量桥。
 - **`usage.json` 全零不一定是采集 bug**：dsh 桥与 provider 返回的 `cacheReadTokens: 0` 一致——先是"桥漏了"的假设，实际是结构性分叉。规则：怀疑计量前先看 provider 侧原始响应字段是否也为 0。
 - **自定义检查点要按 (kind, commandVersion) 集合逐条决定**：只置一个"已批准"标志会让第二个检查点悬空、run 以 Crashed 收尾；改成集合循环后 Completed。规则：多检查点流程的自动化脚本必须枚举全部挂起项并打印各自决定，而不是给一个全局 approve。
-- **控制面"来源新鲜度"必须由后端按真实观测点回填**：真实 profile 返回 `UNAVAILABLE/None` 会让界面常显琥珀色"不可用/无观测时间"，看起来像故障。规则：读到了哪个观测点就填哪个的 `observedAt/lastSuccessfulAt`，别让 UI 用缺省值暗示故障。
 - **部署脚本对"新增文件"要容错**：`cp file file.bak` 在首次部署新文件时 `cannot stat`。规则：`[ -f "$f" ] && cp ...` 再写，备份只在文件已存在时做。
 - **跨 ssh→cmd→wsl 的引号地狱用"文件化脚本"破**：嵌套引号里 `$PATH` 被本地展开、`$(basename ...)` 语法错、`>` 重定向错。规则：本地写 `.sh` → scp → 远端 `bash /path/script.sh`，一次传一层。
 - **非 raw 字符串里的 `\u`/`\url` 会炸 Python**：`\url{...}` 在普通字符串里被当 unicode 转义 → `truncated \uXXXX escape`。规则：含 LaTeX 反斜杠的文本用编辑工具写文件，或用 raw 字符串。
@@ -183,3 +180,15 @@
 - **既有测试可能一直挂着没人发现**：`app-shell.test.tsx` 渲染 AppShell 时没包 `QueryClientProvider`，而 AppShell 一直在用 `useQuery`，所以这两条测试长期失败；全套跑下来才看得出（125 测试里 2 个红）。规则：动一个组件前先跑全套，把"本来就红"的和"自己弄红"的分清楚；修它只需改用仓库既有的 `renderWithClient` 助手。
 - **改了 API 就要重生成契约，否则构建门会拦**：committed `openapi.json` 缺了昨晚落地的 5 个 `/api/v1/store/*` 端点（当时没跑 `npm run generate:contracts` 就提交），`npm run build` 的 `check:contracts` 直接失败。规则：加/改路由后立刻 `npm run generate:contracts`；`build` 还需 `PYTHONPATH` 指向 `bogda/src`，否则 `check:contracts` 报 `No module named 'bogda'`。
 - **全量重装控制台前先比对哈希**：`deploy_console.sh` 会 `rm -rf $APP/src` 再覆盖，若线上有本地没有的热修就会被静默回退。规则：部署前 `md5sum` 比对关键文件（本次 5 个文件全一致才敢装）。
+
+## 2026-09-12 — Hermes 视频识别插件与组会 PPT（mission 061）
+
+- **渲染器的间距字段是长度、不是倍数**：doc2ppt 的 `line_spacing`/`paragraph_spacing` 按 metrics 单位（pt）解析，写 `1.3` 会被当成 1.3pt。规则：照渲染层怎么消费字段来写值——先读那段代码，再填数。
+- **`text_bounds` 是内缩后的文本区，单位随 metrics，而容器几何走画布单位（in）**：两者混用直接报 "Text bounds exceed container"。规则：文本区按 `容器(画布单位)×72 ± 内缩` 换算并留余量；表格别带 `text_metrics`（字号从 `content.font_size` 或 `type_scale` 取）。
+- **source-closed 内容质检只读每个对象的 `content`**：描边宽度、表格字号、页码、素材路径都会被判成"无出处主张"（一次 28 条）。规则：把非事实性数字挪出 content——字号进 style profile、页脚改文字、描边宽度不写、素材路径避开会被当实体的词。
+- **批量重命名编号文件绝不能信默认排序**：`幻灯片10.PNG` 字典序排在 `幻灯片2` 前，14 页被打乱，是视觉复核说"第 2 页是对比表"与设计不符才暴露。规则：用显式数字序映射，并用独立信号（字节大小 vs 内容复杂度）交叉验证。
+- **同一时刻只跑一个 hermes 进程**：清早端到端 311s 三连重试报"连不上模型提供方"，排除 DNS/端点/工具集后确认为并发进程争用；停掉并发进程后原样命令一次成功，零代码改动。规则：演示前预热一次并串行执行，别把并发争用误诊成配置问题。
+- **同一条内容落在多个时间窗里重复展开会被读成 bug**：报告按 30s 分桶而 ASR 块 60s，同一句在相邻桶逐字重复。规则：跨窗条目只展开一次，其余标「（续）」，并在表尾说明它表示跨窗而非新增。
+- **架构图要按"图"再读一遍，版面质检兜不住语义**：重叠/溢出/裁切全绿，但第二条箭头指进了转写框、画面轨那条没有入边——是重读自己的坐标才发现的。规则：图类交付物单独做一次"按节点与箭头还原数据流"的检查。
+- **模型的"不能看图"分两层，别混**：模型侧 DeepSeek 已出视觉模型（`deepseek-v4-flash-vision-exp`），客户端侧 Claude Code 仍拒绝把图发给它（`[attachment omitted]`）。规则：先分清是模型能力还是客户端拦截，再选路线。
+- **盲会话里的视觉质检必须写明是谁在看**：无视觉时走外部 VLM + 机械测算（真实字体外接尺寸），结论按"模型判读"表述并注明非人工复核。规则：禁止把模型判读写成人眼复核。
